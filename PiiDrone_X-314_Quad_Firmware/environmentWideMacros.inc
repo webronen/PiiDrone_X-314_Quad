@@ -12,7 +12,7 @@
 .macro CLK_MAIN_setup
 
 	; CLKCTRL - Clock Controller
-	; Source: "file:///C:/Users/Webronen/Documents/AVR/AVRxt_ATtiny3224.pdf#page=92"
+	; Source: "https://github.com/webronen/Shared/blob/fd7909dd559d7c5b82a921b5bef6246ac03cfd53/pdf/AVRxt_ATtiny3224.pdf#page=92"
 	
 	; CLK_MAIN = 32.768 kHz internal ultra low-power oscillator
 	protectedIOREGwrite
@@ -34,7 +34,7 @@
 .macro TCA_MODE_setup
 
 	; TCA - 16-bit Timer/Counter Type A
-	; Source: "file:///C:/Users/Webronen/Documents/AVR/AVRxt_ATtiny3224.pdf#page=228"
+	; Source: "https://github.com/webronen/Shared/blob/fd7909dd559d7c5b82a921b5bef6246ac03cfd53/pdf/AVRxt_ATtiny3224.pdf#page=228"
 	
 	; Enable TCA
 	ldi r16, TCA_SPLIT_ENABLE_bm
