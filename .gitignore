@@ -1,0 +1,7 @@
+# By default, devy all.
+*
+
+# But allow these.
+!/PiiDrone_X-314_Quad_Firmware/*.asm
+!/PiiDrone_X-314_Quad_Firmware/*.inc
+!.gitignore
