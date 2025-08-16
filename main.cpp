@@ -169,7 +169,7 @@ static inline void quaternionMultiply(DataQuaternion &r, const DataQuaternion &q
 
 static inline void quaternionNormalize(DataQuaternion &q)
 {
-  const float norm_sq = q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w;
+  const float norm_sq =  q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w;
   const float inv_norm = 1.0f / __builtin_sqrtf(norm_sq + __FLT_EPSILON__);
   q.x *= inv_norm;
   q.y *= inv_norm;
