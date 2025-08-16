@@ -43,7 +43,7 @@ void loop(void)
 {
   NRF_TWI0->TASKS_STARTRX = 1;
   NRF_TIMER0->TASKS_CAPTURE[0] = true;
-  uint32_t loopTime = NRF_TIMER0->CC[0];
+  const uint32_t loopTime = NRF_TIMER0->CC[0];
 
   static uint32_t lastMotorUpdateTime = loopTime;
   static uint32_t lastPIDUpdateTime = loopTime;
@@ -169,11 +169,12 @@ static inline void quaternionMultiply(DataQuaternion &r, const DataQuaternion &q
 
 static inline void quaternionNormalize(DataQuaternion &q)
 {
-  const float inv_n = 1.0f / __builtin_fmaf(q.x, q.x, __builtin_fmaf(q.y, q.y, __builtin_fmaf(q.z, q.z, q.w * q.w)));
-  q.x *= inv_n;
-  q.y *= inv_n;
-  q.z *= inv_n;
-  q.w *= inv_n;
+  const float norm_sq = q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w;
+  const float inv_norm = 1.0f / __builtin_sqrtf(norm_sq + __FLT_EPSILON__);
+  q.x *= inv_norm;
+  q.y *= inv_norm;
+  q.z *= inv_norm;
+  q.w *= inv_norm;
 }
 
 static inline void setControlInputs(float desiredYaw, float desiredPitch, float desiredRoll, float desiredThrust)
