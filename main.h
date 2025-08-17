@@ -3,6 +3,8 @@
 #ifndef MAIN_H
 #define MAIN_H
 
+#include <Nicla_System.h>
+
 #include <sensors/Sensor.h>
 #include <sensors/SensorQuaternion.h>
 #include <sensors/SensorXYZ.h>
