@@ -17,20 +17,25 @@ void setup(void)
 {
   // Memory barrier before hardware init
   __DMB();
-
   // Hardware init
   initialize();
 
-  // Sensor initialization (ordered by priority)
+  // Sensor initialization
   sensortec.begin();
-  quaternion.begin(QUATERNION_HZ, QUATERNION_LATENCY); // Highest priority
+
+  // Enable required sensors
   accelerometer.begin(ACCELEROMETER_HZ, ACCELEROMETER_LATENCY);
   accelerometer.setRange(ACCELEROMETER_RANGE);
   gyroscope.begin(GYROSCOPE_HZ, GYROSCOPE_LATENCY);
   gyroscope.setRange(GYROSCOPE_RANGE);
+  
+  // TODO: Magnetometer calibration, before using in quaternion/rotation vector
+  // magnetometer.begin(MAGNETOMETER_HZ, MAGNETOMETER_LATENCY);
+  magnetometer.begin(0, 0); // Disable magnetometer
+  
+  // Initialize 6 DoF quaternion (Acc + Gyro). 9 DoF (Acc + Gyro + Mag) in future, when magnetometer calibrated
+  quaternion.begin(QUATERNION_HZ, QUATERNION_LATENCY);
 
-  // Lower priority sensors
-  magnetometer.begin(MAGNETOMETER_HZ, MAGNETOMETER_LATENCY);
   pressure.begin(PRESSURE_HZ, PRESSURE_LATENCY);
   humidity.begin(HUMIDITY_HZ, HUMIDITY_LATENCY);
   temperature.begin(TEMPERATURE_HZ, TEMPERATURE_LATENCY);
@@ -110,6 +115,9 @@ static inline void initialize(void)
   NRF_CLOCK->TASKS_HFCLKSTART = 1;
   while (NRF_CLOCK->EVENTS_HFCLKSTARTED == 0)
     __WFE();
+
+  nicla::begin();
+  nicla::enableCharging(300);
 
   NRF_TIMER0->BITMODE = TIMER_BITMODE_BITMODE_32Bit;
   NRF_TIMER0->PRESCALER = 4;
