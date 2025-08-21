@@ -1,22 +1,19 @@
 #include "main.h"
 
 FCU flightControlUnit = {0, 0, 0, 0, 1013.25f, 0.0f, 50.0f, 25.0f, -30};
-ESC motorController = {0};
+ESC motorController = {0x8000, 0x8000, 0x8000, 0x8000};
 DataQuaternion targetQuaternion = {0.0f, 0.0f, 0.0f, 1.0f};
 
-PID rollPID = INIT_PID(rollPID, ROLL_SETPOINT, KP_ROLL, KI_ROLL, KD_ROLL, WP_ROLL, WI_ROLL, WD_ROLL);
-PID pitchPID = INIT_PID(pitchPID, PITCH_SETPOINT, KP_PITCH, KI_PITCH, KD_PITCH, WP_PITCH, WI_PITCH, WD_PITCH);
-PID yawPID = INIT_PID(yawPID, YAW_SETPOINT, KP_YAW, KI_YAW, KD_YAW, WP_YAW, WI_YAW, WD_YAW);
-PID thrustPID = INIT_PID(thrustPID, THRUST_SETPOINT, KP_THRUST, KI_THRUST, KD_THRUST, WP_THRUST, WI_THRUST, WD_THRUST);
-PID altitudePID = INIT_PID(altitudePID, ALTITUDE_SETPOINT, KP_ALTITUDE, KI_ALTITUDE, KD_ALTITUDE, WP_ALTITUDE, WI_ALTITUDE, WD_ALTITUDE);
+// Initialize PID controllers
+PID rollPID = INIT_PID(ROLL_SETPOINT, KP_ROLL, KI_ROLL, KD_ROLL);
+PID pitchPID = INIT_PID(PITCH_SETPOINT, KP_PITCH, KI_PITCH, KD_PITCH);
+PID yawPID = INIT_PID(YAW_SETPOINT, KP_YAW, KI_YAW, KD_YAW);
 
 volatile DataPacket rx_packet;
 DataPacket tx_packet;
 
 void setup(void)
 {
-  // Memory barrier before hardware init
-  __DMB();
   // Hardware init
   initialize();
 
@@ -28,20 +25,17 @@ void setup(void)
   accelerometer.setRange(ACCELEROMETER_RANGE);
   gyroscope.begin(GYROSCOPE_HZ, GYROSCOPE_LATENCY);
   gyroscope.setRange(GYROSCOPE_RANGE);
-  
+
   // TODO: Magnetometer calibration, before using in quaternion/rotation vector
   // magnetometer.begin(MAGNETOMETER_HZ, MAGNETOMETER_LATENCY);
   magnetometer.begin(0, 0); // Disable magnetometer
-  
+
   // Initialize 6 DoF quaternion (Acc + Gyro). 9 DoF (Acc + Gyro + Mag) in future, when magnetometer calibrated
   quaternion.begin(QUATERNION_HZ, QUATERNION_LATENCY);
 
   pressure.begin(PRESSURE_HZ, PRESSURE_LATENCY);
   humidity.begin(HUMIDITY_HZ, HUMIDITY_LATENCY);
   temperature.begin(TEMPERATURE_HZ, TEMPERATURE_LATENCY);
-
-  // Ensure all operations complete
-  __DSB();
 }
 
 void loop(void)
@@ -53,60 +47,30 @@ void loop(void)
   static uint32_t lastMotorUpdateTime = loopTime;
   static uint32_t lastPIDUpdateTime = loopTime;
   static uint32_t lastSensorUpdateTime = loopTime;
-  static uint32_t lastDataSendTime = loopTime;
+  // static uint32_t lastDataSendTime = loopTime;
 
-  if (NRF_RADIO->EVENTS_CRCOK)
-  {
-    NRF_RADIO->EVENTS_CRCOK = 0;
-  }
+  // if (NRF_RADIO->EVENTS_CRCOK)
+  // {
+  //   NRF_RADIO->EVENTS_CRCOK = 0;
+  // }
 
-  if (loopTime - lastSensorUpdateTime >= HZ_TO_US(401))
+  if (loopTime >= lastSensorUpdateTime)
   {
-    lastSensorUpdateTime = loopTime;
+    lastSensorUpdateTime += HZ_TO_US(401);
     sensortec.update();
   }
 
-  if (loopTime - lastPIDUpdateTime >= HZ_TO_US(211))
+  if (loopTime >= lastPIDUpdateTime)
   {
-    lastPIDUpdateTime = loopTime;
+    lastPIDUpdateTime += HZ_TO_US(211);
+    setControlInputs(0, 0, 0, 80);
     updateFlightControl();
   }
 
-  if (loopTime - lastMotorUpdateTime >= HZ_TO_US(101))
+  if (loopTime >= lastMotorUpdateTime)
   {
-    lastMotorUpdateTime = loopTime;
+    lastMotorUpdateTime += HZ_TO_US(101);
     updateESC();
-  }
-
-  if (loopTime - lastDataSendTime >= HZ_TO_US(100))
-  {
-    lastDataSendTime = loopTime;
-
-    tx_packet.node = 0x01;
-    tx_packet.zone = 0x01;
-    tx_packet.type = TYPE_QUATERNION;
-    memcpy(tx_packet.data, &quaternion._data, 4 * sizeof(float));
-    sendRadioData();
-
-    tx_packet.type = TYPE_PRESSURE;
-    memset(tx_packet.data, 0, sizeof(tx_packet.data));
-    memcpy(tx_packet.data, &flightControlUnit.pressure, sizeof(float));
-    sendRadioData();
-
-    tx_packet.type = TYPE_TEMPERATURE;
-    memset(tx_packet.data, 0, sizeof(tx_packet.data));
-    memcpy(tx_packet.data, &flightControlUnit.temperature, sizeof(float));
-    sendRadioData();
-
-    tx_packet.type = TYPE_ALTITUDE;
-    memset(tx_packet.data, 0, sizeof(tx_packet.data));
-    memcpy(tx_packet.data, &flightControlUnit.altitude, sizeof(float));
-    sendRadioData();
-
-    tx_packet.type = TYPE_HUMIDITY;
-    memset(tx_packet.data, 0, sizeof(tx_packet.data));
-    memcpy(tx_packet.data, &flightControlUnit.humidity, sizeof(float));
-    sendRadioData();
   }
 }
 
@@ -116,14 +80,16 @@ static inline void initialize(void)
   while (NRF_CLOCK->EVENTS_HFCLKSTARTED == 0)
     __WFE();
 
-  nicla::begin();
-  nicla::enableCharging(300);
-
   NRF_TIMER0->BITMODE = TIMER_BITMODE_BITMODE_32Bit;
   NRF_TIMER0->PRESCALER = 4;
   NRF_TIMER0->TASKS_START = 1;
 
-  NRF_PWM0->COUNTERTOP = PID_OUTPUT_MAX;
+  NRF_P0->PIN_CNF[MOTOR1_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) | (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
+  NRF_P0->PIN_CNF[MOTOR2_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) | (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
+  NRF_P0->PIN_CNF[MOTOR3_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) | (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
+  NRF_P0->PIN_CNF[MOTOR4_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) | (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
+
+  NRF_PWM0->COUNTERTOP = 800;
   NRF_PWM0->PRESCALER = PWM_PRESCALER_PRESCALER_DIV_1;
   NRF_PWM0->DECODER = PWM_DECODER_LOAD_Individual;
   NRF_PWM0->SEQ[0].PTR = (uint32_t)&motorController.motor1;
@@ -152,99 +118,123 @@ static inline void initialize(void)
   NRF_RADIO->DATAWHITEIV = 0x55;
   NRF_RADIO->TASKS_RXEN = 1;
 
-  NRF_P0->PIN_CNF[MOTOR1_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) | (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
-  NRF_P0->PIN_CNF[MOTOR2_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) | (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
-  NRF_P0->PIN_CNF[MOTOR3_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) | (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
-  NRF_P0->PIN_CNF[MOTOR4_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) | (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
-  NRF_P0->OUTCLR = (1 << MOTOR1_PIN) | (1 << MOTOR2_PIN) | (1 << MOTOR3_PIN) | (1 << MOTOR4_PIN);
-
   NRF_TWI0->PSELSCL = 16;
   NRF_TWI0->PSELSDA = 15;
   NRF_TWI0->FREQUENCY = TWI_FREQUENCY_FREQUENCY_K400;
   NRF_TWI0->ADDRESS = 0x6A;
   NRF_TWI0->ENABLE = TWI_ENABLE_ENABLE_Enabled;
+
+  nicla::begin();
+  nicla::enable3V3LDO();
+  nicla::enableCharging(300);
+
+  Serial.begin(SERIAL_BAUDRATE);
 }
 
 static inline void quaternionMultiply(DataQuaternion &r, const DataQuaternion &q1, const DataQuaternion &q2)
 {
-  r.w = __builtin_fmaf(-q1.x, q2.x, __builtin_fmaf(-q1.y, q2.y, __builtin_fmaf(-q1.z, q2.z, q1.w * q2.w)));
-  r.x = __builtin_fmaf(q1.w, q2.x, __builtin_fmaf(q1.x, q2.w, __builtin_fmaf(q1.y, q2.z, -q1.z * q2.y)));
-  r.y = __builtin_fmaf(q1.w, q2.y, __builtin_fmaf(-q1.x, q2.z, __builtin_fmaf(q1.y, q2.w, q1.z * q2.x)));
-  r.z = __builtin_fmaf(q1.w, q2.z, __builtin_fmaf(q1.x, q2.y, __builtin_fmaf(-q1.y, q2.x, q1.z * q2.w)));
+  r.w = q1.w * q2.w - q1.x * q2.x - q1.y * q2.y - q1.z * q2.z;
+  r.x = q1.w * q2.x + q1.x * q2.w + q1.y * q2.z - q1.z * q2.y;
+  r.y = q1.w * q2.y - q1.x * q2.z + q1.y * q2.w + q1.z * q2.x;
+  r.z = q1.w * q2.z + q1.x * q2.y - q1.y * q2.x + q1.z * q2.w;
 
   quaternionNormalize(r);
 }
 
 static inline void quaternionNormalize(DataQuaternion &q)
 {
-  const float norm_sq = q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w;
-  const float inv_norm = 1.0f / __builtin_sqrtf(norm_sq + __FLT_EPSILON__);
-  q.x *= inv_norm;
-  q.y *= inv_norm;
-  q.z *= inv_norm;
-  q.w *= inv_norm;
+  const float mag_sq = q.w * q.w + q.x * q.x + q.y * q.y + q.z * q.z;
+  const float inv_mag = 1.0f / __builtin_sqrtf(mag_sq + __FLT_EPSILON__);
+
+  q.w *= inv_mag;
+  q.x *= inv_mag;
+  q.y *= inv_mag;
+  q.z *= inv_mag;
 }
 
 static inline void setControlInputs(float desiredYaw, float desiredPitch, float desiredRoll, float desiredThrust)
 {
-  yawPID.setpoint = desiredYaw;
-  pitchPID.setpoint = desiredPitch;
+  flightControlUnit.thrust = desiredThrust;
   rollPID.setpoint = desiredRoll;
-  thrustPID.setpoint = desiredThrust;
+  pitchPID.setpoint = desiredPitch;
+  yawPID.setpoint = desiredYaw;
 }
 
 static inline void updateESC()
 {
-  const float t = thrustPID.output, r = rollPID.output, p = pitchPID.output, y = yawPID.output;
-  motorController.motor1 = (uint16_t)__builtin_fmaxf(0, __builtin_fminf(PID_OUTPUT_MAX, t - r - p + y));
-  motorController.motor2 = (uint16_t)__builtin_fmaxf(0, __builtin_fminf(PID_OUTPUT_MAX, t + r - p - y));
-  motorController.motor3 = (uint16_t)__builtin_fmaxf(0, __builtin_fminf(PID_OUTPUT_MAX, t + r + p + y));
-  motorController.motor4 = (uint16_t)__builtin_fmaxf(0, __builtin_fminf(PID_OUTPUT_MAX, t - r + p - y));
+  const float thrust = flightControlUnit.thrust;
+  const float roll = rollPID.output;
+  const float pitch = pitchPID.output;
+  const float yaw = yawPID.output;
 
-  __DMB();
-  NRF_PWM0->TASKS_SEQSTART[0] = 1;
-  __DSB();
+  // Calculate motor outputs with safety clamping
+  const uint16_t m1 = (uint16_t)constrain(thrust + roll - pitch - yaw, 0, 800);
+  const uint16_t m2 = (uint16_t)constrain(thrust - roll - pitch + yaw, 0, 800);
+  const uint16_t m3 = (uint16_t)constrain(thrust + roll + pitch + yaw, 0, 800);
+  const uint16_t m4 = (uint16_t)constrain(thrust - roll + pitch - yaw, 0, 800);
+
+  Serial.print("M1:");
+  Serial.print(m1);
+  Serial.print(",M2:");
+  Serial.print(m2);
+  Serial.print(",M3:");
+  Serial.print(m3);
+  Serial.print(",M4:");
+  Serial.println(m4);
+
+  //   // Set motor values with PWM control bit
+  //   motorController.motor1 = 0x8000 | m1;  // Front Left, CW
+  //   motorController.motor2 = 0x8000 | m2;  // Front Right, CCW
+  //   motorController.motor3 = 0x8000 | m3;  // Rear Left, CW
+  //   motorController.motor4 = 0x8000 | m4;  // Rear Right, CCW
+
+  //   // Ensure memory operations complete before starting PWM sequence
+  //   __DMB();
+  //   NRF_PWM0->TASKS_SEQSTART[0] = 1;
+  //   __DSB();
 }
 
-static inline void updatePID(PID &pid, float cv)
+static inline void updatePID(PID &pid, float measured_value)
 {
-  const float e = pid.setpoint - cv, ae = __builtin_fabsf(e);
-  pid.error = e * (1.0f - __builtin_fminf(1.0f, ae * (1.0f / THRESHOLD_ERROR)));
+  static const float dt = 1.0f / 211.0f;
 
-  const float p = pid.wp * pid.kp * pid.error;
-  const float raw_d = cv - pid.lastMeasurement;
-  pid.derivative = __builtin_fmaf(LPF, raw_d, HPF * pid.derivative);
-  const float d = pid.wd * pid.kd * pid.derivative;
+  // Calculate error
+  const float error = pid.setpoint - measured_value;
+  const float proportional = error;
+  const float derivative = (error - pid.previous_error) / dt;
 
-  const bool no_windup = (pid.output < PID_OUTPUT_MAX) && (pid.output > PID_OUTPUT_MIN);
-  pid.integral += no_windup ? pid.error : 0.0f;
-  const float i = pid.wi * pid.ki * pid.integral;
+  // Calculate output without integral for anti-windup check
+  const float output_no_i = (pid.kp * proportional) + (pid.kd * derivative);
 
-  pid.output = __builtin_fmaf(p, 1.0f, __builtin_fmaf(i, 1.0f, d));
-  pid.lastMeasurement = cv;
+  // Anti-windup: only integrate if output wouldn't saturate
+  const bool should_integrate = (output_no_i <= 800) && (output_no_i >= -800);
+  pid.integral += error * dt * should_integrate;
+
+  // Calculate final output
+  pid.output = output_no_i + (pid.ki * pid.integral);
+  pid.output = constrain(pid.output, -800, 800);
+
+  // Store for next iteration
+  pid.previous_error = error;
 }
 
 static inline void updateFlightControl()
 {
-  flightControlUnit.pressure = __builtin_fmaf(LPF, pressure._value, HPF * flightControlUnit.pressure);
-  flightControlUnit.temperature = __builtin_fmaf(LPF, temperature._value - TEMPERATURE_CORRECTION_FACTOR, HPF * flightControlUnit.temperature);
-  flightControlUnit.humidity = __builtin_fmaf(LPF, humidity._value, HPF * flightControlUnit.humidity);
+  flightControlUnit.pressure = LPF * pressure._value + HPF * flightControlUnit.pressure;
+  flightControlUnit.temperature = LPF * (temperature._value - TEMPERATURE_CORRECTION_FACTOR) + HPF * flightControlUnit.temperature;
+  flightControlUnit.humidity = LPF * humidity._value + HPF * flightControlUnit.humidity;
 
-  const float pr = flightControlUnit.pressure * INV_SEA_LEVEL_PRESSURE;
-  flightControlUnit.altitude = __builtin_fmaf(LPF, BARO_ALTITUDE_CONSTANT * (1.0f - __builtin_powf(pr, BARO_PRESSURE_EXPONENT)), HPF * flightControlUnit.altitude);
+  const float pressure_ratio = flightControlUnit.pressure * INV_SEA_LEVEL_PRESSURE;
+  const float raw_altitude = BARO_ALTITUDE_CONSTANT * (1.0f - powf(pressure_ratio, BARO_PRESSURE_EXPONENT));
+  flightControlUnit.altitude = LPF * raw_altitude + HPF * flightControlUnit.altitude;
 
-  DataQuaternion ci = {-quaternion._data.x, -quaternion._data.y, -quaternion._data.z, quaternion._data.w};
-  DataQuaternion ce;
-  quaternionMultiply(ce, ci, targetQuaternion);
+  DataQuaternion conjugate = {-quaternion._data.x, -quaternion._data.y, -quaternion._data.z, quaternion._data.w};
+  DataQuaternion error;
+  quaternionMultiply(error, conjugate, targetQuaternion);
 
-  updatePID(rollPID, ce.x);
-  updatePID(pitchPID, ce.y);
-  updatePID(yawPID, ce.z);
-  updatePID(altitudePID, flightControlUnit.altitude);
-
-  thrustPID.setpoint = (__builtin_fabsf(thrustPID.setpoint) > THRESHOLD_THRUST) ? thrustPID.setpoint : altitudePID.output;
-  updatePID(thrustPID, flightControlUnit.thrust);
-  flightControlUnit.thrust = thrustPID.output;
+  updatePID(rollPID, error.x);
+  updatePID(pitchPID, error.y);
+  updatePID(yawPID, error.z);
 }
 
 static inline void sendRadioData()

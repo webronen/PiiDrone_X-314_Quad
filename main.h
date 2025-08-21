@@ -4,6 +4,7 @@
 #define MAIN_H
 
 #include <Nicla_System.h>
+#include <Serial.h>
 
 #include <sensors/Sensor.h>
 #include <sensors/SensorQuaternion.h>
@@ -18,50 +19,31 @@
 #define INV_SEA_LEVEL_PRESSURE (1.0f / 1013.25f)
 #define TEMPERATURE_CORRECTION_FACTOR 6.95f
 #define EPSILON 1e-6f
+#define PWM_BASE_CLOCK 16000000UL                        // nRF52 PWM default (16MHz)
+#define PWM_FREQUENCY 20000UL                            // 20kHz target frequency
+#define PWM_COUNTER_TOP (PWM_BASE_CLOCK / PWM_FREQUENCY) // 19.975kHz PWM (-0.125% error)
 
 // Constants for altitude calculation
 #define BARO_ALTITUDE_CONSTANT 44307.694f
 #define BARO_PRESSURE_EXPONENT 0.190284f
 
-// PID constants for roll, pitch, yaw, thrust, and altitude
-#define KP_ROLL 1.0f
-#define KI_ROLL 0.03f
-#define KD_ROLL 0.05f
-#define WP_ROLL 1.0f
-#define WI_ROLL 1.0f
-#define WD_ROLL 1.0f
+// Quaternion components range from -1.0 to 1.0
+// Much smaller gains needed compared to degree/radian based systems
+#define KP_ROLL 0.1f
+#define KI_ROLL 0.0f
+#define KD_ROLL 0.0f
 
-#define KP_PITCH 1.0f
-#define KI_PITCH 0.03f
-#define KD_PITCH 0.05f
-#define WP_PITCH 1.0f
-#define WI_PITCH 1.0f
-#define WD_PITCH 1.0f
+#define KP_PITCH 0.1f
+#define KI_PITCH 0.0f
+#define KD_PITCH 0.0f
 
-#define KP_YAW 0.6f
-#define KI_YAW 0.02f
+#define KP_YAW 0.1f
+#define KI_YAW 0.0f
 #define KD_YAW 0.0f
-#define WP_YAW 1.0f
-#define WI_YAW 1.0f
-#define WD_YAW 1.0f
-
-#define KP_THRUST 0.8f
-#define KI_THRUST 0.04f
-#define KD_THRUST 0.1f
-#define WP_THRUST 1.0f
-#define WI_THRUST 1.0f
-#define WD_THRUST 1.0f
-
-#define KP_ALTITUDE 0.8f
-#define KI_ALTITUDE 0.04f
-#define KD_ALTITUDE 0.2f
-#define WP_ALTITUDE 1.0f
-#define WI_ALTITUDE 1.0f
-#define WD_ALTITUDE 1.0f
 
 // PID initialization macro
-#define INIT_PID(pid, setpoint, kp, ki, kd, wp, wi, wd) \
-  {setpoint, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, kp, ki, kd, wp, wi, wd}
+#define INIT_PID(sp, kp_val, ki_val, kd_val) \
+  {sp, kp_val, ki_val, kd_val, 0.0f, 0.0f, 0.0f}
 
 // Motor pin definitions
 #define MOTOR1_PIN 11
@@ -73,15 +55,11 @@
 #define ROLL_SETPOINT 0.0f
 #define PITCH_SETPOINT 0.0f
 #define YAW_SETPOINT 0.0f
-#define ALTITUDE_SETPOINT 0.0f
 #define THRUST_SETPOINT 0.0f
 
-// Thresholds for PID and thrust
-#define THRESHOLD_INTEGRAL 100.0f
-#define THRESHOLD_ERROR 0.1f
-#define PID_OUTPUT_MIN -0x3FFF
-#define PID_OUTPUT_MAX 0x3FFF
-#define THRESHOLD_THRUST 10.0f
+// Thresholds for PID
+#define PID_OUTPUT_MAX PWM_COUNTER_TOP
+#define PID_OUTPUT_MIN -PWM_COUNTER_TOP
 
 // Sensor configuration constants
 #define ACCELEROMETER_HZ 400
@@ -141,14 +119,10 @@ typedef struct
 typedef struct
 {
   float setpoint;
-  float error;
-  float lastError;
-  float integral;
-  float derivative;
-  float output;
   float kp, ki, kd;
-  float wp, wi, wd;
-  float lastMeasurement;
+  float integral;
+  float previous_error;
+  float output;
 } PID;
 
 // Data packet structure
@@ -180,7 +154,6 @@ extern PID rollPID;
 extern PID pitchPID;
 extern PID yawPID;
 extern PID thrustPID;
-extern PID altitudePID;
 
 // Function declarations
 static inline void initialize(void);
