@@ -38,7 +38,7 @@ void loop(void)
   if (tud_cdc_n_available(0) >= sizeof(DataPacket))
   {
     tud_cdc_n_read(0, (uint8_t *)&tx_packet.node, sizeof(DataPacket));
-    sendRadioData();
+    sendDataPacket();
   }
 }
 
