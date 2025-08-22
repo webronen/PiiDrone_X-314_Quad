@@ -1,7 +1,7 @@
 #include "main.h"
 
-FCU flightControlUnit = {
-    .thrust = 80.0f,      // 10% thrust, range 0 - 800
+FCU fcu = {
+    .thrust = 0.0f,       // 10% thrust, range 0 - 800
     .roll = 0.0f,         // 0° roll (level)
     .pitch = 0.0f,        // 0° pitch (level)
     .yaw = 0.0f,          // 0° yaw (north)
@@ -11,7 +11,7 @@ FCU flightControlUnit = {
     .temperature = 25.0f  // 25°C (room temperature)
 };
 
-ESC motorController = {
+ESC esc = {
     .motor1 = 0x8000,
     .motor2 = 0x8000,
     .motor3 = 0x8000,
@@ -48,18 +48,18 @@ void setup(void)
 
 void loop(void)
 {
-  NRF_TIMER0->TASKS_CAPTURE[0] = true;
+  NRF_TIMER0->TASKS_CAPTURE[0] = 1;
   const uint32_t loopTime = NRF_TIMER0->CC[0];
 
   static uint32_t lastMotorUpdateTime = loopTime;
   static uint32_t lastPidUpdateTime = loopTime;
   static uint32_t lastSensorUpdateTime = loopTime;
-  static uint32_t lastWatchdogReset = loopTime;
 
   if (NRF_RADIO->EVENTS_CRCOK)
   {
     NRF_RADIO->EVENTS_CRCOK = 0;
-    // TODO:
+
+    parseDataPacket();
   }
 
   if (loopTime >= lastSensorUpdateTime)
@@ -90,7 +90,7 @@ static inline void radioInit(void)
     __WFE();
 
   NRF_RADIO->SHORTS = (RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_START_Msk);
-  NRF_RADIO->PACKETPTR = (uint32_t)&rx_packet.node;
+  NRF_RADIO->PACKETPTR = (uint32_t)&rx_packet;
   NRF_RADIO->TXPOWER = RADIO_TXPOWER_TXPOWER_Pos4dBm;
 
   NRF_RADIO->PCNF1 = (sizeof(DataPacket) << RADIO_PCNF1_MAXLEN_Pos) |          // Maximum length of packet payload
@@ -127,14 +127,14 @@ static inline void sendDataPacket(void)
   while (NRF_RADIO->STATE)
     __WFE();
 
-  NRF_RADIO->PACKETPTR = (uint32_t)&tx_packet.node;
+  NRF_RADIO->PACKETPTR = (uint32_t)&tx_packet;
   NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk;
   NRF_RADIO->TASKS_TXEN = 1;
 
   while (NRF_RADIO->STATE)
     __WFE();
 
-  NRF_RADIO->PACKETPTR = (uint32_t)&rx_packet.node;
+  NRF_RADIO->PACKETPTR = (uint32_t)&rx_packet;
   NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_START_Msk;
   NRF_RADIO->TASKS_RXEN = 1;
 }
@@ -149,7 +149,7 @@ static inline void pwmInit(void)
   NRF_PWM0->COUNTERTOP = PWM_COUNTER_TOP;
   NRF_PWM0->PRESCALER = PWM_PRESCALER_PRESCALER_DIV_1;
   NRF_PWM0->DECODER = PWM_DECODER_LOAD_Individual;
-  NRF_PWM0->SEQ[0].PTR = (uint32_t)&motorController.motor1;
+  NRF_PWM0->SEQ[0].PTR = (uint32_t)&esc.motor1;
   NRF_PWM0->SEQ[0].CNT = (sizeof(ESC) / sizeof(uint16_t));
   NRF_PWM0->SEQ[0].REFRESH = PWM_SEQ_REFRESH_CNT_Continuous;
   NRF_PWM0->PSEL.OUT[0] = MOTOR1_PIN;
@@ -157,14 +157,14 @@ static inline void pwmInit(void)
   NRF_PWM0->PSEL.OUT[2] = MOTOR3_PIN;
   NRF_PWM0->PSEL.OUT[3] = MOTOR4_PIN;
   NRF_PWM0->ENABLE = PWM_ENABLE_ENABLE_Enabled;
-  NRF_PWM0->TASKS_SEQSTART[0] = true;
+  NRF_PWM0->TASKS_SEQSTART[0] = 1;
 }
 
 static inline void timerInit(void)
 {
   NRF_TIMER0->BITMODE = TIMER_BITMODE_BITMODE_32Bit;
   NRF_TIMER0->PRESCALER = 4;
-  NRF_TIMER0->TASKS_START = true;
+  NRF_TIMER0->TASKS_START = 1;
 }
 
 static inline void niclaInit(void)
@@ -205,7 +205,7 @@ static inline void quaternionMultiply(DataQuaternion &r, const DataQuaternion &q
 
 static inline void setControlInputs(const float thrust, const float roll, const float pitch, const float yaw)
 {
-  flightControlUnit.thrust = thrust;
+  fcu.thrust = thrust;
   rollPID.setpoint = roll;
   pitchPID.setpoint = pitch;
   yawPID.setpoint = yaw;
@@ -213,7 +213,7 @@ static inline void setControlInputs(const float thrust, const float roll, const 
 
 static inline void updateESC(void)
 {
-  const float thrust = flightControlUnit.thrust;
+  const float thrust = fcu.thrust;
   const float roll = rollPID.output;
   const float pitch = pitchPID.output;
   const float yaw = yawPID.output;
@@ -228,7 +228,7 @@ static inline void updateESC(void)
   // motorController.motor3 = 0x8000 | m3; // Rear Left, CW
   // motorController.motor4 = 0x8000 | m4; // Rear Right, CCW
 
-  NRF_PWM0->TASKS_SEQSTART[0] = true;
+  NRF_PWM0->TASKS_SEQSTART[0] = 1;
 }
 
 static inline void updatePID(PID &pid, float measured_value)
@@ -251,13 +251,13 @@ static inline void updatePID(PID &pid, float measured_value)
 
 static inline void updateFlightControl(void)
 {
-  flightControlUnit.pressure = LPF * pressure._value + HPF * flightControlUnit.pressure;
-  flightControlUnit.temperature = LPF * (temperature._value - TEMPERATURE_CORRECTION_FACTOR) + HPF * flightControlUnit.temperature;
-  flightControlUnit.humidity = LPF * humidity._value + HPF * flightControlUnit.humidity;
+  fcu.pressure = LPF * pressure._value + HPF * fcu.pressure;
+  fcu.temperature = LPF * (temperature._value - TEMPERATURE_CORRECTION_FACTOR) + HPF * fcu.temperature;
+  fcu.humidity = LPF * humidity._value + HPF * fcu.humidity;
 
-  const float pressure_ratio = flightControlUnit.pressure * INV_SEA_LEVEL_PRESSURE;
+  const float pressure_ratio = fcu.pressure * INV_SEA_LEVEL_PRESSURE;
   const float raw_altitude = BARO_ALTITUDE_CONSTANT * (1.0f - __builtin_powf(pressure_ratio, BARO_PRESSURE_EXPONENT));
-  flightControlUnit.altitude = LPF * raw_altitude + HPF * flightControlUnit.altitude;
+  fcu.altitude = LPF * raw_altitude + HPF * fcu.altitude;
 
   const DataQuaternion conjugate = {-quaternion._data.x, -quaternion._data.y, -quaternion._data.z, quaternion._data.w};
   DataQuaternion error;
@@ -276,4 +276,113 @@ static inline void updateFlightControl(void)
   updatePID(rollPID, error.x);
   updatePID(pitchPID, error.y);
   updatePID(yawPID, error.z);
+}
+
+static inline void parseDataPacket(void)
+{
+  if (rx_packet.node == 1 && rx_packet.zone == 0)
+  {
+    switch (rx_packet.type)
+    {
+    case 0:
+    { // PID gains
+      uint8_t axis = rx_packet.data[0];
+      uint8_t gain = rx_packet.data[1];
+      float value;
+
+      // Manual copy for volatile data
+      uint8_t *value_bytes = (uint8_t *)&value;
+      value_bytes[0] = rx_packet.data[2];
+      value_bytes[1] = rx_packet.data[3];
+      value_bytes[2] = rx_packet.data[4];
+      value_bytes[3] = rx_packet.data[5];
+
+      if (axis < 3 && gain < 3)
+      {
+        switch (axis)
+        {
+        case 0: // PITCH
+          switch (gain)
+          {
+          case 0:
+            pitchPID.kp = value;
+            Serial.print("PITCH Kp = ");
+            Serial.println(value, 3);
+            break;
+          case 1:
+            pitchPID.ki = value;
+            Serial.print("PITCH Ki = ");
+            Serial.println(value, 3);
+            break;
+          case 2:
+            pitchPID.kd = value;
+            Serial.print("PITCH Kd = ");
+            Serial.println(value, 3);
+            break;
+          }
+          break;
+        case 1: // ROLL
+          switch (gain)
+          {
+          case 0:
+            rollPID.kp = value;
+            Serial.print("ROLL Kp = ");
+            Serial.println(value, 3);
+            break;
+          case 1:
+            rollPID.ki = value;
+            Serial.print("ROLL Ki = ");
+            Serial.println(value, 3);
+            break;
+          case 2:
+            rollPID.kd = value;
+            Serial.print("ROLL Kd = ");
+            Serial.println(value, 3);
+            break;
+          }
+          break;
+        case 2: // YAW
+          switch (gain)
+          {
+          case 0:
+            yawPID.kp = value;
+            Serial.print("YAW Kp = ");
+            Serial.println(value, 3);
+            break;
+          case 1:
+            yawPID.ki = value;
+            Serial.print("YAW Ki = ");
+            Serial.println(value, 3);
+            break;
+          case 2:
+            yawPID.kd = value;
+            Serial.print("YAW Kd = ");
+            Serial.println(value, 3);
+            break;
+          }
+          break;
+        }
+      }
+      break;
+    }
+
+    case 1:
+    { // Thrust
+      float thrust_value;
+
+      // Manual copy for volatile data
+      uint8_t *thrust_bytes = (uint8_t *)&thrust_value;
+      thrust_bytes[0] = rx_packet.data[0];
+      thrust_bytes[1] = rx_packet.data[1];
+      thrust_bytes[2] = rx_packet.data[2];
+      thrust_bytes[3] = rx_packet.data[3];
+
+      // Update thrust with readable print
+      fcu.thrust = constrain(thrust_value, 0.0f, 800.0f);
+      Serial.print("THRUST = ");
+      Serial.println(fcu.thrust, 0);
+      break;
+    }
+    }
+  }
 }

@@ -3,8 +3,8 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-#define NODE 1 // 0 = Remote, 1 = Drone
-#define ZONE 0 // Unused, 0 for both
+#define NODE 1
+#define ZONE 0
 
 #define DEBUG
 
@@ -19,11 +19,9 @@
 #define LPF 0.1f
 #define HPF (1.0f - LPF)
 #define ONE_SECOND_IN_US 1000000
-#define INV_ONE_SECOND_IN_US (1.0f / ONE_SECOND_IN_US)
 #define HZ_TO_US(Hz) (ONE_SECOND_IN_US / (Hz))
 #define INV_SEA_LEVEL_PRESSURE (1.0f / 1013.25f)
 #define TEMPERATURE_CORRECTION_FACTOR 6.95f
-#define EPSILON 1e-6f
 #define PWM_BASE_CLOCK 16000000UL                        // nRF52 PWM default (16MHz)
 #define PWM_FREQUENCY 20000UL                            // 20kHz target frequency
 #define PWM_COUNTER_TOP (PWM_BASE_CLOCK / PWM_FREQUENCY) // 19.975kHz PWM (-0.125% error)
@@ -34,17 +32,17 @@
 
 // Quaternion components range from -1.0 to 1.0
 // Much smaller gains needed compared to degree/radian based systems
-#define KP_PITCH 0.01f // 1.
-#define KI_PITCH 0.0f  // 3.
-#define KD_PITCH 0.0f  // 2.
+#define KP_PITCH 0.0f
+#define KI_PITCH 0.0f
+#define KD_PITCH 0.0f
 
-#define KP_ROLL 0.0f // 4.
-#define KI_ROLL 0.0f // 6.
-#define KD_ROLL 0.0f // 5.
+#define KP_ROLL 0.0f
+#define KI_ROLL 0.0f
+#define KD_ROLL 0.0f
 
-#define KP_YAW 0.0f // 7.
-#define KI_YAW 0.0f // 9.
-#define KD_YAW 0.0f // 8,
+#define KP_YAW 0.0f
+#define KI_YAW 0.0f
+#define KD_YAW 0.0f
 
 // Motor pin definitions
 #define MOTOR1_PIN 11
@@ -129,8 +127,7 @@ typedef struct
 } PID;
 
 // Data packet structure
-typedef struct
-{
+typedef struct __attribute__((packed)) {
   uint8_t node;
   uint8_t zone;
   uint8_t type;
@@ -138,7 +135,7 @@ typedef struct
 } DataPacket;
 
 // Data packet types
-#define TYPE_PID_CONFIG 0x00
+#define TYPE_PID 0x00
 
 // External variables
 extern FCU fcu;
@@ -163,5 +160,6 @@ static inline void setControlInputs(const float thrust, const float roll, const 
 static inline void updateESC(void);
 static inline void updatePID(PID &pid, float currentValue);
 static inline void updateFlightControl(void);
+static inline void parseDataPacket(void);
 
 #endif
