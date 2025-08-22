@@ -3,6 +3,9 @@
 #ifndef MAIN_H
 #define MAIN_H
 
+#define NODE 1 // 0 = Remote, 1 = Drone
+#define ZONE 0 // Unused, 0 for both
+
 #define DEBUG
 
 #include <Nicla_System.h>
@@ -32,8 +35,8 @@
 // Quaternion components range from -1.0 to 1.0
 // Much smaller gains needed compared to degree/radian based systems
 #define KP_PITCH 0.01f // 1.
-#define KI_PITCH 0.0f // 3.
-#define KD_PITCH 0.0f // 2.
+#define KI_PITCH 0.0f  // 3.
+#define KD_PITCH 0.0f  // 2.
 
 #define KP_ROLL 0.0f // 4.
 #define KI_ROLL 0.0f // 6.
@@ -135,14 +138,7 @@ typedef struct
 } DataPacket;
 
 // Data packet types
-#define TYPE_QUATERNION 0x01
-#define TYPE_PRESSURE 0x02
-#define TYPE_TEMPERATURE 0x03
-#define TYPE_ALTITUDE 0x04
-#define TYPE_PID 0x05
-#define TYPE_RSSI 0x06
-#define TYPE_HUMIDITY 0x07
-#define TYPE_MOTOR 0x08
+#define TYPE_PID_CONFIG 0x00
 
 // External variables
 extern FCU fcu;
@@ -156,7 +152,6 @@ extern PID yawPID;
 extern PID thrustPID;
 
 // Function declarations
-static inline void initialize(void);
 static inline void radioInit(void);
 static inline void sendDataPacket(void);
 static inline void pwmInit(void);
@@ -164,7 +159,6 @@ static inline void timerInit(void);
 static inline void niclaInit(void);
 static inline void imuInit(void);
 static inline void quaternionMultiply(DataQuaternion &result, const DataQuaternion &q1, const DataQuaternion &q2);
-static inline void quaternionNormalize(DataQuaternion &q);
 static inline void setControlInputs(const float thrust, const float roll, const float pitch, const float yaw);
 static inline void updateESC(void);
 static inline void updatePID(PID &pid, float currentValue);

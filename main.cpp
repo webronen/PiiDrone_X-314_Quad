@@ -177,7 +177,7 @@ static inline void niclaInit(void)
 static inline void imuInit(void)
 {
   sensortec.begin();
-  
+
   accelerometer.begin(ACCELEROMETER_HZ, ACCELEROMETER_LATENCY);
   accelerometer.setRange(ACCELEROMETER_RANGE);
   gyroscope.begin(GYROSCOPE_HZ, GYROSCOPE_LATENCY);
@@ -201,19 +201,6 @@ static inline void quaternionMultiply(DataQuaternion &r, const DataQuaternion &q
   r.x = q1.w * q2.x + q1.x * q2.w + q1.y * q2.z - q1.z * q2.y;
   r.y = q1.w * q2.y - q1.x * q2.z + q1.y * q2.w + q1.z * q2.x;
   r.z = q1.w * q2.z + q1.x * q2.y - q1.y * q2.x + q1.z * q2.w;
-
-  quaternionNormalize(r);
-}
-
-static inline void quaternionNormalize(DataQuaternion &q)
-{
-  const float norm = q.w * q.w + q.x * q.x + q.y * q.y + q.z * q.z;
-  const float inv_norm = 1.0f / __builtin_sqrtf(norm + __FLT_EPSILON__);
-
-  q.w *= inv_norm;
-  q.x *= inv_norm;
-  q.y *= inv_norm;
-  q.z *= inv_norm;
 }
 
 static inline void setControlInputs(const float thrust, const float roll, const float pitch, const float yaw)
@@ -224,7 +211,7 @@ static inline void setControlInputs(const float thrust, const float roll, const 
   yawPID.setpoint = yaw;
 }
 
-static inline void updateESC()
+static inline void updateESC(void)
 {
   const float thrust = flightControlUnit.thrust;
   const float roll = rollPID.output;
@@ -236,10 +223,10 @@ static inline void updateESC()
   const uint16_t m3 = (uint16_t)constrain(thrust + roll + pitch + yaw, 0, PID_OUTPUT_MAX);
   const uint16_t m4 = (uint16_t)constrain(thrust - roll + pitch - yaw, 0, PID_OUTPUT_MAX);
 
-  motorController.motor1 = 0x8000 | m1; // Front Left, CW
-  motorController.motor2 = 0x8000 | m2; // Front Right, CCW
-  motorController.motor3 = 0x8000 | m3; // Rear Left, CW
-  motorController.motor4 = 0x8000 | m4; // Rear Right, CCW
+  // motorController.motor1 = 0x8000 | m1; // Front Left, CW
+  // motorController.motor2 = 0x8000 | m2; // Front Right, CCW
+  // motorController.motor3 = 0x8000 | m3; // Rear Left, CW
+  // motorController.motor4 = 0x8000 | m4; // Rear Right, CCW
 
   NRF_PWM0->TASKS_SEQSTART[0] = true;
 }
@@ -262,7 +249,7 @@ static inline void updatePID(PID &pid, float measured_value)
   pid.previous_error = proportional;
 }
 
-static inline void updateFlightControl()
+static inline void updateFlightControl(void)
 {
   flightControlUnit.pressure = LPF * pressure._value + HPF * flightControlUnit.pressure;
   flightControlUnit.temperature = LPF * (temperature._value - TEMPERATURE_CORRECTION_FACTOR) + HPF * flightControlUnit.temperature;
@@ -274,7 +261,22 @@ static inline void updateFlightControl()
 
   const DataQuaternion conjugate = {-quaternion._data.x, -quaternion._data.y, -quaternion._data.z, quaternion._data.w};
   DataQuaternion error;
+
+  /*
+    In this case, the order of the quaternion multiplication does not matter,
+    because hoverQuaternion is a unit quaternion. Multiplicative identity.
+    
+    quaternionMultiply(error, hoverQuaternion, conjugate);
+    quaternionMultiply(error, conjugate, hoverQuaternion);
+
+    Both are valid.
+  */
   quaternionMultiply(error, conjugate, hoverQuaternion);
+
+  Serial.print("Q.Y:");
+  Serial.print(quaternion._data.y); // Current nose up/down tilt
+  Serial.print(",Err.Y:");
+  Serial.println(error.y); // The calculated error
 
   updatePID(rollPID, error.x);
   updatePID(pitchPID, error.y);
