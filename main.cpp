@@ -265,18 +265,13 @@ static inline void updateFlightControl(void)
   /*
     In this case, the order of the quaternion multiplication does not matter,
     because hoverQuaternion is a unit quaternion. Multiplicative identity.
-    
+
     quaternionMultiply(error, hoverQuaternion, conjugate);
     quaternionMultiply(error, conjugate, hoverQuaternion);
 
     Both are valid.
   */
   quaternionMultiply(error, conjugate, hoverQuaternion);
-
-  Serial.print("Q.Y:");
-  Serial.print(quaternion._data.y); // Current nose up/down tilt
-  Serial.print(",Err.Y:");
-  Serial.println(error.y); // The calculated error
 
   updatePID(rollPID, error.x);
   updatePID(pitchPID, error.y);
