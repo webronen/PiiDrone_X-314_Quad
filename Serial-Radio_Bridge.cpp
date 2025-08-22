@@ -14,6 +14,7 @@ volatile static DataPacket rx_packet;
 static DataPacket tx_packet;
 
 static inline void radioInit(void);
+static inline void sendDataPacket(void);
 
 void setup(void)
 {
@@ -22,29 +23,6 @@ void setup(void)
   Serial.begin(MBPS_TO_BPS(1));
   while (!Serial)
     __WFE();
-}
-
-static inline void sendRadioData()
-{
-  while (!NRF_RADIO->EVENTS_END)
-    __WFE();
-
-  NRF_RADIO->EVENTS_END = 0;
-  NRF_RADIO->TASKS_DISABLE = 1;
-
-  while (NRF_RADIO->STATE)
-    __WFE();
-  
-  NRF_RADIO->PACKETPTR = (uint32_t)&tx_packet.node;
-  NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk;
-  NRF_RADIO->TASKS_TXEN = 1;
-  
-  while (NRF_RADIO->STATE)
-    __WFE();
-
-  NRF_RADIO->PACKETPTR = (uint32_t)&rx_packet.node;
-  NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_START_Msk;
-  NRF_RADIO->TASKS_RXEN = 1;
 }
 
 void loop(void)
@@ -95,5 +73,28 @@ static inline void radioInit(void)
   NRF_RADIO->MODECNF0 = (RADIO_MODECNF0_DTX_B0 << RADIO_MODECNF0_DTX_Pos) |  // Transmit 0 when idle
                         (RADIO_MODECNF0_RU_Fast << RADIO_MODECNF0_RU_Pos);   // Fast ramp-up
 
+  NRF_RADIO->TASKS_RXEN = 1;
+}
+
+static inline void sendDataPacket(void)
+{
+  while (!NRF_RADIO->EVENTS_END)
+    __WFE();
+
+  NRF_RADIO->EVENTS_END = 0;
+  NRF_RADIO->TASKS_DISABLE = 1;
+
+  while (NRF_RADIO->STATE)
+    __WFE();
+  
+  NRF_RADIO->PACKETPTR = (uint32_t)&tx_packet.node;
+  NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk;
+  NRF_RADIO->TASKS_TXEN = 1;
+  
+  while (NRF_RADIO->STATE)
+    __WFE();
+
+  NRF_RADIO->PACKETPTR = (uint32_t)&rx_packet.node;
+  NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_START_Msk;
   NRF_RADIO->TASKS_RXEN = 1;
 }
