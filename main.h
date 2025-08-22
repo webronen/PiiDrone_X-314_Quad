@@ -3,6 +3,8 @@
 #ifndef MAIN_H
 #define MAIN_H
 
+#define DEBUG
+
 #include <Nicla_System.h>
 #include <Serial.h>
 
@@ -29,21 +31,17 @@
 
 // Quaternion components range from -1.0 to 1.0
 // Much smaller gains needed compared to degree/radian based systems
-#define KP_ROLL 0.1f
-#define KI_ROLL 0.0f
-#define KD_ROLL 0.0f
+#define KP_PITCH 0.01f // 1.
+#define KI_PITCH 0.0f // 3.
+#define KD_PITCH 0.0f // 2.
 
-#define KP_PITCH 0.1f
-#define KI_PITCH 0.0f
-#define KD_PITCH 0.0f
+#define KP_ROLL 0.0f // 4.
+#define KI_ROLL 0.0f // 6.
+#define KD_ROLL 0.0f // 5.
 
-#define KP_YAW 0.1f
-#define KI_YAW 0.0f
-#define KD_YAW 0.0f
-
-// PID initialization macro
-#define INIT_PID(sp, kp_val, ki_val, kd_val) \
-  {sp, kp_val, ki_val, kd_val, 0.0f, 0.0f, 0.0f}
+#define KP_YAW 0.0f // 7.
+#define KI_YAW 0.0f // 9.
+#define KD_YAW 0.0f // 8,
 
 // Motor pin definitions
 #define MOTOR1_PIN 11
@@ -51,15 +49,15 @@
 #define MOTOR3_PIN 27
 #define MOTOR4_PIN 29
 
-// Setpoints for roll, pitch, yaw, altitude, and thrust
+// Setpoints for roll, pitch, yaw, and thrust
 #define ROLL_SETPOINT 0.0f
 #define PITCH_SETPOINT 0.0f
 #define YAW_SETPOINT 0.0f
 #define THRUST_SETPOINT 0.0f
 
 // Thresholds for PID
-#define PID_OUTPUT_MAX PWM_COUNTER_TOP
-#define PID_OUTPUT_MIN -PWM_COUNTER_TOP
+#define PID_OUTPUT_MAX 800
+#define PID_OUTPUT_MIN -800
 
 // Sensor configuration constants
 #define ACCELEROMETER_HZ 400
@@ -98,21 +96,23 @@ SensorQuaternion quaternion(BHY2_SENSOR_ID_RV);
 // Flight control unit structure
 typedef struct
 {
+  float thrust;
   float roll;
   float pitch;
   float yaw;
-  float thrust;
   float pressure;
   float altitude;
   float humidity;
   float temperature;
-  int8_t rssi;
 } FCU;
 
 // ESC structure for motor control
 typedef struct
 {
-  uint16_t motor1, motor2, motor3, motor4;
+  uint16_t motor1;
+  uint16_t motor2;
+  uint16_t motor3;
+  uint16_t motor4;
 } ESC;
 
 // PID structure
@@ -147,7 +147,7 @@ typedef struct
 // External variables
 extern FCU fcu;
 extern ESC esc;
-extern DataQuaternion hoverQuaternion;
+extern const DataQuaternion hoverQuaternion;
 extern volatile DataPacket rx_packet;
 extern DataPacket tx_packet;
 extern PID rollPID;
@@ -157,12 +157,17 @@ extern PID thrustPID;
 
 // Function declarations
 static inline void initialize(void);
+static inline void radioInit(void);
+static inline void sendDataPacket(void);
+static inline void pwmInit(void);
+static inline void timerInit(void);
+static inline void niclaInit(void);
+static inline void imuInit(void);
 static inline void quaternionMultiply(DataQuaternion &result, const DataQuaternion &q1, const DataQuaternion &q2);
 static inline void quaternionNormalize(DataQuaternion &q);
-static inline void setControlInputs(float desiredYaw, float desiredPitch, float desiredRoll, float desiredThrust);
+static inline void setControlInputs(const float thrust, const float roll, const float pitch, const float yaw);
 static inline void updateESC(void);
 static inline void updatePID(PID &pid, float currentValue);
 static inline void updateFlightControl(void);
-static inline void sendRadioData(void);
 
 #endif
