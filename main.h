@@ -136,6 +136,8 @@ typedef struct __attribute__((packed)) {
 
 // Data packet types
 #define TYPE_PID 0x00
+#define TYPE_SETPOINT 0x01
+#define TYPE_THRUST 0x02
 
 // External variables
 extern FCU fcu;
