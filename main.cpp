@@ -231,13 +231,13 @@ static inline void updatePID(PID &pid, const float value)
   const float error = pid.setpoint - value;
 
   // 2. Derivative term on measurement (avoids derivative kick)
-  const float derivative = -(value - pid.previous_value) * INV_PID_DT;
+  const float derivative = -(value - pid.previous_value) * PID_LOOP_HZ;
 
   // 3. Proportional + Derivative output (without integral yet)
   const float output_no_i = (pid.kp * error) + (pid.kd * derivative);
 
   // 4. Conditional integration (branchless)
-  pid.integral += error * PID_DT * ((output_no_i <= PID_MAX) && (output_no_i >= PID_MIN));
+  pid.integral += error * PID_LOOP_PERIOD * ((output_no_i <= PID_MAX) && (output_no_i >= PID_MIN));
 
   // 5. Auto-scaled integrator limit (branchless)
   const float i_limit = PID_MAX / (pid.ki + __FLT_EPSILON__);
