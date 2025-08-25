@@ -1,7 +1,7 @@
 #include "main.h"
 
 FCU fcu = {
-    .thrust = 0.0f,       // 10% thrust, range 0 - 800
+    .thrust = 0.0f,       // thrust, range 0 - 800
     .roll = 0.0f,         // 0° roll (level)
     .pitch = 0.0f,        // 0° pitch (level)
     .yaw = 0.0f,          // 0° yaw (north)
@@ -111,7 +111,7 @@ static inline void radioInit(void)
   NRF_RADIO->DATAWHITEIV = 0x55;
 
   NRF_RADIO->MODECNF0 = (RADIO_MODECNF0_DTX_B0 << RADIO_MODECNF0_DTX_Pos) | // Transmit 0 when idle
-                        (RADIO_MODECNF0_RU_Fast << RADIO_MODECNF0_RU_Pos);  // Fast ramp-up
+                        (RADIO_MODECNF0_RU_Fast << RADIO_MODECNF0_RU_Pos);          // Fast ramp-up
 
   NRF_RADIO->TASKS_RXEN = 1;
 }
@@ -146,7 +146,7 @@ static inline void pwmInit(void)
   NRF_P0->PIN_CNF[MOTOR3_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) | (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
   NRF_P0->PIN_CNF[MOTOR4_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) | (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
 
-  NRF_PWM0->COUNTERTOP = PWM_COUNTER_TOP;
+  NRF_PWM0->COUNTERTOP = PWM_TOP;
   NRF_PWM0->PRESCALER = PWM_PRESCALER_PRESCALER_DIV_1;
   NRF_PWM0->DECODER = PWM_DECODER_LOAD_Individual;
   NRF_PWM0->SEQ[0].PTR = (uint32_t)&esc.motor1;
@@ -171,7 +171,7 @@ static inline void niclaInit(void)
 {
   nicla::begin();
   nicla::enable3V3LDO();
-  nicla::enableCharging(300);
+  nicla::enableCharging(300); // Charging current 300 mA (Max)
 }
 
 static inline void imuInit(void)
@@ -213,15 +213,10 @@ static inline void setControlInputs(const float thrust, const float roll, const 
 
 static inline void updateESC(void)
 {
-  const float thrust = fcu.thrust;
-  const float roll = rollPID.output;
-  const float pitch = pitchPID.output;
-  const float yaw = yawPID.output;
-
-  const uint16_t m1 = (uint16_t)constrain(thrust + roll - pitch - yaw, 0, PID_OUTPUT_MAX);
-  const uint16_t m2 = (uint16_t)constrain(thrust - roll - pitch + yaw, 0, PID_OUTPUT_MAX);
-  const uint16_t m3 = (uint16_t)constrain(thrust + roll + pitch + yaw, 0, PID_OUTPUT_MAX);
-  const uint16_t m4 = (uint16_t)constrain(thrust - roll + pitch - yaw, 0, PID_OUTPUT_MAX);
+  const uint16_t m1 = (uint16_t)constrain(fcu.thrust + rollPID.output - pitchPID.output - yawPID.output, 0, PID_MAX);
+  const uint16_t m2 = (uint16_t)constrain(fcu.thrust - rollPID.output - pitchPID.output + yawPID.output, 0, PID_MAX);
+  const uint16_t m3 = (uint16_t)constrain(fcu.thrust + rollPID.output + pitchPID.output + yawPID.output, 0, PID_MAX);
+  const uint16_t m4 = (uint16_t)constrain(fcu.thrust - rollPID.output + pitchPID.output - yawPID.output, 0, PID_MAX);
 
   // motorController.motor1 = 0x8000 | m1; // Front Left, CW
   // motorController.motor2 = 0x8000 | m2; // Front Right, CCW
@@ -231,20 +226,18 @@ static inline void updateESC(void)
   NRF_PWM0->TASKS_SEQSTART[0] = 1;
 }
 
-static inline void updatePID(PID &pid, float measured_value)
+static inline void updatePID(PID &pid, const float measured_value)
 {
-  static const float dt = 1.0f / 211.0f;
-
   const float proportional = pid.setpoint - measured_value;
-  const float derivative = (proportional - pid.previous_error) / dt;
+  const float derivative = (proportional - pid.previous_error) / PID_DT;
 
   const float output_no_i = (pid.kp * proportional) + (pid.kd * derivative);
-  const bool should_integrate = (output_no_i <= PID_OUTPUT_MAX) && (output_no_i >= PID_OUTPUT_MIN);
+  const bool should_integrate = (output_no_i <= PID_MAX) && (output_no_i >= PID_MIN);
 
-  pid.integral += proportional * dt * should_integrate;
+  pid.integral += proportional * PID_DT * should_integrate;
 
   pid.output = output_no_i + (pid.ki * pid.integral);
-  pid.output = constrain(pid.output, PID_OUTPUT_MIN, PID_OUTPUT_MAX);
+  pid.output = constrain(pid.output, PID_MIN, PID_MAX);
 
   pid.previous_error = proportional;
 }
@@ -280,109 +273,131 @@ static inline void updateFlightControl(void)
 
 static inline void parseDataPacket(void)
 {
-  if (rx_packet.node == 1 && rx_packet.zone == 0)
+  if (rx_packet.node != NODE_ID || rx_packet.zone != ZONE_ID)
   {
-    switch (rx_packet.type)
-    {
-    case 0:
-    { // PID gains
-      uint8_t axis = rx_packet.data[0];
-      uint8_t gain = rx_packet.data[1];
-      float value;
-
-      // Manual copy for volatile data
-      uint8_t *value_bytes = (uint8_t *)&value;
-      value_bytes[0] = rx_packet.data[2];
-      value_bytes[1] = rx_packet.data[3];
-      value_bytes[2] = rx_packet.data[4];
-      value_bytes[3] = rx_packet.data[5];
-
-      if (axis < 3 && gain < 3)
-      {
-        switch (axis)
-        {
-        case 0: // PITCH
-          switch (gain)
-          {
-          case 0:
-            pitchPID.kp = value;
-            Serial.print("PITCH Kp = ");
-            Serial.println(value, 3);
-            break;
-          case 1:
-            pitchPID.ki = value;
-            Serial.print("PITCH Ki = ");
-            Serial.println(value, 3);
-            break;
-          case 2:
-            pitchPID.kd = value;
-            Serial.print("PITCH Kd = ");
-            Serial.println(value, 3);
-            break;
-          }
-          break;
-        case 1: // ROLL
-          switch (gain)
-          {
-          case 0:
-            rollPID.kp = value;
-            Serial.print("ROLL Kp = ");
-            Serial.println(value, 3);
-            break;
-          case 1:
-            rollPID.ki = value;
-            Serial.print("ROLL Ki = ");
-            Serial.println(value, 3);
-            break;
-          case 2:
-            rollPID.kd = value;
-            Serial.print("ROLL Kd = ");
-            Serial.println(value, 3);
-            break;
-          }
-          break;
-        case 2: // YAW
-          switch (gain)
-          {
-          case 0:
-            yawPID.kp = value;
-            Serial.print("YAW Kp = ");
-            Serial.println(value, 3);
-            break;
-          case 1:
-            yawPID.ki = value;
-            Serial.print("YAW Ki = ");
-            Serial.println(value, 3);
-            break;
-          case 2:
-            yawPID.kd = value;
-            Serial.print("YAW Kd = ");
-            Serial.println(value, 3);
-            break;
-          }
-          break;
-        }
-      }
-      break;
-    }
-
-    case 1:
-    { // Thrust
-      float thrust_value;
-
-      // Manual copy for volatile data
-      uint8_t *thrust_bytes = (uint8_t *)&thrust_value;
-      thrust_bytes[0] = rx_packet.data[0];
-      thrust_bytes[1] = rx_packet.data[1];
-      thrust_bytes[2] = rx_packet.data[2];
-      thrust_bytes[3] = rx_packet.data[3];
-
-      // Update thrust with readable print
-      fcu.thrust = constrain(thrust_value, 0.0f, 800.0f);
-      Serial.print("THRUST = ");
-      Serial.println(fcu.thrust, 0);
-      break;
-    }
-    }
+    return;
   }
+
+  switch (rx_packet.type)
+  {
+  case TYPE_PID:
+    handlePidPacket();
+    break;
+
+  case TYPE_SETPOINT:
+    handleSetpointPacket();
+    break;
+
+  case TYPE_THRUST:
+    handleThrustPacket();
+    break;
+  }
+}
+
+static inline void handlePidPacket(void)
+{
+  const uint8_t axis = rx_packet.data[0];
+  const uint8_t gain = rx_packet.data[1];
+
+  float value = 0.0f;
+  extractFloatFromData(value, 2);
+
+  if (axis >= 3 || gain >= 3)
+  {
+    return;
+  }
+
+  switch (axis)
+  {
+  case AXIS_PITCH:
+    switch (gain)
+    {
+    case GAIN_KP:
+      pitchPID.kp = value;
+      break;
+    case GAIN_KI:
+      pitchPID.ki = value;
+      break;
+    case GAIN_KD:
+      pitchPID.kd = value;
+      break;
+    }
+    break;
+
+  case AXIS_ROLL:
+    switch (gain)
+    {
+    case GAIN_KP:
+      rollPID.kp = value;
+      break;
+    case GAIN_KI:
+      rollPID.ki = value;
+      break;
+    case GAIN_KD:
+      rollPID.kd = value;
+      break;
+    }
+    break;
+
+  case AXIS_YAW:
+    switch (gain)
+    {
+    case GAIN_KP:
+      yawPID.kp = value;
+      break;
+    case GAIN_KI:
+      yawPID.ki = value;
+      break;
+    case GAIN_KD:
+      yawPID.kd = value;
+      break;
+    }
+    break;
+  }
+}
+
+static inline void handleSetpointPacket(void)
+{
+  const uint8_t axis = rx_packet.data[0];
+
+  float value = 0.0f;
+  extractFloatFromData(value, 1);
+
+  if (axis >= 3)
+  {
+    return;
+  }
+
+  switch (axis)
+  {
+  case AXIS_PITCH:
+    fcu.pitch = constrain(value, SETPOINT_MIN, SETPOINT_MAX);
+    break;
+
+  case AXIS_ROLL:
+    fcu.roll = constrain(value, SETPOINT_MIN, SETPOINT_MAX);
+    break;
+
+  case AXIS_YAW:
+    fcu.yaw = constrain(value, SETPOINT_MIN, SETPOINT_MAX);
+    break;
+  }
+}
+
+static inline void handleThrustPacket(void)
+{
+  float thrust = 0.0f;
+  extractFloatFromData(thrust, 0);
+
+  fcu.thrust = constrain(thrust, 0.0f, PID_MAX);
+}
+
+static inline void extractFloatFromData(float &value, const uint8_t index)
+{
+  uint8_t *bytes = (uint8_t *)&value;
+
+  bytes[0] = rx_packet.data[index];
+  bytes[1] = rx_packet.data[index + 1];
+  bytes[2] = rx_packet.data[index + 2];
+  bytes[3] = rx_packet.data[index + 3];
 }

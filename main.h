@@ -3,11 +3,12 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-#define NODE 1
-#define ZONE 0
+#define NODE_ID 1
+#define ZONE_ID 0
 
 #define DEBUG
 
+#include <nrf.h>
 #include <Nicla_System.h>
 #include <Serial.h>
 
@@ -22,9 +23,10 @@
 #define HZ_TO_US(Hz) (ONE_SECOND_IN_US / (Hz))
 #define INV_SEA_LEVEL_PRESSURE (1.0f / 1013.25f)
 #define TEMPERATURE_CORRECTION_FACTOR 6.95f
-#define PWM_BASE_CLOCK 16000000UL                        // nRF52 PWM default (16MHz)
-#define PWM_FREQUENCY 20000UL                            // 20kHz target frequency
-#define PWM_COUNTER_TOP (PWM_BASE_CLOCK / PWM_FREQUENCY) // 19.975kHz PWM (-0.125% error)
+#define PWM_BASE_CLOCK 16000000UL                // nRF52 PWM default (16MHz)
+#define PWM_FREQUENCY 20000UL                    // 20kHz target frequency
+#define PWM_TOP (PWM_BASE_CLOCK / PWM_FREQUENCY) // 19.975kHz PWM (-0.125% error)
+#define PID_DT (1.0f / 211)                      // Fixed 211 Hz frequency
 
 // Constants for altitude calculation
 #define BARO_ALTITUDE_CONSTANT 44307.694f
@@ -56,9 +58,26 @@
 #define YAW_SETPOINT 0.0f
 #define THRUST_SETPOINT 0.0f
 
-// Thresholds for PID
-#define PID_OUTPUT_MAX 800
-#define PID_OUTPUT_MIN -800
+// Thresholds for PID and Setpoint
+#define PID_MAX 800.0f
+#define PID_MIN -800.0f
+#define SETPOINT_MAX 1.0f
+#define SETPOINT_MIN -1.0f
+
+// Data packet types
+#define TYPE_PID 0x00
+#define TYPE_SETPOINT 0x01
+#define TYPE_THRUST 0x02
+
+// Axis types
+#define AXIS_PITCH 0
+#define AXIS_ROLL 1
+#define AXIS_YAW 2
+
+// Gain types
+#define GAIN_KP 0
+#define GAIN_KI 1
+#define GAIN_KD 2
 
 // Sensor configuration constants
 #define ACCELEROMETER_HZ 400
@@ -127,17 +146,13 @@ typedef struct
 } PID;
 
 // Data packet structure
-typedef struct __attribute__((packed)) {
+typedef struct __attribute__((packed))
+{
   uint8_t node;
   uint8_t zone;
   uint8_t type;
   uint8_t data[252];
 } DataPacket;
-
-// Data packet types
-#define TYPE_PID 0x00
-#define TYPE_SETPOINT 0x01
-#define TYPE_THRUST 0x02
 
 // External variables
 extern FCU fcu;
@@ -145,10 +160,10 @@ extern ESC esc;
 extern const DataQuaternion hoverQuaternion;
 extern volatile DataPacket rx_packet;
 extern DataPacket tx_packet;
-extern PID rollPID;
-extern PID pitchPID;
-extern PID yawPID;
-extern PID thrustPID;
+extern PID roll;
+extern PID pitch;
+extern PID yaw;
+extern PID thrust;
 
 // Function declarations
 static inline void radioInit(void);
@@ -160,8 +175,12 @@ static inline void imuInit(void);
 static inline void quaternionMultiply(DataQuaternion &result, const DataQuaternion &q1, const DataQuaternion &q2);
 static inline void setControlInputs(const float thrust, const float roll, const float pitch, const float yaw);
 static inline void updateESC(void);
-static inline void updatePID(PID &pid, float currentValue);
+static inline void updatePID(PID &pid, const float currentValue);
 static inline void updateFlightControl(void);
 static inline void parseDataPacket(void);
+static inline void handlePidPacket(void);
+static inline void handleSetpointPacket(void);
+static inline void handleThrustPacket(void);
+static inline void extractFloatFromData(float &value, const uint8_t index);
 
 #endif
