@@ -26,7 +26,6 @@
 #define PWM_BASE_CLOCK 16000000UL                // nRF52 PWM default (16MHz)
 #define PWM_FREQUENCY 20000UL                    // 20kHz target frequency
 #define PWM_TOP (PWM_BASE_CLOCK / PWM_FREQUENCY) // 19.975kHz PWM (-0.125% error)
-#define PID_DT (1.0f / 211)                      // Fixed 211 Hz frequency
 
 // Constants for altitude calculation
 #define BARO_ALTITUDE_CONSTANT 44307.694f
@@ -59,6 +58,7 @@
 #define THRUST_SETPOINT 0.0f
 
 // Thresholds for PID and Setpoint
+#define PID_DT (1.0f / 211) // Fixed 211 Hz frequency
 #define PID_MAX 800.0f
 #define PID_MIN -800.0f
 #define SETPOINT_MAX 1.0f

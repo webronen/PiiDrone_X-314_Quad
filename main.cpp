@@ -23,7 +23,6 @@ const DataQuaternion hoverQuaternion = {
     .z = 0.0f,
     .w = 1.0f};
 
-// Initialize PID controllers
 PID rollPID = {.setpoint = ROLL_SETPOINT, .kp = KP_ROLL, .ki = KI_ROLL, .kd = KD_ROLL};
 PID pitchPID = {.setpoint = PITCH_SETPOINT, .kp = KP_PITCH, .ki = KI_PITCH, .kd = KD_PITCH};
 PID yawPID = {.setpoint = YAW_SETPOINT, .kp = KP_YAW, .ki = KI_YAW, .kd = KD_YAW};
@@ -111,7 +110,7 @@ static inline void radioInit(void)
   NRF_RADIO->DATAWHITEIV = 0x55;
 
   NRF_RADIO->MODECNF0 = (RADIO_MODECNF0_DTX_B0 << RADIO_MODECNF0_DTX_Pos) | // Transmit 0 when idle
-                        (RADIO_MODECNF0_RU_Fast << RADIO_MODECNF0_RU_Pos);          // Fast ramp-up
+                        (RADIO_MODECNF0_RU_Fast << RADIO_MODECNF0_RU_Pos);  // Fast ramp-up
 
   NRF_RADIO->TASKS_RXEN = 1;
 }
