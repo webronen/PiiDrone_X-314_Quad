@@ -58,7 +58,10 @@
 #define THRUST_SETPOINT 0.0f
 
 // Thresholds for PID and Setpoint
-#define PID_DT (1.0f / 211) // Fixed 211 Hz frequency
+#define PID_LOOP_FREQ_HZ 211.0f          // The frequency of the PID loop
+#define PID_DT (1.0f / PID_LOOP_FREQ_HZ) // The period (delta time) between updates
+#define INV_PID_DT (PID_LOOP_FREQ_HZ)    // The precomputed inverse of the period
+
 #define PID_MAX 800.0f
 #define PID_MIN -800.0f
 #define SETPOINT_MAX 1.0f
@@ -141,7 +144,6 @@ typedef struct
   float setpoint;
   float kp, ki, kd;
   float integral;
-  float previous_error;
   float previous_value;
   float output;
 } PID;

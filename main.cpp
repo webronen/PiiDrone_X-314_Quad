@@ -227,17 +227,29 @@ static inline void updateESC(void)
 
 static inline void updatePID(PID &pid, const float value)
 {
+  // 1. Error between desired setpoint and measured value
   const float error = pid.setpoint - value;
-  const float derivative = -(value - pid.previous_value) / PID_DT;
-  const float output_no_i = (pid.kp * error) + (pid.kd * derivative);
-  
-  const bool should_integrate = (output_no_i <= PID_MAX) && (output_no_i >= PID_MIN);
-  pid.integral += error * PID_DT * should_integrate;
 
+  // 2. Derivative term on measurement (avoids derivative kick)
+  const float derivative = -(value - pid.previous_value) * INV_PID_DT;
+
+  // 3. Proportional + Derivative output (without integral yet)
+  const float output_no_i = (pid.kp * error) + (pid.kd * derivative);
+
+  // 4. Conditional integration (branchless)
+  pid.integral += error * PID_DT * ((output_no_i <= PID_MAX) && (output_no_i >= PID_MIN));
+
+  // 5. Auto-scaled integrator limit (branchless)
+  const float i_limit = PID_MAX / (pid.ki + __FLT_EPSILON__);
+  pid.integral = constrain(pid.integral, -i_limit, i_limit);
+
+  // 6. Combine P, I, and D terms
   pid.output = output_no_i + (pid.ki * pid.integral);
+
+  // 7. Clamp final output to actuator limits
   pid.output = constrain(pid.output, PID_MIN, PID_MAX);
-  
-  pid.previous_error = error;
+
+  // 8. Store for next iteration
   pid.previous_value = value;
 }
 
