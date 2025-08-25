@@ -142,6 +142,7 @@ typedef struct
   float kp, ki, kd;
   float integral;
   float previous_error;
+  float previous_value;
   float output;
 } PID;
 
@@ -172,10 +173,10 @@ static inline void pwmInit(void);
 static inline void timerInit(void);
 static inline void niclaInit(void);
 static inline void imuInit(void);
-static inline void quaternionMultiply(DataQuaternion &result, const DataQuaternion &q1, const DataQuaternion &q2);
+static inline void quaternionMultiply(DataQuaternion &r, const DataQuaternion &q1, const DataQuaternion &q2);
 static inline void setControlInputs(const float thrust, const float roll, const float pitch, const float yaw);
 static inline void updateESC(void);
-static inline void updatePID(PID &pid, const float currentValue);
+static inline void updatePID(PID &pid, const float value);
 static inline void updateFlightControl(void);
 static inline void parseDataPacket(void);
 static inline void handlePidPacket(void);

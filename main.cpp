@@ -225,20 +225,20 @@ static inline void updateESC(void)
   NRF_PWM0->TASKS_SEQSTART[0] = 1;
 }
 
-static inline void updatePID(PID &pid, const float measured_value)
+static inline void updatePID(PID &pid, const float value)
 {
-  const float proportional = pid.setpoint - measured_value;
-  const float derivative = (proportional - pid.previous_error) / PID_DT;
-
-  const float output_no_i = (pid.kp * proportional) + (pid.kd * derivative);
+  const float error = pid.setpoint - value;
+  const float derivative = -(value - pid.previous_value) / PID_DT;
+  const float output_no_i = (pid.kp * error) + (pid.kd * derivative);
+  
   const bool should_integrate = (output_no_i <= PID_MAX) && (output_no_i >= PID_MIN);
-
-  pid.integral += proportional * PID_DT * should_integrate;
+  pid.integral += error * PID_DT * should_integrate;
 
   pid.output = output_no_i + (pid.ki * pid.integral);
   pid.output = constrain(pid.output, PID_MIN, PID_MAX);
-
-  pid.previous_error = proportional;
+  
+  pid.previous_error = error;
+  pid.previous_value = value;
 }
 
 static inline void updateFlightControl(void)
@@ -298,13 +298,13 @@ static inline void handlePidPacket(void)
   const uint8_t axis = rx_packet.data[0];
   const uint8_t gain = rx_packet.data[1];
 
-  float value = 0.0f;
-  extractFloatFromData(value, 2);
-
   if (axis >= 3 || gain >= 3)
   {
     return;
   }
+
+  float value = 0.0f;
+  extractFloatFromData(value, 2);
 
   switch (axis)
   {
@@ -359,13 +359,13 @@ static inline void handleSetpointPacket(void)
 {
   const uint8_t axis = rx_packet.data[0];
 
-  float value = 0.0f;
-  extractFloatFromData(value, 1);
-
   if (axis >= 3)
   {
     return;
   }
+
+  float value = 0.0f;
+  extractFloatFromData(value, 1);
 
   switch (axis)
   {
