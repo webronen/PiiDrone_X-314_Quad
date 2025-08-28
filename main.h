@@ -84,15 +84,15 @@
 // Sensor configuration constants
 #define ACCELEROMETER_HZ 400
 #define ACCELEROMETER_LATENCY 1
-#define ACCELEROMETER_RANGE 4
+#define ACCELEROMETER_RANGE 8 // ±8g
 
 #define GYROSCOPE_HZ 400
 #define GYROSCOPE_LATENCY 1
-#define GYROSCOPE_RANGE 1000
+#define GYROSCOPE_RANGE 1000 // ±1000°/s
 
 #define MAGNETOMETER_HZ 25
 #define MAGNETOMETER_LATENCY 4
-#define MAGNETOMETER_RANGE 2500
+#define MAGNETOMETER_RANGE 2500 // ±2500µT
 
 #define PRESSURE_HZ 1
 #define PRESSURE_LATENCY 100
@@ -131,10 +131,10 @@ typedef struct
 // ESC structure for motor control
 typedef struct
 {
-  uint16_t motor1;
-  uint16_t motor2;
-  uint16_t motor3;
-  uint16_t motor4;
+  uint16_t m1;
+  uint16_t m2;
+  uint16_t m3;
+  uint16_t m4;
 } ESC;
 
 // PID structure

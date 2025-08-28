@@ -12,10 +12,10 @@ FCU fcu = {
 };
 
 ESC esc = {
-    .motor1 = 0x8000,
-    .motor2 = 0x8000,
-    .motor3 = 0x8000,
-    .motor4 = 0x8000};
+    .m1 = 0x8000,
+    .m2 = 0x8000,
+    .m3 = 0x8000,
+    .m4 = 0x8000};
 
 const DataQuaternion hoverQuaternion = {
     .x = 0.0f,
@@ -148,7 +148,7 @@ static inline void pwmInit(void)
   NRF_PWM0->COUNTERTOP = PWM_TOP;
   NRF_PWM0->PRESCALER = PWM_PRESCALER_PRESCALER_DIV_1;
   NRF_PWM0->DECODER = PWM_DECODER_LOAD_Individual;
-  NRF_PWM0->SEQ[0].PTR = (uint32_t)&esc.motor1;
+  NRF_PWM0->SEQ[0].PTR = (uint32_t)&esc.m1;
   NRF_PWM0->SEQ[0].CNT = (sizeof(ESC) / sizeof(uint16_t));
   NRF_PWM0->SEQ[0].REFRESH = PWM_SEQ_REFRESH_CNT_Continuous;
   NRF_PWM0->PSEL.OUT[0] = MOTOR1_PIN;
@@ -168,8 +168,10 @@ static inline void timerInit(void)
 
 static inline void niclaInit(void)
 {
-  nicla::begin();
-  nicla::enable3V3LDO();
+  nicla::begin(false);
+  nicla::setBatteryNTCEnabled(false);
+  nicla::disableLDO();
+  nicla::enable1V8LDO();
   nicla::enableCharging(300); // Charging current 300 mA (Max)
 }
 
@@ -196,6 +198,7 @@ static inline void imuInit(void)
 
 static inline void quaternionMultiply(DataQuaternion &r, const DataQuaternion &q1, const DataQuaternion &q2)
 {
+  // Hamilton product
   r.w = q1.w * q2.w - q1.x * q2.x - q1.y * q2.y - q1.z * q2.z;
   r.x = q1.w * q2.x + q1.x * q2.w + q1.y * q2.z - q1.z * q2.y;
   r.y = q1.w * q2.y - q1.x * q2.z + q1.y * q2.w + q1.z * q2.x;
@@ -217,10 +220,19 @@ static inline void updateESC(void)
   const uint16_t m3 = (uint16_t)constrain(fcu.thrust + rollPID.output + pitchPID.output + yawPID.output, 0, PID_MAX);
   const uint16_t m4 = (uint16_t)constrain(fcu.thrust - rollPID.output + pitchPID.output - yawPID.output, 0, PID_MAX);
 
-  // motorController.motor1 = 0x8000 | m1; // Front Left, CW
-  // motorController.motor2 = 0x8000 | m2; // Front Right, CCW
-  // motorController.motor3 = 0x8000 | m3; // Rear Left, CW
-  // motorController.motor4 = 0x8000 | m4; // Rear Right, CCW
+  Serial.print("M1:");
+  Serial.print(m1);
+  Serial.print(",M2:");
+  Serial.print(m2);
+  Serial.print(",M3:");
+  Serial.print(m3);
+  Serial.print(",M4:");
+  Serial.println(m4);
+
+  esc.m1 = 0x8000 | m1; // Front Left, CCW
+  esc.m2 = 0x8000 | m2; // Front Right, CW
+  esc.m3 = 0x8000 | m3; // Rear Left, CW
+  esc.m4 = 0x8000 | m4; // Rear Right, CCW
 
   NRF_PWM0->TASKS_SEQSTART[0] = 1;
 }
