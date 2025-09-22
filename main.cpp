@@ -329,6 +329,7 @@ static inline void handlePidPacket(void)
 
   float value = 0.0f;
   extractFloatFromData(value, 2);
+  value = constrain(value, GAIN_MIN, GAIN_MAX);
 
   switch (axis)
   {
@@ -390,19 +391,20 @@ static inline void handleSetpointPacket(void)
 
   float value = 0.0f;
   extractFloatFromData(value, 1);
+  value = constrain(value, SETPOINT_MIN, SETPOINT_MAX);
 
   switch (axis)
   {
   case AXIS_PITCH:
-    fcu.pitch = constrain(value, SETPOINT_MIN, SETPOINT_MAX);
+    fcu.pitch = value;
     break;
 
   case AXIS_ROLL:
-    fcu.roll = constrain(value, SETPOINT_MIN, SETPOINT_MAX);
+    fcu.roll = value;
     break;
 
   case AXIS_YAW:
-    fcu.yaw = constrain(value, SETPOINT_MIN, SETPOINT_MAX);
+    fcu.yaw = value;
     break;
   }
 }
@@ -412,7 +414,7 @@ static inline void handleThrustPacket(void)
   float thrust = 0.0f;
   extractFloatFromData(thrust, 0);
 
-  fcu.thrust = constrain(thrust, 0.0f, PID_MAX);
+  fcu.thrust = constrain(thrust, THRUST_MIN, PID_MAX);
 }
 
 static inline void extractFloatFromData(float &value, const uint8_t index)

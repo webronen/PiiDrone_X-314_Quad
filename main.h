@@ -63,8 +63,11 @@
 
 #define PID_MAX 800.0f
 #define PID_MIN -800.0f
+#define GAIN_MAX 1.0f
+#define GAIN_MIN 0.0f
 #define SETPOINT_MAX 1.0f
 #define SETPOINT_MIN -1.0f
+#define THRUST_MIN 0.0f
 
 // Data packet types
 #define TYPE_PID 0x00
