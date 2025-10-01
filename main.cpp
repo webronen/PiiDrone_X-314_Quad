@@ -37,12 +37,6 @@ void setup(void)
   pwmInit();
   niclaInit();
   imuInit();
-
-#ifdef DEBUG
-  Serial.begin(SERIAL_BAUDRATE);
-  while (!Serial)
-    __WFE();
-#endif
 }
 
 void loop(void)
@@ -50,9 +44,9 @@ void loop(void)
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
   const uint32_t loopTime = NRF_TIMER0->CC[0];
 
-  static uint32_t lastMotorUpdateTime = loopTime;
-  static uint32_t lastPidUpdateTime = loopTime;
   static uint32_t lastSensorUpdateTime = loopTime;
+  static uint32_t lastPidUpdateTime = loopTime;
+  static uint32_t lastMotorUpdateTime = loopTime;
 
   if (NRF_RADIO->EVENTS_CRCOK)
   {
@@ -172,7 +166,8 @@ static inline void niclaInit(void)
   nicla::setBatteryNTCEnabled(false);
   nicla::disableLDO();
   nicla::enable1V8LDO();
-  nicla::enableCharging(300); // Charging current 300 mA (Max)
+  // nicla::enableCharging(300); // Charging current 300 mA (Max)
+  nicla::disableCharging();
 }
 
 static inline void imuInit(void)
@@ -220,20 +215,14 @@ static inline void updateESC(void)
   const uint16_t m3 = (uint16_t)constrain(fcu.thrust + rollPID.output + pitchPID.output + yawPID.output, 0, PID_MAX);
   const uint16_t m4 = (uint16_t)constrain(fcu.thrust - rollPID.output + pitchPID.output - yawPID.output, 0, PID_MAX);
 
-  Serial.print("M1:");
-  Serial.print(m1);
-  Serial.print(",M2:");
-  Serial.print(m2);
-  Serial.print(",M3:");
-  Serial.print(m3);
-  Serial.print(",M4:");
-  Serial.println(m4);
-
+  // Set the invert bit (0x8000) to invert the PWM signal
   esc.m1 = 0x8000 | m1; // Front Left, CCW
   esc.m2 = 0x8000 | m2; // Front Right, CW
   esc.m3 = 0x8000 | m3; // Rear Left, CW
   esc.m4 = 0x8000 | m4; // Rear Right, CCW
 
+  // Memory barrier to ensure PWM values are updated before starting the sequence
+  __DMB();
   NRF_PWM0->TASKS_SEQSTART[0] = 1;
 }
 

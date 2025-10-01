@@ -6,8 +6,6 @@
 #define NODE_ID 1
 #define ZONE_ID 0
 
-#define DEBUG
-
 #include <nrf.h>
 #include <Nicla_System.h>
 #include <Serial.h>
@@ -63,7 +61,7 @@
 
 #define PID_MAX 800.0f
 #define PID_MIN -800.0f
-#define GAIN_MAX 1.0f
+#define GAIN_MAX 100.0f
 #define GAIN_MIN 0.0f
 #define SETPOINT_MAX 1.0f
 #define SETPOINT_MIN -1.0f
