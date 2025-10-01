@@ -203,9 +203,9 @@ static inline void quaternionMultiply(DataQuaternion &r, const DataQuaternion &q
 static inline void setControlInputs(const float thrust, const float roll, const float pitch, const float yaw)
 {
   fcu.thrust = thrust;
-  rollPID.setpoint = roll;
-  pitchPID.setpoint = pitch;
-  yawPID.setpoint = yaw;
+  fcu.roll = roll;
+  fcu.pitch = pitch;
+  fcu.yaw = yaw;
 }
 
 static inline void updateESC(void)
@@ -221,7 +221,8 @@ static inline void updateESC(void)
   esc.m3 = 0x8000 | m3; // Rear Left, CW
   esc.m4 = 0x8000 | m4; // Rear Right, CCW
 
-  // Memory barrier to ensure PWM values are updated before starting the sequence
+  /* Memory barrier to ensure PWM values are updated before starting the sequence,
+     needed when writing to HW registers shared with DMA to ensure data coherency */
   __DMB();
   NRF_PWM0->TASKS_SEQSTART[0] = 1;
 }
@@ -265,22 +266,29 @@ static inline void updateFlightControl(void)
   fcu.altitude = LPF * raw_altitude + HPF * fcu.altitude;
 
   const DataQuaternion conjugate = {-quaternion._data.x, -quaternion._data.y, -quaternion._data.z, quaternion._data.w};
-  DataQuaternion error;
 
   /*
     In this case, the order of the quaternion multiplication does not matter,
-    because hoverQuaternion is a unit quaternion. Multiplicative identity.
+    because hoverQuaternion is a unit quaternion (the multiplicative identity).
 
     quaternionMultiply(error, hoverQuaternion, conjugate);
     quaternionMultiply(error, conjugate, hoverQuaternion);
 
-    Both are valid.
-  */
-  quaternionMultiply(error, conjugate, hoverQuaternion);
+    Both are valid when hoverQuaternion is the identity.
 
-  updatePID(rollPID, error.x);
-  updatePID(pitchPID, error.y);
-  updatePID(yawPID, error.z);
+    However, the preferred and conventional order is:
+      quaternionMultiply(error, hoverQuaternion, conjugate);
+
+    This expresses "desired * conjugate(current)", which generalizes correctly
+    if you use a non-identity target quaternion in the future.
+  */
+
+  DataQuaternion error;
+  quaternionMultiply(error, hoverQuaternion, conjugate);
+
+  updatePID(rollPID, error.x + fcu.roll);
+  updatePID(pitchPID, error.y + fcu.pitch);
+  updatePID(yawPID, error.z + fcu.yaw);
 }
 
 static inline void parseDataPacket(void)
