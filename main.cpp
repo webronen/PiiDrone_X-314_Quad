@@ -166,8 +166,12 @@ static inline void niclaInit(void)
   nicla::setBatteryNTCEnabled(false);
   nicla::disableLDO();
   nicla::enable1V8LDO();
-  // nicla::enableCharging(300); // Charging current 300 mA (Max)
   nicla::disableCharging();
+
+  // Set BQ25120A battery under-voltage lockout (UVLO) threshold to 2.2V. Read-modify-write register, keeping other bits intact.
+  uint8_t reg = bq25120a.readByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL);
+  reg = (reg & ~0x07) | 0x06; // Set bits 2:0 to 110 for 2.2V UVLO
+  bq25120a.writeByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL, reg);
 }
 
 static inline void imuInit(void)

@@ -9,6 +9,7 @@
 #include <nrf.h>
 #include <Nicla_System.h>
 #include <Serial.h>
+#include "BQ25120A.h"
 
 #include <sensors/Sensor.h>
 #include <sensors/SensorQuaternion.h>
@@ -68,9 +69,9 @@
 #define THRUST_MIN 0.0f
 
 // Data packet types
-#define TYPE_PID 0x00
-#define TYPE_SETPOINT 0x01
-#define TYPE_THRUST 0x02
+#define TYPE_PID 0
+#define TYPE_SETPOINT 1
+#define TYPE_THRUST 2
 
 // Axis types
 #define AXIS_PITCH 0
@@ -115,6 +116,9 @@ Sensor pressure(BHY2_SENSOR_ID_BARO);
 Sensor humidity(BHY2_SENSOR_ID_HUM);
 Sensor temperature(BHY2_SENSOR_ID_TEMP);
 SensorQuaternion quaternion(BHY2_SENSOR_ID_RV);
+
+// BQ25120A power management
+BQ25120A bq25120a;
 
 // Flight control unit structure
 typedef struct
