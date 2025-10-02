@@ -73,7 +73,7 @@ void loop(void)
     updateESC();
   }
 
-  nicla::_pmic.getStatusRegister(); // Reset pmic watchdog
+  bq25120a.getStatusRegister(); // Reset bq25120a watchdog
 }
 
 static inline void radioInit(void)
@@ -169,9 +169,9 @@ static inline void niclaInit(void)
   nicla::disableCharging();
 
   // Set BQ25120A battery under-voltage lockout (UVLO) threshold to 2.2V (default is 3.0V). Read-modify-write.
-  uint8_t reg = bq25120a.readByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL);
-  reg = (reg & ~0x07) | 0x06; // Set bits 2:0 to 110 for 2.2V UVLO
-  bq25120a.writeByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL, reg);
+  uint8_t data = bq25120a.readByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL);
+  data = (data & ~0x07) | 0x06; // Set bits 2:0 to 110 for 2.2V UVLO
+  bq25120a.writeByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL, data);
 }
 
 static inline void imuInit(void)
