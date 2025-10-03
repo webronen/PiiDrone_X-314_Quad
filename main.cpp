@@ -187,7 +187,7 @@ static inline void imuInit(void)
   // magnetometer.begin(MAGNETOMETER_HZ, MAGNETOMETER_LATENCY);
   magnetometer.begin(0, 0); // Disable magnetometer
 
-  // Initialize 6 DoF quaternion (Acc + Gyro). 9 DoF (Acc + Gyro + Mag) in future, when magnetometer calibrated
+  // Initialize 6 DoF quaternion (Acc + Gyro). 10 DoF (Acc + Gyro + Mag + Baro/ToF) in future, when magnetometer calibrated
   quaternion.begin(QUATERNION_HZ, QUATERNION_LATENCY);
 
   pressure.begin(PRESSURE_HZ, PRESSURE_LATENCY);

@@ -10,6 +10,7 @@
 #include <Nicla_System.h>
 #include <Serial.h>
 #include "BQ25120A.h"
+#include <vl53l4cx_class.h>
 
 #include <sensors/Sensor.h>
 #include <sensors/SensorQuaternion.h>
@@ -30,8 +31,7 @@
 #define BARO_ALTITUDE_CONSTANT 44307.694f
 #define BARO_PRESSURE_EXPONENT 0.190284f
 
-// Quaternion components range from -1.0 to 1.0
-// Much smaller gains needed compared to degree/radian based systems
+// PID default gains
 #define KP_PITCH 0.0f
 #define KI_PITCH 0.0f
 #define KD_PITCH 0.0f
@@ -119,6 +119,9 @@ SensorQuaternion quaternion(BHY2_SENSOR_ID_RV);
 
 // BQ25120A power management
 BQ25120A bq25120a;
+
+// VL53L4CX Time-of-Flight distance sensor
+VL53L4CX vl53l4cx(&Wire, NC); // XSHUT pin not connected (NC)
 
 // Flight control unit structure
 typedef struct
