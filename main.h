@@ -10,11 +10,17 @@
 #include <Nicla_System.h>
 #include <Serial.h>
 #include "BQ25120A.h"
-#include <vl53l4cx_class.h>
 
 #include <sensors/Sensor.h>
 #include <sensors/SensorQuaternion.h>
 #include <sensors/SensorXYZ.h>
+
+// Remove conflict before including VL53L4CX_class.h
+#ifdef Mode
+#undef Mode
+#endif
+
+#include <vl53l4cx_class.h>
 
 // Constants for filters and timing
 #define LPF 0.1f
