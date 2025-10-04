@@ -248,8 +248,8 @@ static inline void quaternionMultiply(DataQuaternion &r, const DataQuaternion &q
 
 static inline void updateESC(void)
 {
-  esc = {.m1 = 0x8000, .m2 = 0x8000, .m3 = 0x8000, .m4 = 0x8000}; // Default to safe value (off)
-  
+  esc.m1 = esc.m2 = esc.m3 = esc.m4 = 0x8000; // Default to safe value (off)
+
   if (fcu.armed)
   {
     esc.m1 |= (uint16_t)constrain(fcu.thrust + rollPID.output - pitchPID.output - yawPID.output, THRUST_MIN, THRUST_MAX); // Front Left, CCW
@@ -259,11 +259,11 @@ static inline void updateESC(void)
   }
   else
   {
-    fcu.thrust = 0; // Ensure thrust is zero when disarmed
-    fcu.roll = fcu.pitch = fcu.yaw = 0.0f; // Reset control setpoints when disarmed
-    rollPID.integral = pitchPID.integral = yawPID.integral = 0.0f; // Reset integrators when disarmed
+    fcu.thrust = 0;                                                                  // Ensure thrust is zero when disarmed
+    fcu.roll = fcu.pitch = fcu.yaw = 0.0f;                                           // Reset control setpoints when disarmed
+    rollPID.integral = pitchPID.integral = yawPID.integral = 0.0f;                   // Reset integrators when disarmed
     rollPID.previous_value = pitchPID.previous_value = yawPID.previous_value = 0.0f; // Reset previous values when disarmed
-    rollPID.output = pitchPID.output = yawPID.output = 0.0f; // Reset outputs when disarmed
+    rollPID.output = pitchPID.output = yawPID.output = 0.0f;                         // Reset outputs when disarmed
   }
 
   /* Memory barrier to ensure PWM values are updated before starting the sequence,
