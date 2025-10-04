@@ -9,6 +9,8 @@ FCU fcu = {
     .altitude = 0.0f,     // 0 meters (sea level)
     .humidity = 50.0f,    // 50% RH (typical)
     .temperature = 25.0f, // 25°C (room temperature)
+    .distance = 0.0f,     // 0 mm (initial distance)
+    .armed = false        // Not armed initially
 };
 
 ESC esc = {
@@ -37,6 +39,7 @@ void setup(void)
   pwmInit();
   niclaInit();
   imuInit();
+  vl53l4cxInit();
 }
 
 void loop(void)
@@ -48,7 +51,7 @@ void loop(void)
   static uint32_t lastPidUpdateTime = loopTime;
   static uint32_t lastMotorUpdateTime = loopTime;
   static uint32_t lastPacketSendTime = loopTime;
-  
+
   // If received a packet, clear event flag and parse it
   if (NRF_RADIO->EVENTS_CRCOK)
   {
@@ -73,7 +76,9 @@ void loop(void)
   if (loopTime >= lastMotorUpdateTime)
   {
     lastMotorUpdateTime += HZ_TO_US(101);
-    updateESC();
+
+    if (fcu.armed) // Only update motors if armed
+      updateESC();
   }
 
   if (loopTime >= lastPacketSendTime)
@@ -212,6 +217,28 @@ static inline void imuInit(void)
   temperature.begin(TEMPERATURE_HZ, TEMPERATURE_LATENCY);
 }
 
+static inline void vl53l4cxInit(void)
+{
+  // TODO: Roi settings, distance mode, timing budget
+  // Wire.begin();
+  // Wire.setClock(400000); // 400 kHz I2C
+
+  // vl53l4cx.VL53L4CX_SetDeviceAddress(VL53L4CX_ADDR);
+  // vl53l4cx.VL53L4CX_WaitDeviceBooted();
+  // vl53l4cx.VL53L4CX_DataInit();
+  // vl53l4cx.VL53L4CX_SetDistanceMode(VL53L4CX_DISTANCEMODE_LONG);
+  // vl53l4cx.VL53L4CX_SetMeasurementTimingBudgetMicroSeconds(50000); // 50 ms
+
+  // static const VL53L4CX_UserRoi_t userRoi = {
+  //     .TopLeftX = 0,
+  //     .TopLeftY = 0,
+  //     .BotRightX = 15,
+  //     .BotRightY = 15};
+
+  // vl53l4cx.VL53L4CX_SetUserROI(&userRoi);
+  // vl53l4cx.VL53L4CX_StartMeasurement();
+}
+
 static inline void quaternionMultiply(DataQuaternion &r, const DataQuaternion &q1, const DataQuaternion &q2)
 {
   // Hamilton product
@@ -219,14 +246,6 @@ static inline void quaternionMultiply(DataQuaternion &r, const DataQuaternion &q
   r.x = q1.w * q2.x + q1.x * q2.w + q1.y * q2.z - q1.z * q2.y;
   r.y = q1.w * q2.y - q1.x * q2.z + q1.y * q2.w + q1.z * q2.x;
   r.z = q1.w * q2.z + q1.x * q2.y - q1.y * q2.x + q1.z * q2.w;
-}
-
-static inline void setControlInputs(const float thrust, const float roll, const float pitch, const float yaw)
-{
-  fcu.thrust = thrust;
-  fcu.roll = roll;
-  fcu.pitch = pitch;
-  fcu.yaw = yaw;
 }
 
 static inline void updateESC(void)
@@ -278,7 +297,7 @@ static inline void updatePID(PID &pid, const float value)
 
 static inline void updateFlightControl(void)
 {
-  fcu.pressure = LPF * pressure._value + HPF * fcu.pressure;
+  fcu.pressure = LPF * (pressure._value * PA_TO_HPA) + HPF * fcu.pressure;
   fcu.temperature = LPF * (temperature._value - TEMPERATURE_CORRECTION_FACTOR) + HPF * fcu.temperature;
   fcu.humidity = LPF * humidity._value + HPF * fcu.humidity;
 
@@ -417,6 +436,8 @@ static inline void handleThrustPacket(void)
   extractFloatFromData(thrust, 0);
 
   fcu.thrust = constrain(thrust, THRUST_MIN, PID_MAX);
+
+  fcu.armed = fcu.thrust > 1.0f ? true : false;
 }
 
 static inline void extractFloatFromData(float &value, const uint8_t index)

@@ -21,6 +21,7 @@
 #endif
 
 #include <vl53l4cx_class.h>
+#define VL53L4CX_ADDR 0x52
 
 // Constants for filters and timing
 #define LPF 0.1f
@@ -28,6 +29,7 @@
 #define ONE_SECOND_IN_US 1000000
 #define HZ_TO_US(Hz) (ONE_SECOND_IN_US / (Hz))
 #define INV_SEA_LEVEL_PRESSURE (1.0f / 1013.25f)
+#define PA_TO_HPA 0.01f
 #define TEMPERATURE_CORRECTION_FACTOR 6.95f
 #define PWM_BASE_CLOCK 16000000UL                // nRF52 PWM default (16MHz)
 #define PWM_FREQUENCY 20000UL                    // 20kHz target frequency
@@ -141,6 +143,8 @@ typedef struct
   float altitude;
   float humidity;
   float temperature;
+  float distance;
+  bool armed;
 } FCU;
 
 // ESC structure for motor control
@@ -189,8 +193,8 @@ static inline void pwmInit(void);
 static inline void timerInit(void);
 static inline void niclaInit(void);
 static inline void imuInit(void);
+static inline void vl53l4cxInit(void);
 static inline void quaternionMultiply(DataQuaternion &r, const DataQuaternion &q1, const DataQuaternion &q2);
-static inline void setControlInputs(const float thrust, const float roll, const float pitch, const float yaw);
 static inline void updateESC(void);
 static inline void updatePID(PID &pid, const float value);
 static inline void updateFlightControl(void);
