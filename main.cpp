@@ -1,7 +1,8 @@
 #include "main.h"
 
 FCU fcu = {
-    .thrust = 0.0f,       // thrust, range 0 - 800
+    .thrust = 0,          // thrust, range 0 - 800
+    ._pad = 0,            // padding for alignment
     .roll = 0.0f,         // 0° roll (level)
     .pitch = 0.0f,        // 0° pitch (level)
     .yaw = 0.0f,          // 0° yaw (north)
@@ -9,8 +10,9 @@ FCU fcu = {
     .altitude = 0.0f,     // 0 meters (sea level)
     .humidity = 50.0f,    // 50% RH (typical)
     .temperature = 25.0f, // 25°C (room temperature)
-    .distance = 0.0f,     // 0 mm (initial distance)
-    .armed = false        // Not armed initially
+    .distance = 0,        // 0 mm (initial distance)
+    ._pad2 = 0,           // padding for alignment
+    .armed = false        // Disarmed by default
 };
 
 ESC esc = {
@@ -34,12 +36,12 @@ DataPacket tx_packet;
 
 void setup(void)
 {
+  niclaInit();
   radioInit();
   timerInit();
   pwmInit();
-  niclaInit();
   imuInit();
-  vl53l4cxInit();
+  tofInit();
 }
 
 void loop(void)
@@ -56,7 +58,6 @@ void loop(void)
   if (NRF_RADIO->EVENTS_CRCOK)
   {
     NRF_RADIO->EVENTS_CRCOK = 0;
-
     parseDataPacket();
   }
 
@@ -76,9 +77,7 @@ void loop(void)
   if (loopTime >= lastMotorUpdateTime)
   {
     lastMotorUpdateTime += HZ_TO_US(101);
-
-    if (fcu.armed) // Only update motors if armed
-      updateESC();
+    updateESC();
   }
 
   if (loopTime >= lastPacketSendTime)
@@ -88,7 +87,6 @@ void loop(void)
     tx_packet.node = NODE_ID;
     tx_packet.zone = ZONE_ID;
     tx_packet.type = TYPE_TELEMETRY;
-
     memcpy(tx_packet.data, &fcu, sizeof(FCU));
 
     sendDataPacket();
@@ -185,13 +183,13 @@ static inline void niclaInit(void)
 {
   nicla::begin(false);
   nicla::setBatteryNTCEnabled(false);
-  nicla::disableLDO();
-  nicla::enable1V8LDO();
   nicla::disableCharging();
+  nicla::disableLDO();
+  nicla::enable3V3LDO();
 
-  // Set BQ25120A battery under-voltage lockout (UVLO) threshold to 2.2V (default is 3.0V). Read-modify-write.
+  // Disable BQ25120A battery under-voltage lockout (UVLO) threshold (default is 3.0V). Read-modify-write.
   uint8_t data = bq25120a.readByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL);
-  data = (data & ~0x07) | 0x06; // Set bits 2:0 to 110 for 2.2V UVLO
+  data = (data & ~0x07) | 0x07; // Set bits 2:0 to 111 for disabling UVLO threshold
   bq25120a.writeByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL, data);
 }
 
@@ -217,26 +215,26 @@ static inline void imuInit(void)
   temperature.begin(TEMPERATURE_HZ, TEMPERATURE_LATENCY);
 }
 
-static inline void vl53l4cxInit(void)
+static inline void tofInit(void)
 {
-  // TODO: Roi settings, distance mode, timing budget
-  // Wire.begin();
-  // Wire.setClock(400000); // 400 kHz I2C
+  Wire.begin();
+  Wire.setClock(400000); // 400 kHz I2C
 
-  // vl53l4cx.VL53L4CX_SetDeviceAddress(VL53L4CX_ADDR);
-  // vl53l4cx.VL53L4CX_WaitDeviceBooted();
-  // vl53l4cx.VL53L4CX_DataInit();
-  // vl53l4cx.VL53L4CX_SetDistanceMode(VL53L4CX_DISTANCEMODE_LONG);
-  // vl53l4cx.VL53L4CX_SetMeasurementTimingBudgetMicroSeconds(50000); // 50 ms
+  vl53l4cx.VL53L4CX_SetDeviceAddress(VL53L4CX_ADDR);
+  vl53l4cx.VL53L4CX_WaitDeviceBooted();
+  vl53l4cx.VL53L4CX_DataInit();
+  vl53l4cx.VL53L4CX_SetDistanceMode(VL53L4CX_DISTANCEMODE_LONG);
+  vl53l4cx.VL53L4CX_SetMeasurementTimingBudgetMicroSeconds(33000); // 33 ms
 
-  // static const VL53L4CX_UserRoi_t userRoi = {
-  //     .TopLeftX = 0,
-  //     .TopLeftY = 0,
-  //     .BotRightX = 15,
-  //     .BotRightY = 15};
+  // Centered 4x4 ROI in 16x16 SPAD array
+  VL53L4CX_UserRoi_t roi = {
+      .TopLeftX = 6,
+      .TopLeftY = 6,
+      .BotRightX = 9,
+      .BotRightY = 9};
 
-  // vl53l4cx.VL53L4CX_SetUserROI(&userRoi);
-  // vl53l4cx.VL53L4CX_StartMeasurement();
+  vl53l4cx.VL53L4CX_SetUserROI(&roi);
+  vl53l4cx.VL53L4CX_StartMeasurement();
 }
 
 static inline void quaternionMultiply(DataQuaternion &r, const DataQuaternion &q1, const DataQuaternion &q2)
@@ -250,16 +248,23 @@ static inline void quaternionMultiply(DataQuaternion &r, const DataQuaternion &q
 
 static inline void updateESC(void)
 {
-  const uint16_t m1 = (uint16_t)constrain(fcu.thrust + rollPID.output - pitchPID.output - yawPID.output, 0, PID_MAX);
-  const uint16_t m2 = (uint16_t)constrain(fcu.thrust - rollPID.output - pitchPID.output + yawPID.output, 0, PID_MAX);
-  const uint16_t m3 = (uint16_t)constrain(fcu.thrust + rollPID.output + pitchPID.output + yawPID.output, 0, PID_MAX);
-  const uint16_t m4 = (uint16_t)constrain(fcu.thrust - rollPID.output + pitchPID.output - yawPID.output, 0, PID_MAX);
-
-  // Set the invert bit (0x8000) to invert the PWM signal
-  esc.m1 = 0x8000 | m1; // Front Left, CCW
-  esc.m2 = 0x8000 | m2; // Front Right, CW
-  esc.m3 = 0x8000 | m3; // Rear Left, CW
-  esc.m4 = 0x8000 | m4; // Rear Right, CCW
+  esc = {.m1 = 0x8000, .m2 = 0x8000, .m3 = 0x8000, .m4 = 0x8000}; // Default to safe value (off)
+  
+  if (fcu.armed)
+  {
+    esc.m1 |= (uint16_t)constrain(fcu.thrust + rollPID.output - pitchPID.output - yawPID.output, THRUST_MIN, THRUST_MAX); // Front Left, CCW
+    esc.m2 |= (uint16_t)constrain(fcu.thrust - rollPID.output - pitchPID.output + yawPID.output, THRUST_MIN, THRUST_MAX); // Front Right, CW
+    esc.m3 |= (uint16_t)constrain(fcu.thrust + rollPID.output + pitchPID.output + yawPID.output, THRUST_MIN, THRUST_MAX); // Rear Left, CW
+    esc.m4 |= (uint16_t)constrain(fcu.thrust - rollPID.output + pitchPID.output - yawPID.output, THRUST_MIN, THRUST_MAX); // Rear Right, CCW
+  }
+  else
+  {
+    fcu.thrust = 0; // Ensure thrust is zero when disarmed
+    fcu.roll = fcu.pitch = fcu.yaw = 0.0f; // Reset control setpoints when disarmed
+    rollPID.integral = pitchPID.integral = yawPID.integral = 0.0f; // Reset integrators when disarmed
+    rollPID.previous_value = pitchPID.previous_value = yawPID.previous_value = 0.0f; // Reset previous values when disarmed
+    rollPID.output = pitchPID.output = yawPID.output = 0.0f; // Reset outputs when disarmed
+  }
 
   /* Memory barrier to ensure PWM values are updated before starting the sequence,
      needed when writing to HW registers shared with DMA to ensure data coherency */
@@ -297,16 +302,31 @@ static inline void updatePID(PID &pid, const float value)
 
 static inline void updateFlightControl(void)
 {
-  fcu.pressure = LPF * (pressure._value * PA_TO_HPA) + HPF * fcu.pressure;
-  fcu.temperature = LPF * (temperature._value - TEMPERATURE_CORRECTION_FACTOR) + HPF * fcu.temperature;
-  fcu.humidity = LPF * humidity._value + HPF * fcu.humidity;
+  const float newPressure = pressure._value * PA_TO_HPA;
+  fcu.pressure = LPF_BARO * newPressure + HPF_BARO * fcu.pressure;
+
+  const float newTemp = (temperature._value - TEMPERATURE_CORRECTION_FACTOR);
+  fcu.temperature = LPF_ENV * newTemp + HPF_ENV * fcu.temperature;
+  fcu.humidity = LPF_ENV * humidity._value + HPF_ENV * fcu.humidity;
 
   const float pressure_ratio = fcu.pressure * INV_SEA_LEVEL_PRESSURE;
   const float raw_altitude = BARO_ALTITUDE_CONSTANT * (1.0f - __builtin_powf(pressure_ratio, BARO_PRESSURE_EXPONENT));
-  fcu.altitude = LPF * raw_altitude + HPF * fcu.altitude;
+  fcu.altitude = LPF_BARO * raw_altitude + HPF_BARO * fcu.altitude;
+
+  uint8_t ready = 0;
+  if (vl53l4cx.VL53L4CX_GetMeasurementDataReady(&ready) == VL53L4CX_ERROR_NONE && ready)
+  {
+    VL53L4CX_MultiRangingData_t data;
+    if (vl53l4cx.VL53L4CX_GetMultiRangingData(&data) == VL53L4CX_ERROR_NONE &&
+        data.NumberOfObjectsFound > 0 && data.RangeData[0].RangeStatus == 0)
+    {
+      const float newDist = (float)data.RangeData[0].RangeMilliMeter;
+      fcu.distance = (uint16_t)(LPF_DISTANCE * newDist + HPF_DISTANCE * fcu.distance);
+    }
+    vl53l4cx.VL53L4CX_ClearInterruptAndStartMeasurement();
+  }
 
   const DataQuaternion conjugate = {-quaternion._data.x, -quaternion._data.y, -quaternion._data.z, quaternion._data.w};
-
   DataQuaternion error;
   quaternionMultiply(error, hoverQuaternion, conjugate);
 
@@ -432,12 +452,10 @@ static inline void handleSetpointPacket(void)
 
 static inline void handleThrustPacket(void)
 {
-  float thrust = 0.0f;
-  extractFloatFromData(thrust, 0);
+  const uint16_t thrust = (rx_packet.data[1] << 8) | rx_packet.data[0];
+  fcu.thrust = constrain(thrust, THRUST_MIN, THRUST_MAX);
 
-  fcu.thrust = constrain(thrust, THRUST_MIN, PID_MAX);
-
-  fcu.armed = fcu.thrust > 1.0f ? true : false;
+  fcu.armed = fcu.thrust > 1;
 }
 
 static inline void extractFloatFromData(float &value, const uint8_t index)

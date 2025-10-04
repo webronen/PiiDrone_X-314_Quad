@@ -24,13 +24,17 @@
 #define VL53L4CX_ADDR 0x52
 
 // Constants for filters and timing
-#define LPF 0.1f
-#define HPF (1.0f - LPF)
+#define LPF_BARO 0.30f
+#define HPF_BARO (1.0f - LPF_BARO)
+#define LPF_ENV 0.10f
+#define HPF_ENV (1.0f - LPF_ENV)
+#define LPF_DISTANCE 0.25f
+#define HPF_DISTANCE (1.0f - LPF_DISTANCE)
 #define ONE_SECOND_IN_US 1000000
 #define HZ_TO_US(Hz) (ONE_SECOND_IN_US / (Hz))
 #define INV_SEA_LEVEL_PRESSURE (1.0f / 1013.25f)
 #define PA_TO_HPA 0.01f
-#define TEMPERATURE_CORRECTION_FACTOR 6.95f
+#define TEMPERATURE_CORRECTION_FACTOR 5.6f
 #define PWM_BASE_CLOCK 16000000UL                // nRF52 PWM default (16MHz)
 #define PWM_FREQUENCY 20000UL                    // 20kHz target frequency
 #define PWM_TOP (PWM_BASE_CLOCK / PWM_FREQUENCY) // 19.975kHz PWM (-0.125% error)
@@ -74,7 +78,8 @@
 #define GAIN_MIN 0.0f
 #define SETPOINT_MAX 1.0f
 #define SETPOINT_MIN -1.0f
-#define THRUST_MIN 0.0f
+#define THRUST_MAX 800
+#define THRUST_MIN 0
 
 // Data packet types
 #define TYPE_PID 0
@@ -101,16 +106,18 @@
 #define GYROSCOPE_LATENCY 1
 #define GYROSCOPE_RANGE 1000 // ±1000°/s
 
-#define MAGNETOMETER_HZ 25
+#define MAGNETOMETER_HZ 25  
 #define MAGNETOMETER_LATENCY 40
 #define MAGNETOMETER_RANGE 2500 // ±2500µT
 
-#define PRESSURE_HZ 1
-#define PRESSURE_LATENCY 1000
+#define PRESSURE_HZ 10
+#define PRESSURE_LATENCY 200
+
 #define HUMIDITY_HZ 1
 #define HUMIDITY_LATENCY 1000
+
 #define TEMPERATURE_HZ 1
-#define TEMPERATURE_LATENCY 1000
+#define TEMPERATURE_LATENCY 500
 
 #define QUATERNION_HZ 400
 #define QUATERNION_LATENCY 1
@@ -133,9 +140,10 @@ BQ25120A bq25120a;
 VL53L4CX vl53l4cx(&Wire, NC); // XSHUT pin not connected (NC)
 
 // Flight control unit structure
-typedef struct
+typedef struct __attribute__((packed))
 {
-  float thrust;
+  uint16_t thrust;
+  uint16_t _pad;
   float roll;
   float pitch;
   float yaw;
@@ -143,7 +151,8 @@ typedef struct
   float altitude;
   float humidity;
   float temperature;
-  float distance;
+  uint16_t distance;
+  uint16_t _pad2;
   bool armed;
 } FCU;
 
@@ -193,7 +202,7 @@ static inline void pwmInit(void);
 static inline void timerInit(void);
 static inline void niclaInit(void);
 static inline void imuInit(void);
-static inline void vl53l4cxInit(void);
+static inline void tofInit(void);
 static inline void quaternionMultiply(DataQuaternion &r, const DataQuaternion &q1, const DataQuaternion &q2);
 static inline void updateESC(void);
 static inline void updatePID(PID &pid, const float value);
