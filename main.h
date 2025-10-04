@@ -15,7 +15,7 @@
 #include <sensors/SensorQuaternion.h>
 #include <sensors/SensorXYZ.h>
 
-// Remove conflict before including VL53L4CX_class.h
+// Remove conflict before including vl53l4cx_class.h
 #ifdef Mode
 #undef Mode
 #endif
@@ -78,6 +78,7 @@
 #define TYPE_PID 0
 #define TYPE_SETPOINT 1
 #define TYPE_THRUST 2
+#define TYPE_TELEMETRY 3
 
 // Axis types
 #define AXIS_PITCH 0
@@ -99,15 +100,15 @@
 #define GYROSCOPE_RANGE 1000 // ±1000°/s
 
 #define MAGNETOMETER_HZ 25
-#define MAGNETOMETER_LATENCY 4
+#define MAGNETOMETER_LATENCY 40
 #define MAGNETOMETER_RANGE 2500 // ±2500µT
 
 #define PRESSURE_HZ 1
-#define PRESSURE_LATENCY 100
+#define PRESSURE_LATENCY 1000
 #define HUMIDITY_HZ 1
-#define HUMIDITY_LATENCY 100
+#define HUMIDITY_LATENCY 1000
 #define TEMPERATURE_HZ 1
-#define TEMPERATURE_LATENCY 100
+#define TEMPERATURE_LATENCY 1000
 
 #define QUATERNION_HZ 400
 #define QUATERNION_LATENCY 1

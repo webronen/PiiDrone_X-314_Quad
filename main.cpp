@@ -8,7 +8,7 @@ FCU fcu = {
     .pressure = 1013.25f, // Sea level pressure reference
     .altitude = 0.0f,     // 0 meters (sea level)
     .humidity = 50.0f,    // 50% RH (typical)
-    .temperature = 25.0f  // 25°C (room temperature)
+    .temperature = 25.0f, // 25°C (room temperature)
 };
 
 ESC esc = {
@@ -47,7 +47,9 @@ void loop(void)
   static uint32_t lastSensorUpdateTime = loopTime;
   static uint32_t lastPidUpdateTime = loopTime;
   static uint32_t lastMotorUpdateTime = loopTime;
-
+  static uint32_t lastPacketSendTime = loopTime;
+  
+  // If received a packet, clear event flag and parse it
   if (NRF_RADIO->EVENTS_CRCOK)
   {
     NRF_RADIO->EVENTS_CRCOK = 0;
@@ -55,6 +57,7 @@ void loop(void)
     parseDataPacket();
   }
 
+  // Prime number scheduling for tasks, trying to eliminate parallel execution
   if (loopTime >= lastSensorUpdateTime)
   {
     lastSensorUpdateTime += HZ_TO_US(401);
@@ -71,6 +74,19 @@ void loop(void)
   {
     lastMotorUpdateTime += HZ_TO_US(101);
     updateESC();
+  }
+
+  if (loopTime >= lastPacketSendTime)
+  {
+    lastPacketSendTime += HZ_TO_US(2); // Smallest prime, 2 Hz = every 0.5 s
+
+    tx_packet.node = NODE_ID;
+    tx_packet.zone = ZONE_ID;
+    tx_packet.type = TYPE_TELEMETRY;
+
+    memcpy(tx_packet.data, &fcu, sizeof(FCU));
+
+    sendDataPacket();
   }
 
   bq25120a.getStatusRegister(); // Reset bq25120a watchdog
@@ -186,6 +202,7 @@ static inline void imuInit(void)
   // TODO: Magnetometer calibration, before using in quaternion/rotation vector
   // magnetometer.begin(MAGNETOMETER_HZ, MAGNETOMETER_LATENCY);
   magnetometer.begin(0, 0); // Disable magnetometer
+  magnetometer.setRange(MAGNETOMETER_RANGE);
 
   // Initialize 6 DoF quaternion (Acc + Gyro). 10 DoF (Acc + Gyro + Mag + Baro/ToF) in future, when magnetometer calibrated
   quaternion.begin(QUATERNION_HZ, QUATERNION_LATENCY);
@@ -270,22 +287,6 @@ static inline void updateFlightControl(void)
   fcu.altitude = LPF * raw_altitude + HPF * fcu.altitude;
 
   const DataQuaternion conjugate = {-quaternion._data.x, -quaternion._data.y, -quaternion._data.z, quaternion._data.w};
-
-  /*
-    In this case, the order of the quaternion multiplication does not matter,
-    because hoverQuaternion is a unit quaternion (the multiplicative identity).
-
-    quaternionMultiply(error, hoverQuaternion, conjugate);
-    quaternionMultiply(error, conjugate, hoverQuaternion);
-
-    Both are valid when hoverQuaternion is the identity.
-
-    However, the preferred and conventional order is:
-      quaternionMultiply(error, hoverQuaternion, conjugate);
-
-    This expresses "desired * conjugate(current)", which generalizes correctly
-    if you use a non-identity target quaternion in the future.
-  */
 
   DataQuaternion error;
   quaternionMultiply(error, hoverQuaternion, conjugate);
