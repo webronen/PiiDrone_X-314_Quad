@@ -2,7 +2,7 @@
 
 FCU fcu = {
     .thrust = 0,          // thrust, range 0 - 800
-    ._pad = 0,            // padding for alignment
+    ._pad = 0xFFFF,       // padding for alignment
     .roll = 0.0f,         // 0° roll (level)
     .pitch = 0.0f,        // 0° pitch (level)
     .yaw = 0.0f,          // 0° yaw (north)
@@ -11,7 +11,7 @@ FCU fcu = {
     .humidity = 50.0f,    // 50% RH (typical)
     .temperature = 25.0f, // 25°C (room temperature)
     .distance = 0,        // 0 mm (initial distance)
-    ._pad2 = 0,           // padding for alignment
+    ._pad2 = 0xFFFF,      // padding for alignment
     .armed = false        // Disarmed by default
 };
 
@@ -223,7 +223,7 @@ static inline void tofInit(void)
   vl53l4cx.VL53L4CX_SetDeviceAddress(VL53L4CX_ADDR);
   vl53l4cx.VL53L4CX_WaitDeviceBooted();
   vl53l4cx.VL53L4CX_DataInit();
-  vl53l4cx.VL53L4CX_SetDistanceMode(VL53L4CX_DISTANCEMODE_LONG);
+  vl53l4cx.VL53L4CX_SetDistanceMode(VL53L4CX_DISTANCEMODE_MEDIUM);
   vl53l4cx.VL53L4CX_SetMeasurementTimingBudgetMicroSeconds(33000); // 33 ms
 
   // Centered 4x4 ROI in 16x16 SPAD array
@@ -259,11 +259,12 @@ static inline void updateESC(void)
   }
   else
   {
-    fcu.thrust = 0;                                                                  // Ensure thrust is zero when disarmed
-    fcu.roll = fcu.pitch = fcu.yaw = 0.0f;                                           // Reset control setpoints when disarmed
-    rollPID.integral = pitchPID.integral = yawPID.integral = 0.0f;                   // Reset integrators when disarmed
-    rollPID.previous_value = pitchPID.previous_value = yawPID.previous_value = 0.0f; // Reset previous values when disarmed
-    rollPID.output = pitchPID.output = yawPID.output = 0.0f;                         // Reset outputs when disarmed
+    // Disarmed, reset all values to safe state when starting again from zero thrust
+    fcu.thrust = 0;
+    fcu.roll = fcu.pitch = fcu.yaw = 0.0f;
+    rollPID.integral = pitchPID.integral = yawPID.integral = 0.0f;
+    rollPID.previous_value = pitchPID.previous_value = yawPID.previous_value = 0.0f;
+    rollPID.output = pitchPID.output = yawPID.output = 0.0f;
   }
 
   /* Memory barrier to ensure PWM values are updated before starting the sequence,
@@ -455,7 +456,7 @@ static inline void handleThrustPacket(void)
   const uint16_t thrust = (rx_packet.data[1] << 8) | rx_packet.data[0];
   fcu.thrust = constrain(thrust, THRUST_MIN, THRUST_MAX);
 
-  fcu.armed = fcu.thrust > 1;
+  fcu.armed = fcu.thrust > 0;
 }
 
 static inline void extractFloatFromData(float &value, const uint8_t index)
