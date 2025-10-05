@@ -34,7 +34,7 @@
 #define HZ_TO_US(Hz) (ONE_SECOND_IN_US / (Hz))
 #define INV_SEA_LEVEL_PRESSURE (1.0f / 1013.25f)
 #define PA_TO_HPA 0.01f
-#define TEMPERATURE_CORRECTION_FACTOR 5.6f
+#define TEMP_OFFSET 5.6f
 #define PWM_BASE_CLOCK 16000000UL                // nRF52 PWM default (16MHz)
 #define PWM_FREQUENCY 20000UL                    // 20kHz target frequency
 #define PWM_TOP (PWM_BASE_CLOCK / PWM_FREQUENCY) // 19.975kHz PWM (-0.125% error)
@@ -204,6 +204,7 @@ static inline void niclaInit(void);
 static inline void imuInit(void);
 static inline void tofInit(void);
 static inline void quaternionMultiply(DataQuaternion &r, const DataQuaternion &q1, const DataQuaternion &q2);
+static inline void quaternionNormalize(DataQuaternion &q);
 static inline void updateESC(void);
 static inline void updatePID(PID &pid, const float value);
 static inline void updateFlightControl(void);

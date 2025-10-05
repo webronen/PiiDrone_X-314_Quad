@@ -244,6 +244,21 @@ static inline void quaternionMultiply(DataQuaternion &r, const DataQuaternion &q
   r.x = q1.w * q2.x + q1.x * q2.w + q1.y * q2.z - q1.z * q2.y;
   r.y = q1.w * q2.y - q1.x * q2.z + q1.y * q2.w + q1.z * q2.x;
   r.z = q1.w * q2.z + q1.x * q2.y - q1.y * q2.x + q1.z * q2.w;
+
+  quaternionNormalize(r);
+}
+
+static inline void quaternionNormalize(DataQuaternion &q)
+{
+  // Calculate inverse norm using magnitude with epsilon to avoid division by zero
+  const float mag = q.w * q.w + q.x * q.x + q.y * q.y + q.z * q.z;
+  const float inv = 1.0f / __builtin_sqrtf(mag + __FLT_EPSILON__);
+
+  // Normalize result
+  q.w *= inv;
+  q.x *= inv;
+  q.y *= inv;
+  q.z *= inv;
 }
 
 static inline void updateESC(void)
@@ -306,7 +321,7 @@ static inline void updateFlightControl(void)
   const float newPressure = pressure._value * PA_TO_HPA;
   fcu.pressure = LPF_BARO * newPressure + HPF_BARO * fcu.pressure;
 
-  const float newTemp = (temperature._value - TEMPERATURE_CORRECTION_FACTOR);
+  const float newTemp = (temperature._value - TEMP_OFFSET);
   fcu.temperature = LPF_ENV * newTemp + HPF_ENV * fcu.temperature;
   fcu.humidity = LPF_ENV * humidity._value + HPF_ENV * fcu.humidity;
 
@@ -328,6 +343,7 @@ static inline void updateFlightControl(void)
   }
 
   const DataQuaternion conjugate = {-quaternion._data.x, -quaternion._data.y, -quaternion._data.z, quaternion._data.w};
+
   DataQuaternion error;
   quaternionMultiply(error, hoverQuaternion, conjugate);
 
