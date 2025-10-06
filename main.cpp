@@ -49,15 +49,20 @@ void loop(void)
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
   const uint32_t loopTime = NRF_TIMER0->CC[0];
 
+  static uint32_t packetWatchdog = loopTime;
   static uint32_t lastSensorUpdateTime = loopTime;
   static uint32_t lastPidUpdateTime = loopTime;
   static uint32_t lastMotorUpdateTime = loopTime;
   static uint32_t lastPacketSendTime = loopTime;
 
-  // If received a packet, clear event flag and parse it
+  // If received a packet, clear event flag, update packet watchdog timer, and parse data
   if (NRF_RADIO->EVENTS_CRCOK)
   {
     NRF_RADIO->EVENTS_CRCOK = 0;
+
+    // Prevent gradual landing and disarming if packets are being received
+    packetWatchdog = loopTime + HZ_TO_US(0.1f);
+
     parseDataPacket();
   }
 
@@ -90,6 +95,14 @@ void loop(void)
     memcpy(tx_packet.data, &fcu, sizeof(FCU));
 
     sendDataPacket();
+
+    // If no packet received for 10 seconds, clear roll, pitch, yaw to level the drone and gradually land before disarming
+    if (fcu.armed && loopTime >= packetWatchdog)
+    {
+      // TODO: Find good rate for landing speed
+      fcu.roll = fcu.pitch = fcu.yaw = 0.0f; // Level the drone (Hover)
+      fcu.thrust >= 10 ? fcu.thrust -= 10 : fcu.armed = false;
+    }
   }
 
   bq25120a.getStatusRegister(); // Reset bq25120a watchdog
@@ -187,9 +200,9 @@ static inline void niclaInit(void)
   nicla::disableLDO();
   nicla::enable3V3LDO();
 
-  // Set BQ25120A battery under-voltage lockout (UVLO) threshold to 2.2V (default is 3.0V). Read-modify-write.
+  // Disable BQ25120A battery under-voltage lockout (UVLO) threshold (default is 3.0V). Read-modify-write.
   uint8_t data = bq25120a.readByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL);
-  data = (data & ~0x07) | 0x06; // Set bits 2:0 to 110 for 2.2V UVLO threshold
+  data = (data & ~0x07) | 0x07; // Set bits 2:0 to 111 for disabling UVLO threshold
   bq25120a.writeByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL, data);
 }
 
@@ -471,7 +484,7 @@ static inline void handleThrustPacket(void)
 {
   const uint16_t thrust = (rx_packet.data[1] << 8) | rx_packet.data[0];
   fcu.thrust = constrain(thrust, THRUST_MIN, THRUST_MAX);
-  
+
   fcu.armed = fcu.thrust > 0;
 }
 

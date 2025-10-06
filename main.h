@@ -30,7 +30,7 @@
 #define HPF_ENV (1.0f - LPF_ENV)
 #define LPF_DISTANCE 0.25f
 #define HPF_DISTANCE (1.0f - LPF_DISTANCE)
-#define ONE_SECOND_IN_US 1000000
+#define ONE_SECOND_IN_US 1000000.0f
 #define HZ_TO_US(Hz) (ONE_SECOND_IN_US / (Hz))
 #define INV_SEA_LEVEL_PRESSURE (1.0f / 1013.25f)
 #define PA_TO_HPA 0.01f
@@ -213,6 +213,5 @@ static inline void handlePidPacket(void);
 static inline void handleSetpointPacket(void);
 static inline void handleThrustPacket(void);
 static inline void extractFloatFromData(float &value, const uint8_t index);
-static inline void extractUint16FromData(uint16_t &value, const uint8_t index);
 
 #endif
