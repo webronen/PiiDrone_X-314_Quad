@@ -471,7 +471,7 @@ static inline void handleThrustPacket(void)
 {
   const uint16_t thrust = (rx_packet.data[1] << 8) | rx_packet.data[0];
   fcu.thrust = constrain(thrust, THRUST_MIN, THRUST_MAX);
-
+  
   fcu.armed = fcu.thrust > 0;
 }
 

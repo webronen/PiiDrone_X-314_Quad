@@ -213,5 +213,6 @@ static inline void handlePidPacket(void);
 static inline void handleSetpointPacket(void);
 static inline void handleThrustPacket(void);
 static inline void extractFloatFromData(float &value, const uint8_t index);
+static inline void extractUint16FromData(uint16_t &value, const uint8_t index);
 
 #endif
