@@ -200,9 +200,9 @@ static inline void niclaInit(void)
   nicla::disableLDO();
   nicla::enable3V3LDO();
 
-  // Disable BQ25120A battery under-voltage lockout (UVLO) threshold (default is 3.0V). Read-modify-write.
+  // Set BQ25120A battery under-voltage lockout (UVLO) threshold to 2.2V (default is 3.0V). Read-modify-write.
   uint8_t data = bq25120a.readByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL);
-  data = (data & ~0x07) | 0x07; // Set bits 2:0 to 111 for disabling UVLO threshold
+  data = (data & ~0x07) | 0x06; // Set bits 2:0 to 110 for setting UVLO threshold to 2.2V
   bq25120a.writeByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL, data);
 }
 
