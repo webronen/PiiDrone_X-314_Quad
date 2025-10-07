@@ -41,6 +41,7 @@ void setup()
   pwmInit();
   imuInit();
   tofInit();
+  loadPID();
 }
 
 void loop()
@@ -455,4 +456,65 @@ static inline void extractFloatFromData(float &value, const uint8_t index)
   bytes[1] = rxPacket.data[index + 1];
   bytes[2] = rxPacket.data[index + 2];
   bytes[3] = rxPacket.data[index + 3];
+}
+
+static inline void savePID(void)
+{
+  // Enable erase mode
+  NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Een;
+  while (!NRF_NVMC->READY)
+    ; // Wait until erase mode is enabled
+
+  // Erase UICR CUSTOMER area
+  NRF_NVMC->ERASEUICR = NVMC_ERASEUICR_ERASEUICR_Erase;
+  while (!NRF_NVMC->READY)
+    ; // Wait until erase is complete
+
+  // Prepare PID data for writing
+  const float pidData[9] = {
+      rollPid.kp, rollPid.ki, rollPid.kd,
+      pitchPid.kp, pitchPid.ki, pitchPid.kd,
+      yawPid.kp, yawPid.ki, yawPid.kd};
+
+  // Enable write mode
+  NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Wen;
+  while (!NRF_NVMC->READY)
+    ; // Wait until write mode is enabled
+
+  // Write PID data to UICR CUSTOMER area
+  for (uint8_t i = 0; i < 9; i++)
+  {
+    NRF_UICR->CUSTOMER[i] = *((uint32_t *)&pidData[i]);
+    while (!NRF_NVMC->READY)
+      ; // Wait until write is complete before writing next word
+  }
+
+  // Write PID data size as a marker
+  NRF_UICR->CUSTOMER[9] = PID_DATA_SIZE;
+  while (!NRF_NVMC->READY)
+    ; // Wait until write is complete
+
+  // Change back to read mode
+  NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Ren;
+  while (!NRF_NVMC->READY)
+    ; // Wait until read mode is enabled
+}
+
+static inline void loadPID(void)
+{
+  // Read PID data size marker
+  if (NRF_UICR->CUSTOMER[9] != PID_DATA_SIZE)
+    return; // No valid PID data stored, use default values
+
+  // Load PID data from UICR CUSTOMER area
+  const float *pidData = (float *)NRF_UICR->CUSTOMER;
+  rollPid.kp = pidData[0];
+  rollPid.ki = pidData[1];
+  rollPid.kd = pidData[2];
+  pitchPid.kp = pidData[3];
+  pitchPid.ki = pidData[4];
+  pitchPid.kd = pidData[5];
+  yawPid.kp = pidData[6];
+  yawPid.ki = pidData[7];
+  yawPid.kd = pidData[8];
 }

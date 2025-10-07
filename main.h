@@ -78,6 +78,8 @@
 #define TYPE_SETPOINT 1
 #define TYPE_THRUST 2
 #define TYPE_TELEMETRY 3
+#define TYPE_LOAD_DATA 254
+#define TYPE_SAVE_DATA 255
 
 #define AXIS_PITCH 0
 #define AXIS_ROLL 1
@@ -112,6 +114,7 @@
 #define QUATERNION_LATENCY 1
 
 #define SERIAL_BAUDRATE 115200
+#define PID_DATA_SIZE 36
 
 SensorXYZ accelerometer(BHY2_SENSOR_ID_ACC);
 SensorXYZ gyroscope(BHY2_SENSOR_ID_GYRO);
@@ -195,5 +198,7 @@ static inline void handlePidPacket(void);
 static inline void handleSetpointPacket(void);
 static inline void handleThrustPacket(void);
 static inline void extractFloatFromData(float &value, const uint8_t index);
+static inline void savePID(void);
+static inline void loadPID(void);
 
 #endif
