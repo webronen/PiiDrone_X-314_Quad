@@ -15,7 +15,6 @@
 #include <sensors/SensorQuaternion.h>
 #include <sensors/SensorXYZ.h>
 
-// Remove conflict before including vl53l4cx_class.h
 #ifdef Mode
 #undef Mode
 #endif
@@ -23,7 +22,6 @@
 #include <vl53l4cx_class.h>
 #define VL53L4CX_ADDR 0x52
 
-// Constants for filters and timing
 #define LPF_BARO 0.30f
 #define HPF_BARO (1.0f - LPF_BARO)
 #define LPF_ENV 0.10f
@@ -35,15 +33,13 @@
 #define INV_SEA_LEVEL_PRESSURE (1.0f / 1013.25f)
 #define PA_TO_HPA 0.01f
 #define TEMP_OFFSET 5.6f
-#define PWM_BASE_CLOCK 16000000UL                // nRF52 PWM default (16MHz)
-#define PWM_FREQUENCY 20000UL                    // 20kHz target frequency
-#define PWM_TOP (PWM_BASE_CLOCK / PWM_FREQUENCY) // 19.975kHz PWM (-0.125% error)
+#define PWM_BASE_CLOCK 16000000UL
+#define PWM_FREQUENCY 20000UL
+#define PWM_TOP (PWM_BASE_CLOCK / PWM_FREQUENCY)
 
-// Constants for altitude calculation
 #define BARO_ALTITUDE_CONSTANT 44307.694f
 #define BARO_PRESSURE_EXPONENT 0.190284f
 
-// PID default gains
 #define KP_PITCH 0.0f
 #define KI_PITCH 0.0f
 #define KD_PITCH 0.0f
@@ -56,21 +52,18 @@
 #define KI_YAW 0.0f
 #define KD_YAW 0.0f
 
-// Motor pin definitions
 #define MOTOR1_PIN 11
 #define MOTOR2_PIN 28
 #define MOTOR3_PIN 27
 #define MOTOR4_PIN 29
 
-// Setpoints for roll, pitch, yaw, and thrust
 #define ROLL_SETPOINT 0.0f
 #define PITCH_SETPOINT 0.0f
 #define YAW_SETPOINT 0.0f
 #define THRUST_SETPOINT 0.0f
 
-// Thresholds for PID and Setpoint
-#define PID_LOOP_HZ 211.0f                   // The frequency of the PID loop
-#define PID_LOOP_PERIOD (1.0f / PID_LOOP_HZ) // The period (delta time) between updates
+#define PID_LOOP_HZ 211.0f
+#define PID_LOOP_PERIOD (1.0f / PID_LOOP_HZ)
 
 #define PID_MAX 800.0f
 #define PID_MIN -800.0f
@@ -81,34 +74,30 @@
 #define THRUST_MAX 800
 #define THRUST_MIN 0
 
-// Data packet types
 #define TYPE_PID 0
 #define TYPE_SETPOINT 1
 #define TYPE_THRUST 2
 #define TYPE_TELEMETRY 3
 
-// Axis types
 #define AXIS_PITCH 0
 #define AXIS_ROLL 1
 #define AXIS_YAW 2
 
-// Gain types
 #define GAIN_KP 0
 #define GAIN_KI 1
 #define GAIN_KD 2
 
-// Sensor configuration constants
 #define ACCELEROMETER_HZ 400
 #define ACCELEROMETER_LATENCY 1
-#define ACCELEROMETER_RANGE 8 // ±8g
+#define ACCELEROMETER_RANGE 8
 
 #define GYROSCOPE_HZ 400
 #define GYROSCOPE_LATENCY 1
-#define GYROSCOPE_RANGE 1000 // ±1000°/s
+#define GYROSCOPE_RANGE 1000
 
 #define MAGNETOMETER_HZ 25  
 #define MAGNETOMETER_LATENCY 40
-#define MAGNETOMETER_RANGE 2500 // ±2500µT
+#define MAGNETOMETER_RANGE 2500
 
 #define PRESSURE_HZ 10
 #define PRESSURE_LATENCY 200
@@ -124,7 +113,6 @@
 
 #define SERIAL_BAUDRATE 115200
 
-// Sensor objects
 SensorXYZ accelerometer(BHY2_SENSOR_ID_ACC);
 SensorXYZ gyroscope(BHY2_SENSOR_ID_GYRO);
 SensorXYZ magnetometer(BHY2_SENSOR_ID_MAG);
@@ -133,13 +121,10 @@ Sensor humidity(BHY2_SENSOR_ID_HUM);
 Sensor temperature(BHY2_SENSOR_ID_TEMP);
 SensorQuaternion quaternion(BHY2_SENSOR_ID_RV);
 
-// BQ25120A power management
 BQ25120A bq25120a;
 
-// VL53L4CX Time-of-Flight distance sensor
-VL53L4CX vl53l4cx(&Wire, NC); // XSHUT pin not connected (NC)
+VL53L4CX vl53l4cx(&Wire, NC);
 
-// Flight control unit structure
 typedef struct __attribute__((packed))
 {
   uint16_t thrust;
@@ -154,18 +139,16 @@ typedef struct __attribute__((packed))
   uint16_t distance;
   uint16_t _pad2;
   bool armed;
-} FCU;
+} Fcu;
 
-// ESC structure for motor control
 typedef struct
 {
   uint16_t m1;
   uint16_t m2;
   uint16_t m3;
   uint16_t m4;
-} ESC;
+} Esc;
 
-// PID structure
 typedef struct
 {
   float setpoint;
@@ -173,9 +156,8 @@ typedef struct
   float integral;
   float previous_value;
   float output;
-} PID;
+} Pid;
 
-// Data packet structure
 typedef struct __attribute__((packed))
 {
   uint8_t node;
@@ -184,18 +166,18 @@ typedef struct __attribute__((packed))
   uint8_t data[252];
 } DataPacket;
 
-// External variables
-extern FCU fcu;
-extern ESC esc;
-extern const DataQuaternion hoverQuaternion;
-extern volatile DataPacket rx_packet;
-extern DataPacket tx_packet;
-extern PID roll;
-extern PID pitch;
-extern PID yaw;
-extern PID thrust;
+extern Fcu fcu;
+extern Esc esc;
+extern const DataQuaternion HoverQuaternion;
+extern volatile DataPacket rxPacket;
+extern DataPacket txPacket;
+extern Pid rollPid;
+extern Pid pitchPid;
+extern Pid yawPid;
 
-// Function declarations
+void setup(void);
+void loop(void);
+
 static inline void radioInit(void);
 static inline void sendDataPacket(void);
 static inline void pwmInit(void);
@@ -205,8 +187,8 @@ static inline void imuInit(void);
 static inline void tofInit(void);
 static inline void quaternionMultiply(DataQuaternion &r, const DataQuaternion &q1, const DataQuaternion &q2);
 static inline void quaternionNormalize(DataQuaternion &q);
-static inline void updateESC(void);
-static inline void updatePID(PID &pid, const float value);
+static inline void updateEsc(void);
+static inline void updatePid(Pid &pid, const float value);
 static inline void updateFlightControl(void);
 static inline void parseDataPacket(void);
 static inline void handlePidPacket(void);
