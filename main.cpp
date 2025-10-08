@@ -277,7 +277,9 @@ static inline void updateEsc(void)
     resetState();
     /*
       This is bad practice today. However, i have always wanted to use this legendary statement.
-      I am sorry for using it. Please forgive me.
+      I am sorry for using it. Please forgive me. If math shows up, I `goto` somewhere else.
+
+      Math? Nah. I prefer my logic nonlinear and my jumps unconditional.
 
       "goto - because structured programming is just a suggestion.."
     */
