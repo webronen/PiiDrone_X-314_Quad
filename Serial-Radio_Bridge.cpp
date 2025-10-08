@@ -22,7 +22,7 @@ void setup(void)
 
   Serial.begin(MBPS_TO_BPS(1));
   while (!Serial)
-    __WFE();
+    __NOP();
 }
 
 void loop(void)
@@ -31,13 +31,13 @@ void loop(void)
   {
     NRF_RADIO->EVENTS_CRCOK = 0;
     
-    tud_cdc_n_write(0, (uint8_t *)&rx_packet.node, sizeof(DataPacket));
+    tud_cdc_n_write(0, (uint8_t *)&rx_packet, sizeof(DataPacket));
     tud_cdc_n_write_flush(0);
   }
   
   if (tud_cdc_n_available(0) >= sizeof(DataPacket))
   {
-    tud_cdc_n_read(0, (uint8_t *)&tx_packet.node, sizeof(DataPacket));
+    tud_cdc_n_read(0, (uint8_t *)&tx_packet, sizeof(DataPacket));
     sendDataPacket();
   }
 }
@@ -46,10 +46,10 @@ static inline void radioInit(void)
 {
   NRF_CLOCK->TASKS_HFCLKSTART = 1;
   while (!NRF_CLOCK->EVENTS_HFCLKSTARTED)
-    __WFE();
+    __NOP();
 
   NRF_RADIO->SHORTS = (RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_START_Msk);
-  NRF_RADIO->PACKETPTR = (uint32_t)&rx_packet.node;
+  NRF_RADIO->PACKETPTR = (uint32_t)&rx_packet;
   NRF_RADIO->TXPOWER = RADIO_TXPOWER_TXPOWER_Pos8dBm;
 
   NRF_RADIO->PCNF1 = (sizeof(DataPacket) << RADIO_PCNF1_MAXLEN_Pos) |           // Maximum length of packet payload
@@ -79,22 +79,22 @@ static inline void radioInit(void)
 static inline void sendDataPacket(void)
 {
   while (!NRF_RADIO->EVENTS_END)
-    __WFE();
+    __NOP();
 
   NRF_RADIO->EVENTS_END = 0;
   NRF_RADIO->TASKS_DISABLE = 1;
 
   while (NRF_RADIO->STATE)
-    __WFE();
+    __NOP();
   
-  NRF_RADIO->PACKETPTR = (uint32_t)&tx_packet.node;
+  NRF_RADIO->PACKETPTR = (uint32_t)&tx_packet;
   NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk;
   NRF_RADIO->TASKS_TXEN = 1;
   
   while (NRF_RADIO->STATE)
-    __WFE();
+    __NOP();
 
-  NRF_RADIO->PACKETPTR = (uint32_t)&rx_packet.node;
+  NRF_RADIO->PACKETPTR = (uint32_t)&rx_packet;
   NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_START_Msk;
   NRF_RADIO->TASKS_RXEN = 1;
 }
