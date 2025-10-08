@@ -108,7 +108,7 @@ static inline void checkUsbAndCharge()
   const bool chargeDone = (((status >> 6) & 0x03) == 2);
 
   usbPresent && !chargeDone ? nicla::enableCharging(300) : nicla::disableCharging();
-  chargeDone && usbPresent ? nicla::leds.setColorRed() : nicla::leds.setColorRed(0);
+  chargeDone &&usbPresent ? nicla::leds.setColorRed() : nicla::leds.setColorRed(0);
 }
 
 static inline void rcuInit(void)
@@ -267,31 +267,56 @@ static inline void quaternionNormalize(DataQuaternion &q)
 
 static inline void updateEsc(void)
 {
-  esc.m1 = esc.m2 = esc.m3 = esc.m4 = 0x8000;
+  esc.m1 = 0x8000;
+  esc.m2 = 0x8000;
+  esc.m3 = 0x8000;
+  esc.m4 = 0x8000;
 
-  if (fcu.armed)
+  if (!fcu.armed)
   {
-    esc.m1 |= (uint16_t)constrain(fcu.thrust + rollPid.output - pitchPid.output - yawPid.output, THRUST_MIN, THRUST_MAX);
-    esc.m2 |= (uint16_t)constrain(fcu.thrust - rollPid.output - pitchPid.output + yawPid.output, THRUST_MIN, THRUST_MAX);
-    esc.m3 |= (uint16_t)constrain(fcu.thrust + rollPid.output + pitchPid.output + yawPid.output, THRUST_MIN, THRUST_MAX);
-    esc.m4 |= (uint16_t)constrain(fcu.thrust - rollPid.output + pitchPid.output - yawPid.output, THRUST_MIN, THRUST_MAX);
-  }
-  else
-  {
-    safeReset();
+    resetState();
+    /*
+      This is bad practice today. However, i have always wanted to use this legendary statement.
+      I am sorry for using it in my own production code. Please forgive me.
+
+      "goto - because structured programming is just a suggestion.."
+    */
+    goto UPDATE_ESC_END;
   }
 
+  esc.m1 |= (uint16_t)constrain(fcu.thrust + rollPid.output - pitchPid.output - yawPid.output, THRUST_MIN, THRUST_MAX);
+  esc.m2 |= (uint16_t)constrain(fcu.thrust - rollPid.output - pitchPid.output + yawPid.output, THRUST_MIN, THRUST_MAX);
+  esc.m3 |= (uint16_t)constrain(fcu.thrust + rollPid.output + pitchPid.output + yawPid.output, THRUST_MIN, THRUST_MAX);
+  esc.m4 |= (uint16_t)constrain(fcu.thrust - rollPid.output + pitchPid.output - yawPid.output, THRUST_MIN, THRUST_MAX);
+
+  UPDATE_ESC_END:
   __DMB();
   NRF_PWM0->TASKS_SEQSTART[0] = 1;
 }
 
-static inline void safeReset(void)
+static inline void resetState(void)
 {
   fcu.thrust = 0;
-  fcu.roll = fcu.pitch = fcu.yaw = 0.0f;
-  rollPid.integral = pitchPid.integral = yawPid.integral = 0.0f;
-  rollPid.previous_value = pitchPid.previous_value = yawPid.previous_value = 0.0f;
-  rollPid.output = pitchPid.output = yawPid.output = 0.0f;
+  fcu.roll = 0.0f;
+  fcu.pitch = 0.0f;
+  fcu.yaw = 0.0f;
+  fcu.armed = false;
+
+  rollPid.setpoint = 0.0f;
+  pitchPid.setpoint = 0.0f;
+  yawPid.setpoint = 0.0f;
+
+  rollPid.integral = 0.0f;
+  rollPid.previous_value = 0.0f;
+  rollPid.output = 0.0f;
+
+  pitchPid.integral = 0.0f;
+  pitchPid.previous_value = 0.0f;
+  pitchPid.output = 0.0f;
+
+  yawPid.integral = 0.0f;
+  yawPid.previous_value = 0.0f;
+  yawPid.output = 0.0f;
 }
 
 static inline void updatePid(Pid &pid, const float value)
