@@ -33,18 +33,18 @@ Pid yawPid = {.setpoint = YAW_SETPOINT, .kp = KP_YAW, .ki = KI_YAW, .kd = KD_YAW
 volatile DataPacket rxPacket;
 DataPacket txPacket;
 
-void setup()
+void setup(void)
 {
-  niclaInit();
-  radioInit();
-  timerInit();
+  sysInit();
+  rcuInit();
+  clkInit();
   pwmInit();
   imuInit();
   tofInit();
   loadPID();
 }
 
-void loop()
+void loop(void)
 {
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
   const uint32_t loopTime = NRF_TIMER0->CC[0];
@@ -98,14 +98,24 @@ void loop()
     }
   }
 
-  bq25120a.getStatusRegister();
+  checkUsbAndCharge();
 }
 
-static inline void radioInit()
+static inline void checkUsbAndCharge()
+{
+  const uint8_t status = nicla::_pmic.getStatusRegister();
+  const bool usbPresent = ((status >> 2) & 0x01);
+  const bool chargeDone = (((status >> 6) & 0x03) == 2);
+
+  usbPresent && !chargeDone ? nicla::enableCharging(300) : nicla::disableCharging();
+  chargeDone && usbPresent ? nicla::leds.setColorRed() : nicla::leds.setColorRed(0);
+}
+
+static inline void rcuInit(void)
 {
   NRF_CLOCK->TASKS_HFCLKSTART = 1;
   while (!NRF_CLOCK->EVENTS_HFCLKSTARTED)
-    __WFE();
+    __NOP();
 
   NRF_RADIO->SHORTS = (RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_START_Msk);
   NRF_RADIO->PACKETPTR = (uint32_t)&rxPacket;
@@ -134,30 +144,30 @@ static inline void radioInit()
   NRF_RADIO->TASKS_RXEN = 1;
 }
 
-static inline void sendDataPacket()
+static inline void sendDataPacket(void)
 {
   while (!NRF_RADIO->EVENTS_END)
-    __WFE();
+    __NOP();
 
   NRF_RADIO->EVENTS_END = 0;
   NRF_RADIO->TASKS_DISABLE = 1;
 
   while (NRF_RADIO->STATE)
-    __WFE();
+    __NOP();
 
   NRF_RADIO->PACKETPTR = (uint32_t)&txPacket;
   NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk;
   NRF_RADIO->TASKS_TXEN = 1;
 
   while (NRF_RADIO->STATE)
-    __WFE();
+    __NOP();
 
   NRF_RADIO->PACKETPTR = (uint32_t)&rxPacket;
   NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_START_Msk;
   NRF_RADIO->TASKS_RXEN = 1;
 }
 
-static inline void pwmInit()
+static inline void pwmInit(void)
 {
   NRF_P0->PIN_CNF[MOTOR1_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) | (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
   NRF_P0->PIN_CNF[MOTOR2_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) | (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
@@ -178,14 +188,14 @@ static inline void pwmInit()
   NRF_PWM0->TASKS_SEQSTART[0] = 1;
 }
 
-static inline void timerInit()
+static inline void clkInit(void)
 {
   NRF_TIMER0->BITMODE = TIMER_BITMODE_BITMODE_32Bit;
   NRF_TIMER0->PRESCALER = 4;
   NRF_TIMER0->TASKS_START = 1;
 }
 
-static inline void niclaInit()
+static inline void sysInit()
 {
   nicla::begin(false);
   nicla::setBatteryNTCEnabled(false);
@@ -193,12 +203,12 @@ static inline void niclaInit()
   nicla::disableLDO();
   nicla::enable3V3LDO();
 
-  uint8_t data = bq25120a.readByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL);
-  data = (data & ~0x07) | 0x06;
-  bq25120a.writeByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL, data);
+  uint8_t data = nicla::_pmic.readByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL);
+  data = (data & ~0x07) | 0x06; // Set UVLO to 2.2V
+  nicla::_pmic.writeByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL, data);
 }
 
-static inline void imuInit()
+static inline void imuInit(void)
 {
   sensortec.begin();
 
@@ -217,7 +227,7 @@ static inline void imuInit()
   temperature.begin(TEMPERATURE_HZ, TEMPERATURE_LATENCY);
 }
 
-static inline void tofInit()
+static inline void tofInit(void)
 {
   Wire.begin();
   Wire.setClock(400000);
@@ -259,7 +269,7 @@ static inline void quaternionNormalize(DataQuaternion &q)
   q.z *= inv;
 }
 
-static inline void updateEsc()
+static inline void updateEsc(void)
 {
   esc.m1 = esc.m2 = esc.m3 = esc.m4 = 0x8000;
 
@@ -272,15 +282,20 @@ static inline void updateEsc()
   }
   else
   {
-    fcu.thrust = 0;
-    fcu.roll = fcu.pitch = fcu.yaw = 0.0f;
-    rollPid.integral = pitchPid.integral = yawPid.integral = 0.0f;
-    rollPid.previous_value = pitchPid.previous_value = yawPid.previous_value = 0.0f;
-    rollPid.output = pitchPid.output = yawPid.output = 0.0f;
+    disarmEsc();
   }
 
   __DMB();
   NRF_PWM0->TASKS_SEQSTART[0] = 1;
+}
+
+static inline void disarmEsc(void)
+{
+  fcu.thrust = 0;
+  fcu.roll = fcu.pitch = fcu.yaw = 0.0f;
+  rollPid.integral = pitchPid.integral = yawPid.integral = 0.0f;
+  rollPid.previous_value = pitchPid.previous_value = yawPid.previous_value = 0.0f;
+  rollPid.output = pitchPid.output = yawPid.output = 0.0f;
 }
 
 static inline void updatePid(Pid &pid, const float value)
@@ -460,15 +475,15 @@ static inline void extractFloatFromData(float &value, const uint8_t index)
 
 static inline void savePID(void)
 {
-  // Enable erase mode
+  // Change to erase mode
   NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Een;
   while (!NRF_NVMC->READY)
-    ; // Wait until erase mode is enabled
+    __NOP(); // Wait until erase mode is enabled
 
   // Erase UICR CUSTOMER area
   NRF_NVMC->ERASEUICR = NVMC_ERASEUICR_ERASEUICR_Erase;
   while (!NRF_NVMC->READY)
-    ; // Wait until erase is complete
+    __NOP(); // Wait until erase is complete
 
   // Prepare PID data for writing
   const float pidData[9] = {
@@ -479,32 +494,32 @@ static inline void savePID(void)
   // Enable write mode
   NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Wen;
   while (!NRF_NVMC->READY)
-    ; // Wait until write mode is enabled
+    __NOP(); // Wait until write mode is enabled
 
   // Write PID data to UICR CUSTOMER area
-  for (uint8_t i = 0; i < 9; i++)
+  for (uint8_t i = 0; i < PID_BLOCK_SIZE - 1; i++)
   {
     NRF_UICR->CUSTOMER[i] = *((uint32_t *)&pidData[i]);
     while (!NRF_NVMC->READY)
-      ; // Wait until write is complete before writing next word
+      __NOP(); // Wait until write is complete before writing next word
   }
 
   // Write PID data size as a marker
-  NRF_UICR->CUSTOMER[9] = PID_DATA_SIZE;
+  NRF_UICR->CUSTOMER[9] = PID_BLOCK_SIZE;
   while (!NRF_NVMC->READY)
-    ; // Wait until write is complete
+    __NOP(); // Wait until write is complete
 
   // Change back to read mode
   NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Ren;
   while (!NRF_NVMC->READY)
-    ; // Wait until read mode is enabled
+    __NOP(); // Wait until read mode is enabled
 }
 
 static inline void loadPID(void)
 {
   // Read PID data size marker
-  if (NRF_UICR->CUSTOMER[9] != PID_DATA_SIZE)
-    return; // No valid PID data stored, use default values
+  if (NRF_UICR->CUSTOMER[9] != PID_BLOCK_SIZE)
+    return; // No valid PID data stored, return without loading.
 
   // Load PID data from UICR CUSTOMER area
   const float *pidData = (float *)NRF_UICR->CUSTOMER;

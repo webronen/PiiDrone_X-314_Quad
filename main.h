@@ -9,7 +9,6 @@
 #include <nrf.h>
 #include <Nicla_System.h>
 #include <Serial.h>
-#include "BQ25120A.h"
 
 #include <sensors/Sensor.h>
 #include <sensors/SensorQuaternion.h>
@@ -78,8 +77,8 @@
 #define TYPE_SETPOINT 1
 #define TYPE_THRUST 2
 #define TYPE_TELEMETRY 3
-#define TYPE_LOAD_DATA 254
-#define TYPE_SAVE_DATA 255
+#define TYPE_SAVE_FLASH 254
+#define TYPE_LOAD_FLASH 255
 
 #define AXIS_PITCH 0
 #define AXIS_ROLL 1
@@ -97,7 +96,7 @@
 #define GYROSCOPE_LATENCY 1
 #define GYROSCOPE_RANGE 1000
 
-#define MAGNETOMETER_HZ 25  
+#define MAGNETOMETER_HZ 25
 #define MAGNETOMETER_LATENCY 40
 #define MAGNETOMETER_RANGE 2500
 
@@ -114,7 +113,10 @@
 #define QUATERNION_LATENCY 1
 
 #define SERIAL_BAUDRATE 115200
-#define PID_DATA_SIZE 36
+
+// UICR CUSTOMER area layout
+#define UICR_BLOCK_SIZE 32 // 32 words (128 bytes) per UICR CUSTOMER area block
+#define PID_BLOCK_SIZE 10  // PID 9 Words + 1 Word for marker, total 10 words (40 bytes)
 
 SensorXYZ accelerometer(BHY2_SENSOR_ID_ACC);
 SensorXYZ gyroscope(BHY2_SENSOR_ID_GYRO);
@@ -123,8 +125,6 @@ Sensor pressure(BHY2_SENSOR_ID_BARO);
 Sensor humidity(BHY2_SENSOR_ID_HUM);
 Sensor temperature(BHY2_SENSOR_ID_TEMP);
 SensorQuaternion quaternion(BHY2_SENSOR_ID_RV);
-
-BQ25120A bq25120a;
 
 VL53L4CX vl53l4cx(&Wire, NC);
 
@@ -181,16 +181,17 @@ extern Pid yawPid;
 void setup(void);
 void loop(void);
 
-static inline void radioInit(void);
+static inline void rcuInit(void);
 static inline void sendDataPacket(void);
 static inline void pwmInit(void);
-static inline void timerInit(void);
-static inline void niclaInit(void);
+static inline void clkInit(void);
+static inline void sysInit(void);
 static inline void imuInit(void);
 static inline void tofInit(void);
 static inline void quaternionMultiply(DataQuaternion &r, const DataQuaternion &q1, const DataQuaternion &q2);
 static inline void quaternionNormalize(DataQuaternion &q);
 static inline void updateEsc(void);
+static inline void disarmEsc(void);
 static inline void updatePid(Pid &pid, const float value);
 static inline void updateFlightControl(void);
 static inline void parseDataPacket(void);
@@ -200,5 +201,6 @@ static inline void handleThrustPacket(void);
 static inline void extractFloatFromData(float &value, const uint8_t index);
 static inline void savePID(void);
 static inline void loadPID(void);
+static inline void checkUsbAndCharge(void);
 
 #endif
