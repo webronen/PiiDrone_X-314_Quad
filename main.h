@@ -191,7 +191,7 @@ static inline void tofInit(void);
 static inline void quaternionMultiply(DataQuaternion &r, const DataQuaternion &q1, const DataQuaternion &q2);
 static inline void quaternionNormalize(DataQuaternion &q);
 static inline void updateEsc(void);
-static inline void disarmEsc(void);
+static inline void safeReset(void);
 static inline void updatePid(Pid &pid, const float value);
 static inline void updateFlightControl(void);
 static inline void parseDataPacket(void);

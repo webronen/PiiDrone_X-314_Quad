@@ -202,10 +202,6 @@ static inline void sysInit()
   nicla::disableCharging();
   nicla::disableLDO();
   nicla::enable3V3LDO();
-
-  uint8_t data = nicla::_pmic.readByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL);
-  data = (data & ~0x07) | 0x06; // Set UVLO to 2.2V
-  nicla::_pmic.writeByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL, data);
 }
 
 static inline void imuInit(void)
@@ -282,14 +278,14 @@ static inline void updateEsc(void)
   }
   else
   {
-    disarmEsc();
+    safeReset();
   }
 
   __DMB();
   NRF_PWM0->TASKS_SEQSTART[0] = 1;
 }
 
-static inline void disarmEsc(void)
+static inline void safeReset(void)
 {
   fcu.thrust = 0;
   fcu.roll = fcu.pitch = fcu.yaw = 0.0f;
