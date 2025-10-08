@@ -277,7 +277,7 @@ static inline void updateEsc(void)
     resetState();
     /*
       This is bad practice today. However, i have always wanted to use this legendary statement.
-      I am sorry for using it in my own production code. Please forgive me.
+      I am sorry for using it. Please forgive me.
 
       "goto - because structured programming is just a suggestion.."
     */
