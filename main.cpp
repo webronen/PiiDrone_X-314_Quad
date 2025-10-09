@@ -2,7 +2,19 @@
 
 Fcu fcu = {
     .thrust = 0,
-    ._pad = 0xFFFF,
+    .distance = 0,
+    .setpoint_pitch = 0.0f,
+    .setpoint_roll = 0.0f,
+    .setpoint_yaw = 0.0f,
+    .pid_pitch_p = 0.0f,
+    .pid_pitch_i = 0.0f,
+    .pid_pitch_d = 0.0f,
+    .pid_roll_p = 0.0f,
+    .pid_roll_i = 0.0f,
+    .pid_roll_d = 0.0f,
+    .pid_yaw_p = 0.0f,
+    .pid_yaw_i = 0.0f,
+    .pid_yaw_d = 0.0f,
     .roll = 0.0f,
     .pitch = 0.0f,
     .yaw = 0.0f,
@@ -10,15 +22,16 @@ Fcu fcu = {
     .altitude = 0.0f,
     .humidity = 50.0f,
     .temperature = 25.0f,
-    .distance = 0,
-    ._pad2 = 0xFFFF,
-    .armed = false};
+    .armed = false,
+    ._pad = {0}};
 
 Esc esc = {
     .m1 = 0x8000,
     .m2 = 0x8000,
     .m3 = 0x8000,
     .m4 = 0x8000};
+
+FlashBlock flashData = {0};
 
 const DataQuaternion HoverQuaternion = {
     .x = 0.0f,
@@ -41,7 +54,17 @@ void setup(void)
   pwmInit();
   imuInit();
   tofInit();
-  loadPID();
+
+  loadFlashData();
+  pitchPid.kp = flashData.pitch_kp;
+  pitchPid.ki = flashData.pitch_ki;
+  pitchPid.kd = flashData.pitch_kd;
+  rollPid.kp = flashData.roll_kp;
+  rollPid.ki = flashData.roll_ki;
+  rollPid.kd = flashData.roll_kd;
+  yawPid.kp = flashData.yaw_kp;
+  yawPid.ki = flashData.yaw_ki;
+  yawPid.kd = flashData.yaw_kd;
 }
 
 void loop(void)
@@ -49,16 +72,17 @@ void loop(void)
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
   const uint32_t loopTime = NRF_TIMER0->CC[0];
 
-  static uint32_t packetWatchdog = loopTime;
   static uint32_t lastSensorUpdateTime = loopTime;
   static uint32_t lastPidUpdateTime = loopTime;
   static uint32_t lastMotorUpdateTime = loopTime;
   static uint32_t lastPacketSendTime = loopTime;
+  static uint32_t lastPacketReceiveTime = loopTime;
+  static uint32_t startLandingTime = loopTime;
 
   if (NRF_RADIO->EVENTS_CRCOK)
   {
     NRF_RADIO->EVENTS_CRCOK = 0;
-    packetWatchdog = loopTime + HZ_TO_US(0.1f);
+    lastPacketReceiveTime = loopTime + HZ_TO_US(0.1f);
     parseDataPacket();
   }
 
@@ -87,14 +111,38 @@ void loop(void)
     txPacket.node = NODE_ID;
     txPacket.zone = ZONE_ID;
     txPacket.type = TYPE_TELEMETRY;
+
+    fcu.pid_pitch_p = pitchPid.kp;
+    fcu.pid_pitch_i = pitchPid.ki;
+    fcu.pid_pitch_d = pitchPid.kd;
+    fcu.pid_roll_p = rollPid.kp;
+    fcu.pid_roll_i = rollPid.ki;
+    fcu.pid_roll_d = rollPid.kd;
+    fcu.pid_yaw_p = yawPid.kp;
+    fcu.pid_yaw_i = yawPid.ki;
+    fcu.pid_yaw_d = yawPid.kd;
+
+    fcu.setpoint_pitch = pitchPid.setpoint;
+    fcu.setpoint_roll = rollPid.setpoint;
+    fcu.setpoint_yaw = yawPid.setpoint;
+
     memcpy(txPacket.data, &fcu, sizeof(Fcu));
-
     sendDataPacket();
+  }
 
-    if (fcu.armed && loopTime >= packetWatchdog)
+  if (fcu.armed && loopTime >= lastPacketReceiveTime)
+  {
+    if (loopTime >= startLandingTime)
     {
-      fcu.roll = fcu.pitch = fcu.yaw = 0.0f;
-      fcu.thrust >= 10 ? fcu.thrust -= 10 : fcu.armed = false;
+      startLandingTime = loopTime + HZ_TO_US(1);
+      fcu.setpoint_pitch = 0.0f;
+      fcu.setpoint_roll = 0.0f;
+      fcu.setpoint_yaw = 0.0f;
+
+      if (fcu.thrust >= 10)
+        fcu.thrust -= 10;
+      else
+        fcu.armed = false;
     }
   }
 
@@ -107,8 +155,15 @@ static inline void checkUsbAndCharge()
   const bool usbPresent = ((status >> 2) & 0x01);
   const bool chargeDone = (((status >> 6) & 0x03) == 2);
 
-  usbPresent && !chargeDone ? nicla::enableCharging(300) : nicla::disableCharging();
-  chargeDone &&usbPresent ? nicla::leds.setColorRed() : nicla::leds.setColorRed(0);
+  if (usbPresent && !chargeDone)
+    nicla::enableCharging(300);
+  else
+    nicla::disableCharging();
+
+  if (chargeDone && usbPresent)
+    nicla::leds.setColorRed();
+  else
+    nicla::leds.setColorRed(0);
 }
 
 static inline void rcuInit(void)
@@ -291,7 +346,7 @@ static inline void updateEsc(void)
   esc.m3 |= (uint16_t)constrain(fcu.thrust + rollPid.output + pitchPid.output + yawPid.output, THRUST_MIN, THRUST_MAX);
   esc.m4 |= (uint16_t)constrain(fcu.thrust - rollPid.output + pitchPid.output - yawPid.output, THRUST_MIN, THRUST_MAX);
 
-  UPDATE_ESC_END:
+UPDATE_ESC_END:
   __DMB();
   NRF_PWM0->TASKS_SEQSTART[0] = 1;
 }
@@ -366,9 +421,9 @@ static inline void updateFlightControl(void)
   DataQuaternion error;
   quaternionMultiply(error, HoverQuaternion, conjugate);
 
-  updatePid(rollPid, error.x + fcu.roll);
-  updatePid(pitchPid, error.y + fcu.pitch);
-  updatePid(yawPid, error.z + fcu.yaw);
+  updatePid(rollPid, error.x);
+  updatePid(pitchPid, error.y);
+  updatePid(yawPid, error.z);
 }
 
 static inline void parseDataPacket(void)
@@ -388,6 +443,30 @@ static inline void parseDataPacket(void)
     break;
   case TYPE_THRUST:
     handleThrustPacket();
+    break;
+  case TYPE_SAVE:
+    flashData.pitch_kp = pitchPid.kp;
+    flashData.pitch_ki = pitchPid.ki;
+    flashData.pitch_kd = pitchPid.kd;
+    flashData.roll_kp = rollPid.kp;
+    flashData.roll_ki = rollPid.ki;
+    flashData.roll_kd = rollPid.kd;
+    flashData.yaw_kp = yawPid.kp;
+    flashData.yaw_ki = yawPid.ki;
+    flashData.yaw_kd = yawPid.kd;
+    saveFlashData();
+    break;
+  case TYPE_LOAD:
+    loadFlashData();
+    pitchPid.kp = flashData.pitch_kp;
+    pitchPid.ki = flashData.pitch_ki;
+    pitchPid.kd = flashData.pitch_kd;
+    rollPid.kp = flashData.roll_kp;
+    rollPid.ki = flashData.roll_ki;
+    rollPid.kd = flashData.roll_kd;
+    yawPid.kp = flashData.yaw_kp;
+    yawPid.ki = flashData.yaw_ki;
+    yawPid.kd = flashData.yaw_kd;
     break;
   }
 }
@@ -431,6 +510,7 @@ static inline void handlePidPacket(void)
     case GAIN_KI:
       rollPid.ki = value;
       break;
+      break;
     case GAIN_KD:
       rollPid.kd = value;
       break;
@@ -469,13 +549,13 @@ static inline void handleSetpointPacket(void)
   switch (axis)
   {
   case AXIS_PITCH:
-    fcu.pitch = value;
+    pitchPid.setpoint = value;
     break;
   case AXIS_ROLL:
-    fcu.roll = value;
+    rollPid.setpoint = value;
     break;
   case AXIS_YAW:
-    fcu.yaw = value;
+    yawPid.setpoint = value;
     break;
   }
 }
@@ -484,7 +564,11 @@ static inline void handleThrustPacket(void)
 {
   const uint16_t thrust = (rxPacket.data[1] << 8) | rxPacket.data[0];
   fcu.thrust = constrain(thrust, THRUST_MIN, THRUST_MAX);
-  fcu.armed = fcu.thrust > 0;
+
+  if (fcu.thrust > THRUST_MIN)
+    fcu.armed = true;
+  else
+    fcu.armed = false;
 }
 
 static inline void extractFloatFromData(float &value, const uint8_t index)
@@ -496,63 +580,39 @@ static inline void extractFloatFromData(float &value, const uint8_t index)
   bytes[3] = rxPacket.data[index + 3];
 }
 
-static inline void savePID(void)
+static inline void eraseFlashData(void)
 {
-  // Change to erase mode
   NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Een;
   while (!NRF_NVMC->READY)
-    __NOP(); // Wait until erase mode is enabled
+    __NOP();
 
-  // Erase UICR CUSTOMER area
   NRF_NVMC->ERASEUICR = NVMC_ERASEUICR_ERASEUICR_Erase;
   while (!NRF_NVMC->READY)
-    __NOP(); // Wait until erase is complete
-
-  // Prepare PID data for writing
-  const float pidData[9] = {
-      rollPid.kp, rollPid.ki, rollPid.kd,
-      pitchPid.kp, pitchPid.ki, pitchPid.kd,
-      yawPid.kp, yawPid.ki, yawPid.kd};
-
-  // Enable write mode
-  NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Wen;
-  while (!NRF_NVMC->READY)
-    __NOP(); // Wait until write mode is enabled
-
-  // Write PID data to UICR CUSTOMER area
-  for (uint8_t i = 0; i < PID_BLOCK_SIZE - 1; i++)
-  {
-    NRF_UICR->CUSTOMER[i] = *((uint32_t *)&pidData[i]);
-    while (!NRF_NVMC->READY)
-      __NOP(); // Wait until write is complete before writing next word
-  }
-
-  // Write PID data size as a marker
-  NRF_UICR->CUSTOMER[9] = PID_BLOCK_SIZE;
-  while (!NRF_NVMC->READY)
-    __NOP(); // Wait until write is complete
-
-  // Change back to read mode
-  NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Ren;
-  while (!NRF_NVMC->READY)
-    __NOP(); // Wait until read mode is enabled
+    __NOP();
 }
 
-static inline void loadPID(void)
+static inline void saveFlashData(void)
 {
-  // Read PID data size marker
-  if (NRF_UICR->CUSTOMER[9] != PID_BLOCK_SIZE)
-    return; // No valid PID data stored, return without loading.
+  eraseFlashData();
 
-  // Load PID data from UICR CUSTOMER area
-  const float *pidData = (float *)NRF_UICR->CUSTOMER;
-  rollPid.kp = pidData[0];
-  rollPid.ki = pidData[1];
-  rollPid.kd = pidData[2];
-  pitchPid.kp = pidData[3];
-  pitchPid.ki = pidData[4];
-  pitchPid.kd = pidData[5];
-  yawPid.kp = pidData[6];
-  yawPid.ki = pidData[7];
-  yawPid.kd = pidData[8];
+  NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Wen;
+  while (!NRF_NVMC->READY)
+    __NOP();
+
+  uint32_t *data = (uint32_t *)&flashData;
+  for (uint8_t i = 0; i < UICR_BLOCK_SIZE; i++)
+  {
+    NRF_UICR->CUSTOMER[i] = data[i];
+    while (!NRF_NVMC->READY)
+      __NOP();
+  }
+
+  NVIC_SystemReset();
+}
+
+static inline void loadFlashData(void)
+{
+  uint32_t *data = (uint32_t *)&flashData;
+  for (uint8_t i = 0; i < UICR_BLOCK_SIZE; i++)
+    data[i] = NRF_UICR->CUSTOMER[i];
 }

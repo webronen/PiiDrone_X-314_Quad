@@ -77,8 +77,8 @@
 #define TYPE_SETPOINT 1
 #define TYPE_THRUST 2
 #define TYPE_TELEMETRY 3
-#define TYPE_SAVE_FLASH 254
-#define TYPE_LOAD_FLASH 255
+#define TYPE_LOAD 254
+#define TYPE_SAVE 255
 
 #define AXIS_PITCH 0
 #define AXIS_ROLL 1
@@ -115,8 +115,9 @@
 #define SERIAL_BAUDRATE 115200
 
 // UICR CUSTOMER area layout
-#define UICR_BLOCK_SIZE 32 // 32 words (128 bytes) per UICR CUSTOMER area block
-#define PID_BLOCK_SIZE 10  // PID 9 Words + 1 Word for marker, total 10 words (40 bytes)
+#define UICR_BLOCK_SIZE 32 // 32 words (128 bytes)
+#define UICR_BYTE_COUNT (UICR_BLOCK_SIZE * 4)
+#define UICR_WRITE_LIMIT 5 // Erase required every 5 writes
 
 SensorXYZ accelerometer(BHY2_SENSOR_ID_ACC);
 SensorXYZ gyroscope(BHY2_SENSOR_ID_GYRO);
@@ -128,10 +129,27 @@ SensorQuaternion quaternion(BHY2_SENSOR_ID_RV);
 
 VL53L4CX vl53l4cx(&Wire, NC);
 
-typedef struct __attribute__((packed))
+typedef struct __attribute__((aligned(4), packed))
 {
+  // Thrust and setpoints
   uint16_t thrust;
-  uint16_t _pad;
+  uint16_t distance;
+  float setpoint_pitch;
+  float setpoint_roll;
+  float setpoint_yaw;
+
+  // PID values for each axis/gain
+  float pid_pitch_p;
+  float pid_pitch_i;
+  float pid_pitch_d;
+  float pid_roll_p;
+  float pid_roll_i;
+  float pid_roll_d;
+  float pid_yaw_p;
+  float pid_yaw_i;
+  float pid_yaw_d;
+
+  // Other telemetry
   float roll;
   float pitch;
   float yaw;
@@ -139,12 +157,12 @@ typedef struct __attribute__((packed))
   float altitude;
   float humidity;
   float temperature;
-  uint16_t distance;
-  uint16_t _pad2;
+
   bool armed;
+  uint8_t _pad[3]; // for alignment
 } Fcu;
 
-typedef struct
+typedef struct __attribute__((aligned(4), packed))
 {
   uint16_t m1;
   uint16_t m2;
@@ -152,7 +170,7 @@ typedef struct
   uint16_t m4;
 } Esc;
 
-typedef struct
+typedef struct __attribute__((aligned(4), packed))
 {
   float setpoint;
   float kp, ki, kd;
@@ -169,14 +187,24 @@ typedef struct __attribute__((packed))
   uint8_t data[252];
 } DataPacket;
 
+typedef struct __attribute__((aligned(4), packed))
+{
+  float roll_kp, roll_ki, roll_kd;
+  float pitch_kp, pitch_ki, pitch_kd;
+  float yaw_kp, yaw_ki, yaw_kd;
+  uint32_t write_count;
+  uint32_t _pad[(UICR_BYTE_COUNT - 40) / 4];
+} FlashBlock;
+
 extern Fcu fcu;
 extern Esc esc;
+extern FlashBlock flashData;
 extern const DataQuaternion HoverQuaternion;
-extern volatile DataPacket rxPacket;
-extern DataPacket txPacket;
 extern Pid rollPid;
 extern Pid pitchPid;
 extern Pid yawPid;
+extern volatile DataPacket rxPacket;
+extern DataPacket txPacket;
 
 void setup(void);
 void loop(void);
@@ -199,8 +227,11 @@ static inline void handlePidPacket(void);
 static inline void handleSetpointPacket(void);
 static inline void handleThrustPacket(void);
 static inline void extractFloatFromData(float &value, const uint8_t index);
-static inline void savePID(void);
-static inline void loadPID(void);
 static inline void checkUsbAndCharge(void);
+
+// UICR Flash functions
+static inline void eraseFlashData(void);
+static inline void saveFlashData(void);
+static inline void loadFlashData(void);
 
 #endif
