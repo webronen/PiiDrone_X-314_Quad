@@ -1,50 +1,20 @@
 #include "main.h"
 
-Fcu fcu = {
-    .thrust = 0,
-    .distance = 0,
-    .setpoint_pitch = 0.0f,
-    .setpoint_roll = 0.0f,
-    .setpoint_yaw = 0.0f,
-    .pid_pitch_p = 0.0f,
-    .pid_pitch_i = 0.0f,
-    .pid_pitch_d = 0.0f,
-    .pid_roll_p = 0.0f,
-    .pid_roll_i = 0.0f,
-    .pid_roll_d = 0.0f,
-    .pid_yaw_p = 0.0f,
-    .pid_yaw_i = 0.0f,
-    .pid_yaw_d = 0.0f,
-    .roll = 0.0f,
-    .pitch = 0.0f,
-    .yaw = 0.0f,
-    .pressure = 1013.25f,
-    .altitude = 0.0f,
-    .humidity = 50.0f,
-    .temperature = 25.0f,
-    .armed = false,
-    ._pad = {0}};
+Fcu fcu = {0};
+Esc esc = {0x8000, 0x8000, 0x8000, 0x8000};
 
-Esc esc = {
-    .m1 = 0x8000,
-    .m2 = 0x8000,
-    .m3 = 0x8000,
-    .m4 = 0x8000};
-
-FlashBlock flashData = {0};
-
-const DataQuaternion HoverQuaternion = {
-    .x = 0.0f,
-    .y = 0.0f,
-    .z = 0.0f,
-    .w = 1.0f};
-
-Pid rollPid = {.setpoint = ROLL_SETPOINT, .kp = KP_ROLL, .ki = KI_ROLL, .kd = KD_ROLL};
-Pid pitchPid = {.setpoint = PITCH_SETPOINT, .kp = KP_PITCH, .ki = KI_PITCH, .kd = KD_PITCH};
-Pid yawPid = {.setpoint = YAW_SETPOINT, .kp = KP_YAW, .ki = KI_YAW, .kd = KD_YAW};
+const DataQuaternion HoverQuaternion = {0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
 
 volatile DataPacket rxPacket;
 DataPacket txPacket;
+
+static float roll_integral = 0.0f;
+static float pitch_integral = 0.0f;
+static float yaw_integral = 0.0f;
+
+static float roll_prev = 0.0f;
+static float pitch_prev = 0.0f;
+static float yaw_prev = 0.0f;
 
 void setup(void)
 {
@@ -55,16 +25,7 @@ void setup(void)
   imuInit();
   tofInit();
 
-  loadFlashData();
-  pitchPid.kp = flashData.pitch_kp;
-  pitchPid.ki = flashData.pitch_ki;
-  pitchPid.kd = flashData.pitch_kd;
-  rollPid.kp = flashData.roll_kp;
-  rollPid.ki = flashData.roll_ki;
-  rollPid.kd = flashData.roll_kd;
-  yawPid.kp = flashData.yaw_kp;
-  yawPid.ki = flashData.yaw_ki;
-  yawPid.kd = flashData.yaw_kd;
+  loadFcuFromFlash();
 }
 
 void loop(void)
@@ -112,20 +73,6 @@ void loop(void)
     txPacket.zone = ZONE_ID;
     txPacket.type = TYPE_TELEMETRY;
 
-    fcu.pid_pitch_p = pitchPid.kp;
-    fcu.pid_pitch_i = pitchPid.ki;
-    fcu.pid_pitch_d = pitchPid.kd;
-    fcu.pid_roll_p = rollPid.kp;
-    fcu.pid_roll_i = rollPid.ki;
-    fcu.pid_roll_d = rollPid.kd;
-    fcu.pid_yaw_p = yawPid.kp;
-    fcu.pid_yaw_i = yawPid.ki;
-    fcu.pid_yaw_d = yawPid.kd;
-
-    fcu.setpoint_pitch = pitchPid.setpoint;
-    fcu.setpoint_roll = rollPid.setpoint;
-    fcu.setpoint_yaw = yawPid.setpoint;
-
     memcpy(txPacket.data, &fcu, sizeof(Fcu));
     sendDataPacket();
   }
@@ -135,14 +82,9 @@ void loop(void)
     if (loopTime >= startLandingTime)
     {
       startLandingTime = loopTime + HZ_TO_US(1);
-      fcu.setpoint_pitch = 0.0f;
-      fcu.setpoint_roll = 0.0f;
-      fcu.setpoint_yaw = 0.0f;
 
-      if (fcu.thrust >= 10)
-        fcu.thrust -= 10;
-      else
-        fcu.armed = false;
+      fcu.roll_setpoint = fcu.pitch_setpoint = fcu.yaw_setpoint = 0.0f;
+      fcu.thrust >= 10 ? fcu.thrust -= 10 : fcu.armed = false;
     }
   }
 
@@ -155,15 +97,8 @@ static inline void checkUsbAndCharge()
   const bool usbPresent = ((status >> 2) & 0x01);
   const bool chargeDone = (((status >> 6) & 0x03) == 2);
 
-  if (usbPresent && !chargeDone)
-    nicla::enableCharging(300);
-  else
-    nicla::disableCharging();
-
-  if (chargeDone && usbPresent)
-    nicla::leds.setColorRed();
-  else
-    nicla::leds.setColorRed(0);
+  (usbPresent && !chargeDone) ? nicla::enableCharging(300) : nicla::disableCharging();
+  (chargeDone && usbPresent) ? nicla::leds.setColorRed() : nicla::leds.setColorRed(0);
 }
 
 static inline void rcuInit(void)
@@ -322,74 +257,38 @@ static inline void quaternionNormalize(DataQuaternion &q)
 
 static inline void updateEsc(void)
 {
-  esc.m1 = 0x8000;
-  esc.m2 = 0x8000;
-  esc.m3 = 0x8000;
-  esc.m4 = 0x8000;
-
   if (!fcu.armed)
   {
-    resetState();
-    /*
-      This is bad practice today. However, i have always wanted to use this legendary statement.
-      I am sorry for using it. Please forgive me. If math shows up, I `goto` somewhere else.
-
-      Math? Nah. I prefer my logic nonlinear and my jumps unconditional.
-
-      "goto - because structured programming is just a suggestion.."
-    */
-    goto UPDATE_ESC_END;
+    fcu.thrust = 0;
+    fcu.roll_setpoint = fcu.pitch_setpoint = fcu.yaw_setpoint = 0.0f;
+    fcu.roll_output = fcu.pitch_output = fcu.yaw_output = 0.0f;
+    roll_integral = pitch_integral = yaw_integral = 0.0f;
+    roll_prev = pitch_prev = yaw_prev = 0.0f;
   }
 
-  esc.m1 |= (uint16_t)constrain(fcu.thrust + rollPid.output - pitchPid.output - yawPid.output, THRUST_MIN, THRUST_MAX);
-  esc.m2 |= (uint16_t)constrain(fcu.thrust - rollPid.output - pitchPid.output + yawPid.output, THRUST_MIN, THRUST_MAX);
-  esc.m3 |= (uint16_t)constrain(fcu.thrust + rollPid.output + pitchPid.output + yawPid.output, THRUST_MIN, THRUST_MAX);
-  esc.m4 |= (uint16_t)constrain(fcu.thrust - rollPid.output + pitchPid.output - yawPid.output, THRUST_MIN, THRUST_MAX);
+  esc.m1 = 0x8000 | (uint16_t)constrain(fcu.thrust + fcu.roll_output - fcu.pitch_output - fcu.yaw_output, THRUST_MIN, THRUST_MAX);
+  esc.m2 = 0x8000 | (uint16_t)constrain(fcu.thrust - fcu.roll_output - fcu.pitch_output + fcu.yaw_output, THRUST_MIN, THRUST_MAX);
+  esc.m3 = 0x8000 | (uint16_t)constrain(fcu.thrust + fcu.roll_output + fcu.pitch_output + fcu.yaw_output, THRUST_MIN, THRUST_MAX);
+  esc.m4 = 0x8000 | (uint16_t)constrain(fcu.thrust - fcu.roll_output + fcu.pitch_output - fcu.yaw_output, THRUST_MIN, THRUST_MAX);
 
-UPDATE_ESC_END:
   __DMB();
   NRF_PWM0->TASKS_SEQSTART[0] = 1;
 }
 
-static inline void resetState(void)
+static inline void updatePid(float setpoint, float value, float kp, float ki, float kd, float &integral, float &prev_value, float *output)
 {
-  fcu.thrust = 0;
-  fcu.roll = 0.0f;
-  fcu.pitch = 0.0f;
-  fcu.yaw = 0.0f;
-  fcu.armed = false;
+  const float error = setpoint - value;
+  const float derivative = -(value - prev_value) * PID_LOOP_HZ;
+  const float outputNoI = (kp * error) + (kd * derivative);
 
-  rollPid.setpoint = 0.0f;
-  pitchPid.setpoint = 0.0f;
-  yawPid.setpoint = 0.0f;
+  integral += error * PID_LOOP_PERIOD * ((outputNoI <= PID_MAX) && (outputNoI >= PID_MIN));
+  const float iLimit = PID_MAX / (ki + __FLT_EPSILON__);
+  integral = constrain(integral, -iLimit, iLimit);
 
-  rollPid.integral = 0.0f;
-  rollPid.previous_value = 0.0f;
-  rollPid.output = 0.0f;
+  *output = outputNoI + (ki * integral);
+  *output = constrain(*output, PID_MIN, PID_MAX);
 
-  pitchPid.integral = 0.0f;
-  pitchPid.previous_value = 0.0f;
-  pitchPid.output = 0.0f;
-
-  yawPid.integral = 0.0f;
-  yawPid.previous_value = 0.0f;
-  yawPid.output = 0.0f;
-}
-
-static inline void updatePid(Pid &pid, const float value)
-{
-  const float error = pid.setpoint - value;
-  const float derivative = -(value - pid.previous_value) * PID_LOOP_HZ;
-  const float outputNoI = (pid.kp * error) + (pid.kd * derivative);
-
-  pid.integral += error * PID_LOOP_PERIOD * ((outputNoI <= PID_MAX) && (outputNoI >= PID_MIN));
-  const float iLimit = PID_MAX / (pid.ki + __FLT_EPSILON__);
-  pid.integral = constrain(pid.integral, -iLimit, iLimit);
-
-  pid.output = outputNoI + (pid.ki * pid.integral);
-  pid.output = constrain(pid.output, PID_MIN, PID_MAX);
-
-  pid.previous_value = value;
+  prev_value = value;
 }
 
 static inline void updateFlightControl(void)
@@ -421,9 +320,9 @@ static inline void updateFlightControl(void)
   DataQuaternion error;
   quaternionMultiply(error, HoverQuaternion, conjugate);
 
-  updatePid(rollPid, error.x);
-  updatePid(pitchPid, error.y);
-  updatePid(yawPid, error.z);
+  updatePid(fcu.roll_setpoint, error.x, fcu.roll_p, fcu.roll_i, fcu.roll_d, roll_integral, roll_prev, &fcu.roll_output);
+  updatePid(fcu.pitch_setpoint, error.y, fcu.pitch_p, fcu.pitch_i, fcu.pitch_d, pitch_integral, pitch_prev, &fcu.pitch_output);
+  updatePid(fcu.yaw_setpoint, error.z, fcu.yaw_p, fcu.yaw_i, fcu.yaw_d, yaw_integral, yaw_prev, &fcu.yaw_output);
 }
 
 static inline void parseDataPacket(void)
@@ -445,28 +344,10 @@ static inline void parseDataPacket(void)
     handleThrustPacket();
     break;
   case TYPE_SAVE:
-    flashData.pitch_kp = pitchPid.kp;
-    flashData.pitch_ki = pitchPid.ki;
-    flashData.pitch_kd = pitchPid.kd;
-    flashData.roll_kp = rollPid.kp;
-    flashData.roll_ki = rollPid.ki;
-    flashData.roll_kd = rollPid.kd;
-    flashData.yaw_kp = yawPid.kp;
-    flashData.yaw_ki = yawPid.ki;
-    flashData.yaw_kd = yawPid.kd;
-    saveFlashData();
+    saveFcuToFlash();
     break;
   case TYPE_LOAD:
-    loadFlashData();
-    pitchPid.kp = flashData.pitch_kp;
-    pitchPid.ki = flashData.pitch_ki;
-    pitchPid.kd = flashData.pitch_kd;
-    rollPid.kp = flashData.roll_kp;
-    rollPid.ki = flashData.roll_ki;
-    rollPid.kd = flashData.roll_kd;
-    yawPid.kp = flashData.yaw_kp;
-    yawPid.ki = flashData.yaw_ki;
-    yawPid.kd = flashData.yaw_kd;
+    loadFcuFromFlash();
     break;
   }
 }
@@ -491,13 +372,13 @@ static inline void handlePidPacket(void)
     switch (gain)
     {
     case GAIN_KP:
-      pitchPid.kp = value;
+      fcu.pitch_p = value;
       break;
     case GAIN_KI:
-      pitchPid.ki = value;
+      fcu.pitch_i = value;
       break;
     case GAIN_KD:
-      pitchPid.kd = value;
+      fcu.pitch_d = value;
       break;
     }
     break;
@@ -505,14 +386,13 @@ static inline void handlePidPacket(void)
     switch (gain)
     {
     case GAIN_KP:
-      rollPid.kp = value;
+      fcu.roll_p = value;
       break;
     case GAIN_KI:
-      rollPid.ki = value;
-      break;
+      fcu.roll_i = value;
       break;
     case GAIN_KD:
-      rollPid.kd = value;
+      fcu.roll_d = value;
       break;
     }
     break;
@@ -520,13 +400,13 @@ static inline void handlePidPacket(void)
     switch (gain)
     {
     case GAIN_KP:
-      yawPid.kp = value;
+      fcu.yaw_p = value;
       break;
     case GAIN_KI:
-      yawPid.ki = value;
+      fcu.yaw_i = value;
       break;
     case GAIN_KD:
-      yawPid.kd = value;
+      fcu.yaw_d = value;
       break;
     }
     break;
@@ -549,13 +429,13 @@ static inline void handleSetpointPacket(void)
   switch (axis)
   {
   case AXIS_PITCH:
-    pitchPid.setpoint = value;
+    fcu.pitch_setpoint = value;
     break;
   case AXIS_ROLL:
-    rollPid.setpoint = value;
+    fcu.roll_setpoint = value;
     break;
   case AXIS_YAW:
-    yawPid.setpoint = value;
+    fcu.yaw_setpoint = value;
     break;
   }
 }
@@ -564,11 +444,7 @@ static inline void handleThrustPacket(void)
 {
   const uint16_t thrust = (rxPacket.data[1] << 8) | rxPacket.data[0];
   fcu.thrust = constrain(thrust, THRUST_MIN, THRUST_MAX);
-
-  if (fcu.thrust > THRUST_MIN)
-    fcu.armed = true;
-  else
-    fcu.armed = false;
+  fcu.armed = fcu.thrust > THRUST_MIN;
 }
 
 static inline void extractFloatFromData(float &value, const uint8_t index)
@@ -580,7 +456,7 @@ static inline void extractFloatFromData(float &value, const uint8_t index)
   bytes[3] = rxPacket.data[index + 3];
 }
 
-static inline void eraseFlashData(void)
+static inline void eraseFcuFlash(void)
 {
   NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Een;
   while (!NRF_NVMC->READY)
@@ -591,16 +467,16 @@ static inline void eraseFlashData(void)
     __NOP();
 }
 
-static inline void saveFlashData(void)
+static inline void saveFcuToFlash(void)
 {
-  eraseFlashData();
+  eraseFcuFlash();
 
   NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Wen;
   while (!NRF_NVMC->READY)
     __NOP();
 
-  uint32_t *data = (uint32_t *)&flashData;
-  for (uint8_t i = 0; i < UICR_BLOCK_SIZE; i++)
+  const uint32_t *data = (const uint32_t *)&fcu;
+  for (uint8_t i = 0; i < (sizeof(Fcu) / 4); i++)
   {
     NRF_UICR->CUSTOMER[i] = data[i];
     while (!NRF_NVMC->READY)
@@ -610,9 +486,9 @@ static inline void saveFlashData(void)
   NVIC_SystemReset();
 }
 
-static inline void loadFlashData(void)
+static inline void loadFcuFromFlash(void)
 {
-  uint32_t *data = (uint32_t *)&flashData;
-  for (uint8_t i = 0; i < UICR_BLOCK_SIZE; i++)
+  uint32_t *data = (uint32_t *)&fcu;
+  for (uint8_t i = 0; i < (sizeof(Fcu) / 4); i++)
     data[i] = NRF_UICR->CUSTOMER[i];
 }

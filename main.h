@@ -39,27 +39,10 @@
 #define BARO_ALTITUDE_CONSTANT 44307.694f
 #define BARO_PRESSURE_EXPONENT 0.190284f
 
-#define KP_PITCH 0.0f
-#define KI_PITCH 0.0f
-#define KD_PITCH 0.0f
-
-#define KP_ROLL 0.0f
-#define KI_ROLL 0.0f
-#define KD_ROLL 0.0f
-
-#define KP_YAW 0.0f
-#define KI_YAW 0.0f
-#define KD_YAW 0.0f
-
 #define MOTOR1_PIN 11
 #define MOTOR2_PIN 28
 #define MOTOR3_PIN 27
 #define MOTOR4_PIN 29
-
-#define ROLL_SETPOINT 0.0f
-#define PITCH_SETPOINT 0.0f
-#define YAW_SETPOINT 0.0f
-#define THRUST_SETPOINT 0.0f
 
 #define PID_LOOP_HZ 211.0f
 #define PID_LOOP_PERIOD (1.0f / PID_LOOP_HZ)
@@ -112,9 +95,6 @@
 #define QUATERNION_HZ 400
 #define QUATERNION_LATENCY 1
 
-#define SERIAL_BAUDRATE 115200
-
-// UICR CUSTOMER area layout
 #define UICR_BLOCK_SIZE 32 // 32 words (128 bytes)
 #define UICR_BYTE_COUNT (UICR_BLOCK_SIZE * 4)
 #define UICR_WRITE_LIMIT 5 // Erase required every 5 writes
@@ -131,36 +111,43 @@ VL53L4CX vl53l4cx(&Wire, NC);
 
 typedef struct __attribute__((aligned(4), packed))
 {
-  // Thrust and setpoints
   uint16_t thrust;
   uint16_t distance;
-  float setpoint_pitch;
-  float setpoint_roll;
-  float setpoint_yaw;
 
-  // PID values for each axis/gain
-  float pid_pitch_p;
-  float pid_pitch_i;
-  float pid_pitch_d;
-  float pid_roll_p;
-  float pid_roll_i;
-  float pid_roll_d;
-  float pid_yaw_p;
-  float pid_yaw_i;
-  float pid_yaw_d;
+  float roll_setpoint;
+  float pitch_setpoint;
+  float yaw_setpoint;
 
-  // Other telemetry
-  float roll;
-  float pitch;
-  float yaw;
+  float roll_p;
+  float roll_i;
+  float roll_d;
+  float roll_output;
+
+  float pitch_p;
+  float pitch_i;
+  float pitch_d;
+  float pitch_output;
+
+  float yaw_p;
+  float yaw_i;
+  float yaw_d;
+  float yaw_output;
+
+  float roll_rad;
+  float pitch_rad;
+  float yaw_rad;
+
   float pressure;
   float altitude;
   float humidity;
   float temperature;
 
   bool armed;
-  uint8_t _pad[3]; // for alignment
+
+  uint8_t _pad[32];
 } Fcu;
+
+static_assert(sizeof(Fcu) == 128, "Fcu struct must be 128 bytes (32 words)");
 
 typedef struct __attribute__((aligned(4), packed))
 {
@@ -170,14 +157,7 @@ typedef struct __attribute__((aligned(4), packed))
   uint16_t m4;
 } Esc;
 
-typedef struct __attribute__((aligned(4), packed))
-{
-  float setpoint;
-  float kp, ki, kd;
-  float integral;
-  float previous_value;
-  float output;
-} Pid;
+static_assert(sizeof(Esc) == 8, "Esc struct must be 8 bytes (2 words)");
 
 typedef struct __attribute__((packed))
 {
@@ -187,22 +167,11 @@ typedef struct __attribute__((packed))
   uint8_t data[252];
 } DataPacket;
 
-typedef struct __attribute__((aligned(4), packed))
-{
-  float roll_kp, roll_ki, roll_kd;
-  float pitch_kp, pitch_ki, pitch_kd;
-  float yaw_kp, yaw_ki, yaw_kd;
-  uint32_t write_count;
-  uint32_t _pad[(UICR_BYTE_COUNT - 40) / 4];
-} FlashBlock;
+static_assert(sizeof(DataPacket) == 255, "DataPacket struct must be 255 bytes");
 
 extern Fcu fcu;
 extern Esc esc;
-extern FlashBlock flashData;
 extern const DataQuaternion HoverQuaternion;
-extern Pid rollPid;
-extern Pid pitchPid;
-extern Pid yawPid;
 extern volatile DataPacket rxPacket;
 extern DataPacket txPacket;
 
@@ -219,8 +188,7 @@ static inline void tofInit(void);
 static inline void quaternionMultiply(DataQuaternion &r, const DataQuaternion &q1, const DataQuaternion &q2);
 static inline void quaternionNormalize(DataQuaternion &q);
 static inline void updateEsc(void);
-static inline void resetState(void);
-static inline void updatePid(Pid &pid, const float value);
+static inline void updatePid(float setpoint, float value, float kp, float ki, float kd, float &integral, float &prev_value, float *output);
 static inline void updateFlightControl(void);
 static inline void parseDataPacket(void);
 static inline void handlePidPacket(void);
@@ -229,9 +197,9 @@ static inline void handleThrustPacket(void);
 static inline void extractFloatFromData(float &value, const uint8_t index);
 static inline void checkUsbAndCharge(void);
 
-// UICR Flash functions
-static inline void eraseFlashData(void);
-static inline void saveFlashData(void);
-static inline void loadFlashData(void);
+// Flash functions
+static inline void eraseFcuFlash(void);
+static inline void saveFcuToFlash(void);
+static inline void loadFcuFromFlash(void);
 
 #endif
