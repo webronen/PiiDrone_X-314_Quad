@@ -34,7 +34,7 @@ void setup(void)
   imuInit();
   tofInit();
 
-  loadFcuFromFlash();
+  handleLoadPacket();
 }
 
 void loop(void)
@@ -343,10 +343,10 @@ static inline void parseDataPacket(void)
     handleThrustPacket();
     break;
   case TYPE_SAVE:
-    saveFcuToFlash();
+    handleSavePacket();
     break;
   case TYPE_LOAD:
-    loadFcuFromFlash();
+    handleLoadPacket();
     break;
   }
 }
@@ -455,7 +455,7 @@ static inline void extractFloatFromData(float &value, const uint8_t index)
   bytes[3] = rxPacket.data[index + 3];
 }
 
-static inline void eraseFcuFlash(void)
+static inline void eraseUserData(void)
 {
   NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Een;
   while (!NRF_NVMC->READY)
@@ -466,9 +466,9 @@ static inline void eraseFcuFlash(void)
     __NOP();
 }
 
-static inline void saveFcuToFlash(void)
+static inline void handleSavePacket(void)
 {
-  eraseFcuFlash();
+  eraseUserData();
 
   NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Wen;
   while (!NRF_NVMC->READY)
@@ -487,7 +487,7 @@ static inline void saveFcuToFlash(void)
   NVIC_SystemReset();
 }
 
-static inline void loadFcuFromFlash(void)
+static inline void handleLoadPacket(void)
 {
   uint32_t *data = (uint32_t *)&fcu;
   for (uint8_t i = 0; i < UICR_BLOCK_WORDS; i++)

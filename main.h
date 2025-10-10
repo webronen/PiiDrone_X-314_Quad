@@ -190,8 +190,8 @@ static inline void handleSetpointPacket(void);
 static inline void handleThrustPacket(void);
 static inline void extractFloatFromData(float &value, const uint8_t index);
 static inline void checkUsbAndCharge(void);
-static inline void eraseFcuFlash(void);
-static inline void saveFcuToFlash(void);
-static inline void loadFcuFromFlash(void);
+static inline void eraseUserData(void);
+static inline void handleSavePacket(void);
+static inline void handleLoadPacket(void);
 
 #endif
