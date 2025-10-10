@@ -3,12 +3,14 @@
 
 #define MBPS_TO_BPS(Mbps) ((Mbps)*1000000UL)
 
-typedef struct __attribute__((packed)) {
+typedef struct __attribute__((aligned(1), packed)) {
   uint8_t node;
   uint8_t zone;
   uint8_t type;
   uint8_t data[252];
 } DataPacket;
+
+static_assert(sizeof(DataPacket) == 255, "DataPacket struct must be 255 bytes");
 
 volatile static DataPacket rxPacket;
 static DataPacket txPacket;
