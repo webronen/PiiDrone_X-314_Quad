@@ -312,15 +312,17 @@ static inline void updateFlightControl(void)
   fcu.humidity = humidity._value;
 
   uint8_t ready = 0;
-  VL53L4CX_MultiRangingData_t data;
-  if (vl53l4cx.VL53L4CX_GetMeasurementDataReady(&ready) == VL53L4CX_ERROR_NONE && ready &&
-      vl53l4cx.VL53L4CX_GetMultiRangingData(&data) == VL53L4CX_ERROR_NONE &&
-      data.NumberOfObjectsFound > 0 &&
-      data.RangeData[0].RangeStatus == 0)
+  if (vl53l4cx.VL53L4CX_GetMeasurementDataReady(&ready) == VL53L4CX_ERROR_NONE && ready)
   {
-    fcu.distance = data.RangeData[0].RangeMilliMeter;
+    VL53L4CX_MultiRangingData_t data;
+    if (vl53l4cx.VL53L4CX_GetMultiRangingData(&data) == VL53L4CX_ERROR_NONE &&
+        data.NumberOfObjectsFound > 0 &&
+        data.RangeData[0].RangeStatus == 0)
+    {
+      fcu.distance = data.RangeData[0].RangeMilliMeter;
+    }
+    vl53l4cx.VL53L4CX_ClearInterruptAndStartMeasurement();
   }
-  vl53l4cx.VL53L4CX_ClearInterruptAndStartMeasurement();
 
   const DataQuaternion conjugate = {-quaternion._data.x, -quaternion._data.y, -quaternion._data.z, quaternion._data.w};
   DataQuaternion error;
