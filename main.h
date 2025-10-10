@@ -104,19 +104,16 @@ typedef struct __attribute__((aligned(4), packed))
   float roll_i;
   float roll_d;
   float roll_setpoint;
-  float roll_output;
 
   float pitch_p;
   float pitch_i;
   float pitch_d;
   float pitch_setpoint;
-  float pitch_output;
 
   float yaw_p;
   float yaw_i;
   float yaw_d;
   float yaw_setpoint;
-  float yaw_output;
 
   float pressure;
   float humidity;
@@ -124,7 +121,7 @@ typedef struct __attribute__((aligned(4), packed))
 
   bool active;
 
-  uint8_t _pad[48];
+  uint8_t _pad[63];
 } Fcu;
 
 static_assert(sizeof(Fcu) == UICR_BLOCK_BYTES, "Fcu struct must be 128 bytes (32 words)");
@@ -152,10 +149,11 @@ static_assert(sizeof(DataPacket) == 255, "DataPacket struct must be 255 bytes");
 typedef struct __attribute__((aligned(4), packed))
 {
   float integral;
+  float output;
   float prev;
-} PidState;
+} Pid;
 
-static_assert(sizeof(PidState) == 8, "PidState struct must be 8 bytes (2 words)");
+static_assert(sizeof(Pid) == 12, "Pid struct must be 12 bytes (3 words)");
 
 extern Fcu fcu;
 extern Esc esc;
@@ -165,9 +163,9 @@ extern DataPacket txPacket;
 
 extern const DataQuaternion HoverQuaternion;
 
-extern PidState roll_pid;
-extern PidState pitch_pid;
-extern PidState yaw_pid;
+extern Pid roll_pid;
+extern Pid pitch_pid;
+extern Pid yaw_pid;
 
 void setup(void);
 void loop(void);

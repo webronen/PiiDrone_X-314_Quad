@@ -21,9 +21,9 @@ DataPacket txPacket = {
     .type = TYPE_TELEMETRY,
     .data = {0}};
 
-PidState roll_pid = {.integral = 0.0f, .prev = 0.0f};
-PidState pitch_pid = {.integral = 0.0f, .prev = 0.0f};
-PidState yaw_pid = {.integral = 0.0f, .prev = 0.0f};
+Pid roll_pid = {.integral = 0.0f, .output = 0.0f, .prev = 0.0f};
+Pid pitch_pid = {.integral = 0.0f, .output = 0.0f, .prev = 0.0f};
+Pid yaw_pid = {.integral = 0.0f, .output = 0.0f, .prev = 0.0f};
 
 void setup(void)
 {
@@ -82,15 +82,16 @@ void loop(void)
     sendDataPacket();
   }
 
-  if (fcu.active && loopTime >= lastPacketReceiveTime)
+  if (fcu.active && loopTime >= lastPacketReceiveTime && loopTime >= startLandingTime)
   {
-    if (loopTime >= startLandingTime)
-    {
-      startLandingTime = loopTime + HZ_TO_US(1);
+    startLandingTime = loopTime + HZ_TO_US(1);
 
-      fcu.roll_setpoint = fcu.pitch_setpoint = fcu.yaw_setpoint = 0.0f;
-      fcu.thrust >= 10 ? fcu.thrust -= 10 : fcu.active = false;
-    }
+    fcu.roll_setpoint = fcu.pitch_setpoint = fcu.yaw_setpoint = 0.0f;
+
+    if (fcu.thrust >= 10)
+      fcu.thrust -= 10;
+    else
+      fcu.active = false;
   }
 
   checkUsbAndCharge();
@@ -102,8 +103,15 @@ static inline void checkUsbAndCharge()
   const bool usbPresent = ((status >> 2) & 0x01);
   const bool chargeDone = (((status >> 6) & 0x03) == 2);
 
-  (usbPresent && !chargeDone) ? nicla::enableCharging(300) : nicla::disableCharging();
-  (usbPresent && chargeDone) ? nicla::leds.setColorRed() : nicla::leds.setColorRed(0);
+  if (usbPresent && !chargeDone)
+    nicla::enableCharging(300);
+  else
+    nicla::disableCharging();
+
+  if (usbPresent && chargeDone)
+    nicla::leds.setColorRed();
+  else
+    nicla::leds.setColorRed(0);
 }
 
 static inline void rcuInit(void)
@@ -266,15 +274,15 @@ static inline void updateEsc(void)
   {
     fcu.thrust = 0;
     fcu.roll_setpoint = fcu.pitch_setpoint = fcu.yaw_setpoint = 0.0f;
-    fcu.roll_output = fcu.pitch_output = fcu.yaw_output = 0.0f;
-    roll_pid.integral = pitch_pid.integral = yaw_pid.integral = 0.0f;
-    roll_pid.prev = pitch_pid.prev = yaw_pid.prev = 0.0f;
+    memset(&roll_pid, 0, sizeof(Pid));
+    memset(&pitch_pid, 0, sizeof(Pid));
+    memset(&yaw_pid, 0, sizeof(Pid));
   }
 
-  esc.m1 = 0x8000 | (uint16_t)constrain(fcu.thrust + fcu.roll_output - fcu.pitch_output - fcu.yaw_output, THRUST_MIN, THRUST_MAX);
-  esc.m2 = 0x8000 | (uint16_t)constrain(fcu.thrust - fcu.roll_output - fcu.pitch_output + fcu.yaw_output, THRUST_MIN, THRUST_MAX);
-  esc.m3 = 0x8000 | (uint16_t)constrain(fcu.thrust + fcu.roll_output + fcu.pitch_output + fcu.yaw_output, THRUST_MIN, THRUST_MAX);
-  esc.m4 = 0x8000 | (uint16_t)constrain(fcu.thrust - fcu.roll_output + fcu.pitch_output - fcu.yaw_output, THRUST_MIN, THRUST_MAX);
+  esc.m1 = 0x8000 | (uint16_t)constrain(fcu.thrust + roll_pid.output - pitch_pid.output - yaw_pid.output, THRUST_MIN, THRUST_MAX);
+  esc.m2 = 0x8000 | (uint16_t)constrain(fcu.thrust - roll_pid.output - pitch_pid.output + yaw_pid.output, THRUST_MIN, THRUST_MAX);
+  esc.m3 = 0x8000 | (uint16_t)constrain(fcu.thrust + roll_pid.output + pitch_pid.output + yaw_pid.output, THRUST_MIN, THRUST_MAX);
+  esc.m4 = 0x8000 | (uint16_t)constrain(fcu.thrust - roll_pid.output + pitch_pid.output - yaw_pid.output, THRUST_MIN, THRUST_MAX);
 
   __DMB();
   NRF_PWM0->TASKS_SEQSTART[0] = 1;
@@ -304,32 +312,29 @@ static inline void updateFlightControl(void)
   fcu.humidity = humidity._value;
 
   uint8_t ready = 0;
-  if (vl53l4cx.VL53L4CX_GetMeasurementDataReady(&ready) == VL53L4CX_ERROR_NONE && ready)
+  VL53L4CX_MultiRangingData_t data;
+  if (vl53l4cx.VL53L4CX_GetMeasurementDataReady(&ready) == VL53L4CX_ERROR_NONE && ready &&
+      vl53l4cx.VL53L4CX_GetMultiRangingData(&data) == VL53L4CX_ERROR_NONE &&
+      data.NumberOfObjectsFound > 0 &&
+      data.RangeData[0].RangeStatus == 0)
   {
-    VL53L4CX_MultiRangingData_t data;
-    if (vl53l4cx.VL53L4CX_GetMultiRangingData(&data) == VL53L4CX_ERROR_NONE &&
-        data.NumberOfObjectsFound > 0 && data.RangeData[0].RangeStatus == 0)
-    {
-      fcu.distance = data.RangeData[0].RangeMilliMeter;
-    }
-    vl53l4cx.VL53L4CX_ClearInterruptAndStartMeasurement();
+    fcu.distance = data.RangeData[0].RangeMilliMeter;
   }
+  vl53l4cx.VL53L4CX_ClearInterruptAndStartMeasurement();
 
   const DataQuaternion conjugate = {-quaternion._data.x, -quaternion._data.y, -quaternion._data.z, quaternion._data.w};
   DataQuaternion error;
   quaternionMultiply(error, HoverQuaternion, conjugate);
 
-  updatePid(fcu.roll_setpoint, error.x, fcu.roll_p, fcu.roll_i, fcu.roll_d, &roll_pid.integral, &roll_pid.prev, &fcu.roll_output);
-  updatePid(fcu.pitch_setpoint, error.y, fcu.pitch_p, fcu.pitch_i, fcu.pitch_d, &pitch_pid.integral, &pitch_pid.prev, &fcu.pitch_output);
-  updatePid(fcu.yaw_setpoint, error.z, fcu.yaw_p, fcu.yaw_i, fcu.yaw_d, &yaw_pid.integral, &yaw_pid.prev, &fcu.yaw_output);
+  updatePid(fcu.roll_setpoint, error.x, fcu.roll_p, fcu.roll_i, fcu.roll_d, &roll_pid.integral, &roll_pid.prev, &roll_pid.output);
+  updatePid(fcu.pitch_setpoint, error.y, fcu.pitch_p, fcu.pitch_i, fcu.pitch_d, &pitch_pid.integral, &pitch_pid.prev, &pitch_pid.output);
+  updatePid(fcu.yaw_setpoint, error.z, fcu.yaw_p, fcu.yaw_i, fcu.yaw_d, &yaw_pid.integral, &yaw_pid.prev, &yaw_pid.output);
 }
 
 static inline void parseDataPacket(void)
 {
   if (rxPacket.node != NODE_ID || rxPacket.zone != ZONE_ID)
-  {
     return;
-  }
 
   switch (rxPacket.type)
   {
@@ -357,9 +362,7 @@ static inline void handlePidPacket(void)
   const uint8_t gain = rxPacket.data[1];
 
   if (axis >= 3 || gain >= 3)
-  {
     return;
-  }
 
   float value = 0.0f;
   extractFloatFromData(value, 2);
@@ -417,9 +420,7 @@ static inline void handleSetpointPacket(void)
   const uint8_t axis = rxPacket.data[0];
 
   if (axis >= 3)
-  {
     return;
-  }
 
   float value = 0.0f;
   extractFloatFromData(value, 1);
