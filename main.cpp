@@ -1,7 +1,11 @@
 #include "main.h"
 
 Fcu fcu = {0};
-Esc esc = {0x8000, 0x8000, 0x8000, 0x8000};
+Esc esc = {
+    .m1 = 0x8000,
+    .m2 = 0x8000,
+    .m3 = 0x8000,
+    .m4 = 0x8000};
 
 const DataQuaternion HoverQuaternion = {
     .x = 0.0f,
