@@ -73,14 +73,14 @@ void loop(void)
     sendDataPacket();
   }
 
-  if (fcu.on && loopTime >= lastPacketReceiveTime)
+  if (fcu.active && loopTime >= lastPacketReceiveTime)
   {
     if (loopTime >= startLandingTime)
     {
       startLandingTime = loopTime + HZ_TO_US(1);
 
       fcu.roll_setpoint = fcu.pitch_setpoint = fcu.yaw_setpoint = 0.0f;
-      fcu.thrust >= 10 ? fcu.thrust -= 10 : fcu.on = false;
+      fcu.thrust >= 10 ? fcu.thrust -= 10 : fcu.active = false;
     }
   }
 
@@ -253,7 +253,7 @@ static inline void quaternionNormalize(DataQuaternion &q)
 
 static inline void updateEsc(void)
 {
-  if (!fcu.on)
+  if (!fcu.active)
   {
     fcu.thrust = 0;
     fcu.roll_setpoint = fcu.pitch_setpoint = fcu.yaw_setpoint = 0.0f;
@@ -289,15 +289,9 @@ static inline void updatePid(float setpoint, float value, float kp, float ki, fl
 
 static inline void updateFlightControl(void)
 {
-  const float newPressure = pressure._value * PA_TO_HPA;
-  fcu.pressure = LPF_BARO * newPressure + HPF_BARO * fcu.pressure;
-
-  const float newTemp = (temperature._value - TEMP_OFFSET);
-  fcu.temperature = LPF_ENV * newTemp + HPF_ENV * fcu.temperature;
-  fcu.humidity = LPF_ENV * humidity._value + HPF_ENV * fcu.humidity;
-
-  const float pressureRatio = fcu.pressure * INV_SEA_LEVEL_PRESSURE;
-  fcu.altitude = BARO_ALTITUDE_CONSTANT * (1.0f - __builtin_powf(pressureRatio, BARO_PRESSURE_EXPONENT));
+  fcu.pressure = pressure._value;
+  fcu.temperature = temperature._value;
+  fcu.humidity = humidity._value;
 
   uint8_t ready = 0;
   if (vl53l4cx.VL53L4CX_GetMeasurementDataReady(&ready) == VL53L4CX_ERROR_NONE && ready)
@@ -306,8 +300,7 @@ static inline void updateFlightControl(void)
     if (vl53l4cx.VL53L4CX_GetMultiRangingData(&data) == VL53L4CX_ERROR_NONE &&
         data.NumberOfObjectsFound > 0 && data.RangeData[0].RangeStatus == 0)
     {
-      const float newDist = (float)data.RangeData[0].RangeMilliMeter;
-      fcu.distance = (uint16_t)(LPF_DISTANCE * newDist + HPF_DISTANCE * fcu.distance);
+      fcu.distance = data.RangeData[0].RangeMilliMeter;
     }
     vl53l4cx.VL53L4CX_ClearInterruptAndStartMeasurement();
   }
@@ -440,7 +433,7 @@ static inline void handleThrustPacket(void)
 {
   const uint16_t thrust = (rxPacket.data[1] << 8) | rxPacket.data[0];
   fcu.thrust = constrain(thrust, THRUST_MIN, THRUST_MAX);
-  fcu.on = fcu.thrust > THRUST_MIN;
+  fcu.active = fcu.thrust > THRUST_MIN;
 }
 
 static inline void extractFloatFromData(float &value, const uint8_t index)
@@ -471,7 +464,7 @@ static inline void saveFcuToFlash(void)
   while (!NRF_NVMC->READY)
     __NOP();
 
-  fcu.on = false;
+  fcu.active = false;
 
   const uint32_t *data = (const uint32_t *)&fcu;
   for (uint8_t i = 0; i < UICR_BLOCK_WORDS; i++)

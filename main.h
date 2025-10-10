@@ -23,21 +23,18 @@
 
 #define LPF_BARO 0.30f
 #define HPF_BARO (1.0f - LPF_BARO)
+
 #define LPF_ENV 0.10f
 #define HPF_ENV (1.0f - LPF_ENV)
+
 #define LPF_DISTANCE 0.25f
 #define HPF_DISTANCE (1.0f - LPF_DISTANCE)
-#define ONE_SECOND_IN_US 1000000.0f
-#define HZ_TO_US(Hz) (ONE_SECOND_IN_US / (Hz))
-#define INV_SEA_LEVEL_PRESSURE (1.0f / 1013.25f)
-#define PA_TO_HPA 0.01f
-#define TEMP_OFFSET 5.6f
+
+#define HZ_TO_US(Hz) (1000000.0f / (Hz))
+
 #define PWM_BASE_CLOCK 16000000UL
 #define PWM_FREQUENCY 20000UL
 #define PWM_TOP (PWM_BASE_CLOCK / PWM_FREQUENCY)
-
-#define BARO_ALTITUDE_CONSTANT 44307.694f
-#define BARO_PRESSURE_EXPONENT 0.190284f
 
 #define MOTOR1_PIN 11
 #define MOTOR2_PIN 28
@@ -114,33 +111,31 @@ typedef struct __attribute__((aligned(4), packed))
   uint16_t thrust;
   uint16_t distance;
 
-  float roll_setpoint;
-  float pitch_setpoint;
-  float yaw_setpoint;
-
   float roll_p;
   float roll_i;
   float roll_d;
+  float roll_setpoint;
   float roll_output;
 
   float pitch_p;
   float pitch_i;
   float pitch_d;
+  float pitch_setpoint;
   float pitch_output;
 
   float yaw_p;
   float yaw_i;
   float yaw_d;
+  float yaw_setpoint;
   float yaw_output;
 
   float pressure;
-  float altitude;
   float humidity;
   float temperature;
 
-  bool on;
+  bool active;
 
-  uint8_t _pad[44];
+  uint8_t _pad[48];
 } Fcu;
 
 static_assert(sizeof(Fcu) == UICR_BLOCK_BYTES, "Fcu struct must be 128 bytes (32 words)");
@@ -192,8 +187,6 @@ static inline void handleSetpointPacket(void);
 static inline void handleThrustPacket(void);
 static inline void extractFloatFromData(float &value, const uint8_t index);
 static inline void checkUsbAndCharge(void);
-
-// Flash functions
 static inline void eraseFcuFlash(void);
 static inline void saveFcuToFlash(void);
 static inline void loadFcuFromFlash(void);
