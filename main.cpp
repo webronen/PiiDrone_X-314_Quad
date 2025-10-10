@@ -446,7 +446,11 @@ static inline void handleThrustPacket(void)
 {
   const uint16_t thrust = (rxPacket.data[1] << 8) | rxPacket.data[0];
   fcu.thrust = constrain(thrust, THRUST_MIN, THRUST_MAX);
-  fcu.active = fcu.thrust > THRUST_MIN;
+
+  if (fcu.thrust > THRUST_MIN)
+    fcu.active = true;
+  else
+    fcu.active = false;
 }
 
 static inline void extractFloatFromData(float &value, const uint8_t index)
