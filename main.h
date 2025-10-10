@@ -1,12 +1,3 @@
-/*
-  Milestone: Second attempt at PID adjust and balancing logic
-    - Refactored PID state into per-axis structs (roll, pitch, yaw) for clarity.
-    - Implemented robust PID update function with anti-windup and output clamping.
-    - Improved ESC and FCU initialization and reset logic.
-    - Ensured safe flash save/load and packet parsing.
-    - Cleaned up code structure for maintainability and further tuning.
-*/
-
 #pragma once
 
 #ifndef MAIN_H
