@@ -73,14 +73,14 @@ void loop(void)
     sendDataPacket();
   }
 
-  if (fcu.armed && loopTime >= lastPacketReceiveTime)
+  if (fcu.on && loopTime >= lastPacketReceiveTime)
   {
     if (loopTime >= startLandingTime)
     {
       startLandingTime = loopTime + HZ_TO_US(1);
 
       fcu.roll_setpoint = fcu.pitch_setpoint = fcu.yaw_setpoint = 0.0f;
-      fcu.thrust >= 10 ? fcu.thrust -= 10 : fcu.armed = false;
+      fcu.thrust >= 10 ? fcu.thrust -= 10 : fcu.on = false;
     }
   }
 
@@ -253,7 +253,7 @@ static inline void quaternionNormalize(DataQuaternion &q)
 
 static inline void updateEsc(void)
 {
-  if (!fcu.armed)
+  if (!fcu.on)
   {
     fcu.thrust = 0;
     fcu.roll_setpoint = fcu.pitch_setpoint = fcu.yaw_setpoint = 0.0f;
@@ -440,7 +440,7 @@ static inline void handleThrustPacket(void)
 {
   const uint16_t thrust = (rxPacket.data[1] << 8) | rxPacket.data[0];
   fcu.thrust = constrain(thrust, THRUST_MIN, THRUST_MAX);
-  fcu.armed = fcu.thrust > THRUST_MIN;
+  fcu.on = fcu.thrust > THRUST_MIN;
 }
 
 static inline void extractFloatFromData(float &value, const uint8_t index)
@@ -471,7 +471,7 @@ static inline void saveFcuToFlash(void)
   while (!NRF_NVMC->READY)
     __NOP();
 
-  fcu.armed = false;
+  fcu.on = false;
 
   const uint32_t *data = (const uint32_t *)&fcu;
   for (uint8_t i = 0; i < UICR_BLOCK_WORDS; i++)

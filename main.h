@@ -138,7 +138,7 @@ typedef struct __attribute__((aligned(4), packed))
   float humidity;
   float temperature;
 
-  bool armed;
+  bool on;
 
   uint8_t _pad[44];
 } Fcu;
