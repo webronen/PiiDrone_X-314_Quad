@@ -6,7 +6,7 @@ Esc esc = {0x8000, 0x8000, 0x8000, 0x8000};
 const DataQuaternion HoverQuaternion = {0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
 
 volatile DataPacket rxPacket;
-DataPacket txPacket;
+DataPacket txPacket = {.node = NODE_ID, .zone = ZONE_ID, .type = TYPE_TELEMETRY, .data = {0}};
 
 static float roll_integral = 0.0f;
 static float pitch_integral = 0.0f;
@@ -69,10 +69,6 @@ void loop(void)
   {
     lastPacketSendTime += HZ_TO_US(2);
 
-    txPacket.node = NODE_ID;
-    txPacket.zone = ZONE_ID;
-    txPacket.type = TYPE_TELEMETRY;
-
     memcpy(txPacket.data, &fcu, sizeof(Fcu));
     sendDataPacket();
   }
@@ -98,7 +94,7 @@ static inline void checkUsbAndCharge()
   const bool chargeDone = (((status >> 6) & 0x03) == 2);
 
   (usbPresent && !chargeDone) ? nicla::enableCharging(300) : nicla::disableCharging();
-  (chargeDone && usbPresent) ? nicla::leds.setColorRed() : nicla::leds.setColorRed(0);
+  (usbPresent && chargeDone) ? nicla::leds.setColorRed() : nicla::leds.setColorRed(0);
 }
 
 static inline void rcuInit(void)
@@ -475,8 +471,10 @@ static inline void saveFcuToFlash(void)
   while (!NRF_NVMC->READY)
     __NOP();
 
+  fcu.armed = false;
+
   const uint32_t *data = (const uint32_t *)&fcu;
-  for (uint8_t i = 0; i < (sizeof(Fcu) / 4); i++)
+  for (uint8_t i = 0; i < UICR_BLOCK_WORDS; i++)
   {
     NRF_UICR->CUSTOMER[i] = data[i];
     while (!NRF_NVMC->READY)
@@ -489,6 +487,6 @@ static inline void saveFcuToFlash(void)
 static inline void loadFcuFromFlash(void)
 {
   uint32_t *data = (uint32_t *)&fcu;
-  for (uint8_t i = 0; i < (sizeof(Fcu) / 4); i++)
+  for (uint8_t i = 0; i < UICR_BLOCK_WORDS; i++)
     data[i] = NRF_UICR->CUSTOMER[i];
 }

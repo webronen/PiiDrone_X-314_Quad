@@ -95,9 +95,9 @@
 #define QUATERNION_HZ 400
 #define QUATERNION_LATENCY 1
 
-#define UICR_BLOCK_SIZE 32 // 32 words (128 bytes)
-#define UICR_BYTE_COUNT (UICR_BLOCK_SIZE * 4)
-#define UICR_WRITE_LIMIT 5 // Erase required every 5 writes
+#define UICR_BLOCK_WORDS 32
+#define UICR_BLOCK_BYTES (UICR_BLOCK_WORDS * 4)
+#define UICR_ERASE_INTERVAL 5
 
 SensorXYZ accelerometer(BHY2_SENSOR_ID_ACC);
 SensorXYZ gyroscope(BHY2_SENSOR_ID_GYRO);
@@ -133,10 +133,6 @@ typedef struct __attribute__((aligned(4), packed))
   float yaw_d;
   float yaw_output;
 
-  float roll_rad;
-  float pitch_rad;
-  float yaw_rad;
-
   float pressure;
   float altitude;
   float humidity;
@@ -144,10 +140,10 @@ typedef struct __attribute__((aligned(4), packed))
 
   bool armed;
 
-  uint8_t _pad[32];
+  uint8_t _pad[44];
 } Fcu;
 
-static_assert(sizeof(Fcu) == 128, "Fcu struct must be 128 bytes (32 words)");
+static_assert(sizeof(Fcu) == UICR_BLOCK_BYTES, "Fcu struct must be 128 bytes (32 words)");
 
 typedef struct __attribute__((aligned(4), packed))
 {
@@ -159,7 +155,7 @@ typedef struct __attribute__((aligned(4), packed))
 
 static_assert(sizeof(Esc) == 8, "Esc struct must be 8 bytes (2 words)");
 
-typedef struct __attribute__((packed))
+typedef struct __attribute__((aligned(1), packed))
 {
   uint8_t node;
   uint8_t zone;
