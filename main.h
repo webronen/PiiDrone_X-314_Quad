@@ -8,7 +8,6 @@
 
 #include <nrf.h>
 #include <Nicla_System.h>
-#include <Serial.h>
 
 #include <sensors/Sensor.h>
 #include <sensors/SensorQuaternion.h>
@@ -19,16 +18,6 @@
 #endif
 
 #include <vl53l4cx_class.h>
-#define VL53L4CX_ADDR 0x52
-
-#define LPF_BARO 0.30f
-#define HPF_BARO (1.0f - LPF_BARO)
-
-#define LPF_ENV 0.10f
-#define HPF_ENV (1.0f - LPF_ENV)
-
-#define LPF_DISTANCE 0.25f
-#define HPF_DISTANCE (1.0f - LPF_DISTANCE)
 
 #define HZ_TO_US(Hz) (1000000.0f / (Hz))
 
@@ -160,11 +149,25 @@ typedef struct __attribute__((aligned(1), packed))
 
 static_assert(sizeof(DataPacket) == 255, "DataPacket struct must be 255 bytes");
 
+typedef struct __attribute__((aligned(4), packed))
+{
+  float integral;
+  float prev;
+} PidState;
+
+static_assert(sizeof(PidState) == 8, "PidState struct must be 8 bytes (2 words)");
+
 extern Fcu fcu;
 extern Esc esc;
-extern const DataQuaternion HoverQuaternion;
+
 extern volatile DataPacket rxPacket;
 extern DataPacket txPacket;
+
+extern const DataQuaternion HoverQuaternion;
+
+extern PidState roll_pid;
+extern PidState pitch_pid;
+extern PidState yaw_pid;
 
 void setup(void);
 void loop(void);
@@ -179,7 +182,7 @@ static inline void tofInit(void);
 static inline void quaternionMultiply(DataQuaternion &r, const DataQuaternion &q1, const DataQuaternion &q2);
 static inline void quaternionNormalize(DataQuaternion &q);
 static inline void updateEsc(void);
-static inline void updatePid(float setpoint, float value, float kp, float ki, float kd, float &integral, float &prev_value, float *output);
+static inline void updatePid(float setpoint, float value, float kp, float ki, float kd, float *integral, float *prev_value, float *output);
 static inline void updateFlightControl(void);
 static inline void parseDataPacket(void);
 static inline void handlePidPacket(void);

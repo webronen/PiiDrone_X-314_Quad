@@ -3,18 +3,23 @@
 Fcu fcu = {0};
 Esc esc = {0x8000, 0x8000, 0x8000, 0x8000};
 
-const DataQuaternion HoverQuaternion = {0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
+const DataQuaternion HoverQuaternion = {
+    .x = 0.0f,
+    .y = 0.0f,
+    .z = 0.0f,
+    .w = 1.0f,
+    .accuracy = 0.0f};
 
 volatile DataPacket rxPacket;
-DataPacket txPacket = {.node = NODE_ID, .zone = ZONE_ID, .type = TYPE_TELEMETRY, .data = {0}};
+DataPacket txPacket = {
+    .node = NODE_ID,
+    .zone = ZONE_ID,
+    .type = TYPE_TELEMETRY,
+    .data = {0}};
 
-static float roll_integral = 0.0f;
-static float pitch_integral = 0.0f;
-static float yaw_integral = 0.0f;
-
-static float roll_prev = 0.0f;
-static float pitch_prev = 0.0f;
-static float yaw_prev = 0.0f;
+PidState roll_pid = {.integral = 0.0f, .prev = 0.0f};
+PidState pitch_pid = {.integral = 0.0f, .prev = 0.0f};
+PidState yaw_pid = {.integral = 0.0f, .prev = 0.0f};
 
 void setup(void)
 {
@@ -214,7 +219,7 @@ static inline void tofInit(void)
   Wire.begin();
   Wire.setClock(400000);
 
-  vl53l4cx.VL53L4CX_SetDeviceAddress(VL53L4CX_ADDR);
+  vl53l4cx.VL53L4CX_SetDeviceAddress(VL53L4CX_DEFAULT_DEVICE_ADDRESS);
   vl53l4cx.VL53L4CX_WaitDeviceBooted();
   vl53l4cx.VL53L4CX_DataInit();
   vl53l4cx.VL53L4CX_SetDistanceMode(VL53L4CX_DISTANCEMODE_MEDIUM);
@@ -258,8 +263,8 @@ static inline void updateEsc(void)
     fcu.thrust = 0;
     fcu.roll_setpoint = fcu.pitch_setpoint = fcu.yaw_setpoint = 0.0f;
     fcu.roll_output = fcu.pitch_output = fcu.yaw_output = 0.0f;
-    roll_integral = pitch_integral = yaw_integral = 0.0f;
-    roll_prev = pitch_prev = yaw_prev = 0.0f;
+    roll_pid.integral = pitch_pid.integral = yaw_pid.integral = 0.0f;
+    roll_pid.prev = pitch_pid.prev = yaw_pid.prev = 0.0f;
   }
 
   esc.m1 = 0x8000 | (uint16_t)constrain(fcu.thrust + fcu.roll_output - fcu.pitch_output - fcu.yaw_output, THRUST_MIN, THRUST_MAX);
@@ -271,20 +276,21 @@ static inline void updateEsc(void)
   NRF_PWM0->TASKS_SEQSTART[0] = 1;
 }
 
-static inline void updatePid(float setpoint, float value, float kp, float ki, float kd, float &integral, float &prev_value, float *output)
+static inline void updatePid(float setpoint, float value, float kp, float ki, float kd,
+                             float *integral, float *prev_value, float *output)
 {
   const float error = setpoint - value;
-  const float derivative = -(value - prev_value) * PID_LOOP_HZ;
+  const float derivative = -(value - *prev_value) * PID_LOOP_HZ;
   const float outputNoI = (kp * error) + (kd * derivative);
 
-  integral += error * PID_LOOP_PERIOD * ((outputNoI <= PID_MAX) && (outputNoI >= PID_MIN));
+  *integral += error * PID_LOOP_PERIOD * ((outputNoI <= PID_MAX) && (outputNoI >= PID_MIN));
   const float iLimit = PID_MAX / (ki + __FLT_EPSILON__);
-  integral = constrain(integral, -iLimit, iLimit);
+  *integral = constrain(*integral, -iLimit, iLimit);
 
-  *output = outputNoI + (ki * integral);
+  *output = outputNoI + (ki * (*integral));
   *output = constrain(*output, PID_MIN, PID_MAX);
 
-  prev_value = value;
+  *prev_value = value;
 }
 
 static inline void updateFlightControl(void)
@@ -309,9 +315,9 @@ static inline void updateFlightControl(void)
   DataQuaternion error;
   quaternionMultiply(error, HoverQuaternion, conjugate);
 
-  updatePid(fcu.roll_setpoint, error.x, fcu.roll_p, fcu.roll_i, fcu.roll_d, roll_integral, roll_prev, &fcu.roll_output);
-  updatePid(fcu.pitch_setpoint, error.y, fcu.pitch_p, fcu.pitch_i, fcu.pitch_d, pitch_integral, pitch_prev, &fcu.pitch_output);
-  updatePid(fcu.yaw_setpoint, error.z, fcu.yaw_p, fcu.yaw_i, fcu.yaw_d, yaw_integral, yaw_prev, &fcu.yaw_output);
+  updatePid(fcu.roll_setpoint, error.x, fcu.roll_p, fcu.roll_i, fcu.roll_d, &roll_pid.integral, &roll_pid.prev, &fcu.roll_output);
+  updatePid(fcu.pitch_setpoint, error.y, fcu.pitch_p, fcu.pitch_i, fcu.pitch_d, &pitch_pid.integral, &pitch_pid.prev, &fcu.pitch_output);
+  updatePid(fcu.yaw_setpoint, error.z, fcu.yaw_p, fcu.yaw_i, fcu.yaw_d, &yaw_pid.integral, &yaw_pid.prev, &fcu.yaw_output);
 }
 
 static inline void parseDataPacket(void)
