@@ -148,7 +148,7 @@ static inline void updatePID(float setpoint, float value, float kp, float ki, fl
 // Data handling and communication
 static inline void extractFloat(float &value, const uint8_t index);
 static inline void parseData(void);
-static inline void sendData(void);
+static inline void sendRCU(void);
 
 // Flash operations
 static inline void eraseFlash(void);

@@ -173,7 +173,7 @@ void loop(void)
     lastPacketSendTime += HZ_TO_US(2);
 
     memcpy(txPacket.data, &fcu, sizeof(Fcu));
-    sendData();
+    sendRCU();
   }
 
   if (fcu.active && loopTime >= lastPacketReceiveTime && loopTime >= startLandingTime)
@@ -208,7 +208,7 @@ static inline void handleCharging()
     nicla::leds.setColorRed(0);
 }
 
-static inline void sendData(void)
+static inline void sendRCU(void)
 {
   while (!NRF_RADIO->EVENTS_END)
     __NOP();
