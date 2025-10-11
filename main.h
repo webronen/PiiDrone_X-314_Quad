@@ -80,8 +80,8 @@
 #define QUATERNION_HZ 400
 #define QUATERNION_LATENCY 1
 
-#define UICR_BLOCK_WORDS 32
-#define UICR_BLOCK_BYTES (UICR_BLOCK_WORDS * 4)
+#define FLASH_BLOCK_WORDS 32
+#define FLASH_BLOCK_BYTES (FLASH_BLOCK_WORDS * 4)
 
 SensorXYZ accelerometer(BHY2_SENSOR_ID_ACC);
 SensorXYZ gyroscope(BHY2_SENSOR_ID_GYRO);
@@ -103,7 +103,7 @@ typedef struct __attribute__((aligned(4), packed))
   uint8_t _pad[63];
 } Fcu;
 
-static_assert(sizeof(Fcu) == UICR_BLOCK_BYTES, "Fcu struct must be 128 bytes (32 words)");
+static_assert(sizeof(Fcu) == FLASH_BLOCK_BYTES, "Fcu struct must be 128 bytes (32 words)");
 
 typedef struct __attribute__((aligned(4), packed))
 {
@@ -137,7 +137,7 @@ Pid yaw_pid = {0};
 
 static inline void updateESC(void);
 static inline void updateFCU(void);
-static inline void updatePID(float setpoint, float value, float kp, float ki, float kd, float *integral, float *prev_value, float *output);
+static inline void updatePID(const float setpoint, const float value, const float kp, const float ki, const float kd, float *integral, float *prev_value, float *output);
 
 static inline void extractFloat(float &value, const uint8_t index);
 static inline void readRCU(void);

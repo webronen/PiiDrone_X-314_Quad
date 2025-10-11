@@ -247,8 +247,8 @@ static inline void updateESC(void)
   NRF_PWM0->TASKS_SEQSTART[0] = 1;
 }
 
-static inline void updatePID(float setpoint, float value, float kp, float ki, float kd,
-                             float *integral, float *prev_value, float *output)
+static inline void updatePID(const float setpoint, const float value, const float kp, const float ki,
+                             const float kd, float *integral, float *prev_value, float *output)
 {
   const float error = setpoint - value;
   const float derivative = -(value - *prev_value) * PID_LOOP_HZ;
@@ -442,7 +442,7 @@ static inline void saveFlash(void)
     __NOP();
 
   const uint32_t *data = (const uint32_t *)&fcu;
-  for (uint8_t i = 0; i < UICR_BLOCK_WORDS; i++)
+  for (uint8_t i = 0; i < FLASH_BLOCK_WORDS; i++)
   {
     NRF_UICR->CUSTOMER[i] = data[i];
     while (!NRF_NVMC->READY)
@@ -455,6 +455,6 @@ static inline void saveFlash(void)
 static inline void loadFlash(void)
 {
   uint32_t *data = (uint32_t *)&fcu;
-  for (uint8_t i = 0; i < UICR_BLOCK_WORDS; i++)
+  for (uint8_t i = 0; i < FLASH_BLOCK_WORDS; i++)
     data[i] = NRF_UICR->CUSTOMER[i];
 }
