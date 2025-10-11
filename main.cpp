@@ -122,7 +122,7 @@ void loop(void)
   {
     NRF_RADIO->EVENTS_CRCOK = 0;
     lastPacketReceiveTime = loopTime + HZ_TO_US(0.1f);
-    parseRCU();
+    readRCU();
   }
 
   if (loopTime >= lastSensorUpdateTime)
@@ -292,7 +292,7 @@ static inline void updateFCU(void)
   updatePID(fcu.yaw_setpoint, error.z, fcu.yaw_p, fcu.yaw_i, fcu.yaw_d, &yaw_pid.integral, &yaw_pid.prev, &yaw_pid.output);
 }
 
-static inline void parseRCU(void)
+static inline void readRCU(void)
 {
   if (rxPacket.node != NODE_ID || rxPacket.zone != ZONE_ID)
     return;

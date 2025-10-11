@@ -140,7 +140,7 @@ static inline void updateFCU(void);
 static inline void updatePID(float setpoint, float value, float kp, float ki, float kd, float *integral, float *prev_value, float *output);
 
 static inline void extractFloat(float &value, const uint8_t index);
-static inline void parseRCU(void);
+static inline void readRCU(void);
 static inline void sendRCU(void);
 
 static inline void eraseFlash(void);
