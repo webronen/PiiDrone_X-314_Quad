@@ -309,6 +309,7 @@ static inline void readRCU(void)
     handleThrust();
     break;
   case TYPE_SAVE:
+    fcu.active = false;
     saveFlash();
     break;
   case TYPE_LOAD:
@@ -439,8 +440,6 @@ static inline void saveFlash(void)
   NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Wen;
   while (!NRF_NVMC->READY)
     __NOP();
-
-  fcu.active = false;
 
   const uint32_t *data = (const uint32_t *)&fcu;
   for (uint8_t i = 0; i < UICR_BLOCK_WORDS; i++)
