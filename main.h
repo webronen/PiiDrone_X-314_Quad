@@ -3,12 +3,12 @@
 #ifndef MAIN_H
 #define MAIN_H
 
+// Project constants
 #define NODE_ID 1
 #define ZONE_ID 0
 
 #include <nrf.h>
 #include <Nicla_System.h>
-
 #include <sensors/Sensor.h>
 #include <sensors/SensorQuaternion.h>
 #include <sensors/SensorXYZ.h>
@@ -19,6 +19,7 @@
 
 #include <vl53l4cx_class.h>
 
+// Utility macros
 #define HZ_TO_US(Hz) (1000000.0f / (Hz))
 
 #define PWM_BASE_CLOCK 16000000UL
@@ -85,6 +86,7 @@
 #define UICR_BLOCK_BYTES (UICR_BLOCK_WORDS * 4)
 #define UICR_ERASE_INTERVAL 5
 
+// Sensor instances
 SensorXYZ accelerometer(BHY2_SENSOR_ID_ACC);
 SensorXYZ gyroscope(BHY2_SENSOR_ID_GYRO);
 SensorXYZ magnetometer(BHY2_SENSOR_ID_MAG);
@@ -92,35 +94,18 @@ Sensor pressure(BHY2_SENSOR_ID_BARO);
 Sensor humidity(BHY2_SENSOR_ID_HUM);
 Sensor temperature(BHY2_SENSOR_ID_TEMP);
 SensorQuaternion quaternion(BHY2_SENSOR_ID_RV);
-
 VL53L4CX vl53l4cx(&Wire, NC);
 
+// Data structures
 typedef struct __attribute__((aligned(4), packed))
 {
   uint16_t thrust;
   uint16_t distance;
-
-  float roll_p;
-  float roll_i;
-  float roll_d;
-  float roll_setpoint;
-
-  float pitch_p;
-  float pitch_i;
-  float pitch_d;
-  float pitch_setpoint;
-
-  float yaw_p;
-  float yaw_i;
-  float yaw_d;
-  float yaw_setpoint;
-
-  float pressure;
-  float humidity;
-  float temperature;
-
+  float roll_p, roll_i, roll_d, roll_setpoint;
+  float pitch_p, pitch_i, pitch_d, pitch_setpoint;
+  float yaw_p, yaw_i, yaw_d, yaw_setpoint;
+  float pressure, humidity, temperature;
   bool active;
-
   uint8_t _pad[63];
 } Fcu;
 
@@ -128,10 +113,7 @@ static_assert(sizeof(Fcu) == UICR_BLOCK_BYTES, "Fcu struct must be 128 bytes (32
 
 typedef struct __attribute__((aligned(4), packed))
 {
-  uint16_t m1;
-  uint16_t m2;
-  uint16_t m3;
-  uint16_t m4;
+  uint16_t m1, m2, m3, m4;
 } Esc;
 
 static_assert(sizeof(Esc) == 8, "Esc struct must be 8 bytes (2 words)");
@@ -157,17 +139,14 @@ static_assert(sizeof(Pid) == 12, "Pid struct must be 12 bytes (3 words)");
 
 extern Fcu fcu;
 extern Esc esc;
-
 extern volatile DataPacket rxPacket;
 extern DataPacket txPacket;
-
 extern const DataQuaternion HoverQuaternion;
-
 extern Pid roll_pid;
 extern Pid pitch_pid;
 extern Pid yaw_pid;
 
-// Control update functions
+// Control and update routines
 static inline void updateESC(void);
 static inline void updateFCU(void);
 static inline void updatePID(float setpoint, float value, float kp, float ki, float kd, float *integral, float *prev_value, float *output);
