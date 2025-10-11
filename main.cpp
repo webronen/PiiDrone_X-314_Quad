@@ -166,7 +166,7 @@ void loop(void)
   handleCharging();
 }
 
-static inline void handleCharging()
+static inline void handleCharging(void)
 {
   const uint8_t status = nicla::_pmic.getStatusRegister();
   const bool usbPresent = ((status >> 2) & 0x01);
