@@ -84,7 +84,6 @@
 
 #define UICR_BLOCK_WORDS 32
 #define UICR_BLOCK_BYTES (UICR_BLOCK_WORDS * 4)
-#define UICR_ERASE_INTERVAL 5
 
 // Sensor instances
 SensorXYZ accelerometer(BHY2_SENSOR_ID_ACC);
