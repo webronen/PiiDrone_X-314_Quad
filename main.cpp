@@ -27,99 +27,23 @@ Pid yaw_pid = {.integral = 0.0f, .output = 0.0f, .prev = 0.0f};
 
 void setup(void)
 {
-  sysInit();
-  rcuInit();
-  clkInit();
-  pwmInit();
-  imuInit();
-  tofInit();
-
-  handleLoadPacket();
-}
-
-void loop(void)
-{
-  NRF_TIMER0->TASKS_CAPTURE[0] = 1;
-  const uint32_t loopTime = NRF_TIMER0->CC[0];
-
-  static uint32_t lastSensorUpdateTime = loopTime;
-  static uint32_t lastPidUpdateTime = loopTime;
-  static uint32_t lastMotorUpdateTime = loopTime;
-  static uint32_t lastPacketSendTime = loopTime;
-  static uint32_t lastPacketReceiveTime = loopTime;
-  static uint32_t startLandingTime = loopTime;
-
-  if (NRF_RADIO->EVENTS_CRCOK)
-  {
-    NRF_RADIO->EVENTS_CRCOK = 0;
-    lastPacketReceiveTime = loopTime + HZ_TO_US(0.1f);
-    parseDataPacket();
-  }
-
-  if (loopTime >= lastSensorUpdateTime)
-  {
-    lastSensorUpdateTime += HZ_TO_US(401);
-    sensortec.update();
-  }
-
-  if (loopTime >= lastPidUpdateTime)
-  {
-    lastPidUpdateTime += HZ_TO_US(211);
-    updateFlightControl();
-  }
-
-  if (loopTime >= lastMotorUpdateTime)
-  {
-    lastMotorUpdateTime += HZ_TO_US(101);
-    updateEsc();
-  }
-
-  if (loopTime >= lastPacketSendTime)
-  {
-    lastPacketSendTime += HZ_TO_US(2);
-
-    memcpy(txPacket.data, &fcu, sizeof(Fcu));
-    sendDataPacket();
-  }
-
-  if (fcu.active && loopTime >= lastPacketReceiveTime && loopTime >= startLandingTime)
-  {
-    startLandingTime = loopTime + HZ_TO_US(1);
-
-    fcu.roll_setpoint = fcu.pitch_setpoint = fcu.yaw_setpoint = 0.0f;
-
-    if (fcu.thrust >= 10)
-      fcu.thrust -= 10;
-    else
-      fcu.active = false;
-  }
-
-  checkUsbAndCharge();
-}
-
-static inline void checkUsbAndCharge()
-{
-  const uint8_t status = nicla::_pmic.getStatusRegister();
-  const bool usbPresent = ((status >> 2) & 0x01);
-  const bool chargeDone = (((status >> 6) & 0x03) == 2);
-
-  if (usbPresent && !chargeDone)
-    nicla::enableCharging(300);
-  else
-    nicla::disableCharging();
-
-  if (usbPresent && chargeDone)
-    nicla::leds.setColorRed();
-  else
-    nicla::leds.setColorRed(0);
-}
-
-static inline void rcuInit(void)
-{
+  // CLOCK
   NRF_CLOCK->TASKS_HFCLKSTART = 1;
   while (!NRF_CLOCK->EVENTS_HFCLKSTARTED)
     __NOP();
 
+  // TIMER
+  NRF_TIMER0->BITMODE = TIMER_BITMODE_BITMODE_32Bit;
+  NRF_TIMER0->PRESCALER = 4;
+  NRF_TIMER0->TASKS_START = 1;
+
+  // GPIO
+  NRF_P0->PIN_CNF[MOTOR1_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) | (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
+  NRF_P0->PIN_CNF[MOTOR2_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) | (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
+  NRF_P0->PIN_CNF[MOTOR3_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) | (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
+  NRF_P0->PIN_CNF[MOTOR4_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) | (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
+
+  // RADIO
   NRF_RADIO->SHORTS = (RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_START_Msk);
   NRF_RADIO->PACKETPTR = (uint32_t)&rxPacket;
   NRF_RADIO->TXPOWER = RADIO_TXPOWER_TXPOWER_Pos4dBm;
@@ -145,9 +69,152 @@ static inline void rcuInit(void)
                         (RADIO_MODECNF0_RU_Fast << RADIO_MODECNF0_RU_Pos);
 
   NRF_RADIO->TASKS_RXEN = 1;
+
+  // PWM
+  NRF_PWM0->COUNTERTOP = PWM_TOP;
+  NRF_PWM0->PRESCALER = PWM_PRESCALER_PRESCALER_DIV_1;
+  NRF_PWM0->DECODER = PWM_DECODER_LOAD_Individual;
+  NRF_PWM0->SEQ[0].PTR = (uint32_t)&esc.m1;
+  NRF_PWM0->SEQ[0].CNT = (sizeof(Esc) / sizeof(uint16_t));
+  NRF_PWM0->SEQ[0].REFRESH = PWM_SEQ_REFRESH_CNT_Continuous;
+  NRF_PWM0->PSEL.OUT[0] = MOTOR1_PIN;
+  NRF_PWM0->PSEL.OUT[1] = MOTOR2_PIN;
+  NRF_PWM0->PSEL.OUT[2] = MOTOR3_PIN;
+  NRF_PWM0->PSEL.OUT[3] = MOTOR4_PIN;
+  NRF_PWM0->ENABLE = PWM_ENABLE_ENABLE_Enabled;
+  NRF_PWM0->TASKS_SEQSTART[0] = 1;
+
+  // NICLA
+  nicla::begin(false);
+  nicla::setBatteryNTCEnabled(false);
+  nicla::disableCharging();
+  nicla::disableLDO();
+  nicla::enable3V3LDO();
+
+  // IMU
+  sensortec.begin();
+
+  accelerometer.begin(ACCELEROMETER_HZ, ACCELEROMETER_LATENCY);
+  accelerometer.setRange(ACCELEROMETER_RANGE);
+  gyroscope.begin(GYROSCOPE_HZ, GYROSCOPE_LATENCY);
+  gyroscope.setRange(GYROSCOPE_RANGE);
+
+  magnetometer.begin(0, 0);
+  magnetometer.setRange(MAGNETOMETER_RANGE);
+
+  quaternion.begin(QUATERNION_HZ, QUATERNION_LATENCY);
+
+  pressure.begin(PRESSURE_HZ, PRESSURE_LATENCY);
+  humidity.begin(HUMIDITY_HZ, HUMIDITY_LATENCY);
+  temperature.begin(TEMPERATURE_HZ, TEMPERATURE_LATENCY);
+
+  // TOF
+  Wire.begin();
+  Wire.setClock(400000);
+
+  vl53l4cx.VL53L4CX_SetDeviceAddress(VL53L4CX_DEFAULT_DEVICE_ADDRESS);
+  vl53l4cx.VL53L4CX_WaitDeviceBooted();
+  vl53l4cx.VL53L4CX_DataInit();
+  vl53l4cx.VL53L4CX_SetDistanceMode(VL53L4CX_DISTANCEMODE_MEDIUM);
+  vl53l4cx.VL53L4CX_SetMeasurementTimingBudgetMicroSeconds(33000);
+
+  VL53L4CX_UserRoi_t roi = {
+      .TopLeftX = 6,
+      .TopLeftY = 6,
+      .BotRightX = 9,
+      .BotRightY = 9};
+
+  vl53l4cx.VL53L4CX_SetUserROI(&roi);
+  vl53l4cx.VL53L4CX_StartMeasurement();
+
+  // FLASH
+  loadFlash();
 }
 
-static inline void sendDataPacket(void)
+void loop(void)
+{
+  NRF_TIMER0->TASKS_CAPTURE[0] = 1;
+  const uint32_t loopTime = NRF_TIMER0->CC[0];
+
+  static uint32_t lastSensorUpdateTime = loopTime;
+  static uint32_t lastPidUpdateTime = loopTime;
+  static uint32_t lastMotorUpdateTime = loopTime;
+  static uint32_t lastPacketSendTime = loopTime;
+  static uint32_t lastPacketReceiveTime = loopTime;
+  static uint32_t startLandingTime = loopTime;
+
+  if (NRF_RADIO->EVENTS_CRCOK)
+  {
+    NRF_RADIO->EVENTS_CRCOK = 0;
+    lastPacketReceiveTime = loopTime + HZ_TO_US(0.1f);
+    parseData();
+  }
+
+  if (loopTime >= lastSensorUpdateTime)
+  {
+    lastSensorUpdateTime += HZ_TO_US(401);
+    sensortec.update();
+  }
+
+  if (loopTime >= lastPidUpdateTime)
+  {
+    lastPidUpdateTime += HZ_TO_US(211);
+    updateFCU();
+  }
+
+  if (loopTime >= lastMotorUpdateTime)
+  {
+    lastMotorUpdateTime += HZ_TO_US(101);
+    updateESC();
+  }
+
+  if (loopTime >= lastPacketSendTime)
+  {
+    lastPacketSendTime += HZ_TO_US(2);
+
+    memcpy(txPacket.data, &fcu, sizeof(Fcu));
+    sendData();
+  }
+
+  if (fcu.active && loopTime >= lastPacketReceiveTime && loopTime >= startLandingTime)
+  {
+    startLandingTime = loopTime + HZ_TO_US(1);
+
+    fcu.roll_setpoint = fcu.pitch_setpoint = fcu.yaw_setpoint = 0.0f;
+
+    if (fcu.thrust >= 10)
+      fcu.thrust -= 10;
+    else
+      fcu.active = false;
+  }
+
+  handleCharging();
+}
+
+
+
+
+
+
+
+static inline void handleCharging()
+{
+  const uint8_t status = nicla::_pmic.getStatusRegister();
+  const bool usbPresent = ((status >> 2) & 0x01);
+  const bool chargeDone = (((status >> 6) & 0x03) == 2);
+
+  if (usbPresent && !chargeDone)
+    nicla::enableCharging(300);
+  else
+    nicla::disableCharging();
+
+  if (usbPresent && chargeDone)
+    nicla::leds.setColorRed();
+  else
+    nicla::leds.setColorRed(0);
+}
+
+static inline void sendData(void)
 {
   while (!NRF_RADIO->EVENTS_END)
     __NOP();
@@ -170,94 +237,17 @@ static inline void sendDataPacket(void)
   NRF_RADIO->TASKS_RXEN = 1;
 }
 
-static inline void pwmInit(void)
-{
-  NRF_P0->PIN_CNF[MOTOR1_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) | (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
-  NRF_P0->PIN_CNF[MOTOR2_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) | (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
-  NRF_P0->PIN_CNF[MOTOR3_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) | (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
-  NRF_P0->PIN_CNF[MOTOR4_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) | (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
-
-  NRF_PWM0->COUNTERTOP = PWM_TOP;
-  NRF_PWM0->PRESCALER = PWM_PRESCALER_PRESCALER_DIV_1;
-  NRF_PWM0->DECODER = PWM_DECODER_LOAD_Individual;
-  NRF_PWM0->SEQ[0].PTR = (uint32_t)&esc.m1;
-  NRF_PWM0->SEQ[0].CNT = (sizeof(Esc) / sizeof(uint16_t));
-  NRF_PWM0->SEQ[0].REFRESH = PWM_SEQ_REFRESH_CNT_Continuous;
-  NRF_PWM0->PSEL.OUT[0] = MOTOR1_PIN;
-  NRF_PWM0->PSEL.OUT[1] = MOTOR2_PIN;
-  NRF_PWM0->PSEL.OUT[2] = MOTOR3_PIN;
-  NRF_PWM0->PSEL.OUT[3] = MOTOR4_PIN;
-  NRF_PWM0->ENABLE = PWM_ENABLE_ENABLE_Enabled;
-  NRF_PWM0->TASKS_SEQSTART[0] = 1;
-}
-
-static inline void clkInit(void)
-{
-  NRF_TIMER0->BITMODE = TIMER_BITMODE_BITMODE_32Bit;
-  NRF_TIMER0->PRESCALER = 4;
-  NRF_TIMER0->TASKS_START = 1;
-}
-
-static inline void sysInit()
-{
-  nicla::begin(false);
-  nicla::setBatteryNTCEnabled(false);
-  nicla::disableCharging();
-  nicla::disableLDO();
-  nicla::enable3V3LDO();
-}
-
-static inline void imuInit(void)
-{
-  sensortec.begin();
-
-  accelerometer.begin(ACCELEROMETER_HZ, ACCELEROMETER_LATENCY);
-  accelerometer.setRange(ACCELEROMETER_RANGE);
-  gyroscope.begin(GYROSCOPE_HZ, GYROSCOPE_LATENCY);
-  gyroscope.setRange(GYROSCOPE_RANGE);
-
-  magnetometer.begin(0, 0);
-  magnetometer.setRange(MAGNETOMETER_RANGE);
-
-  quaternion.begin(QUATERNION_HZ, QUATERNION_LATENCY);
-
-  pressure.begin(PRESSURE_HZ, PRESSURE_LATENCY);
-  humidity.begin(HUMIDITY_HZ, HUMIDITY_LATENCY);
-  temperature.begin(TEMPERATURE_HZ, TEMPERATURE_LATENCY);
-}
-
-static inline void tofInit(void)
-{
-  Wire.begin();
-  Wire.setClock(400000);
-
-  vl53l4cx.VL53L4CX_SetDeviceAddress(VL53L4CX_DEFAULT_DEVICE_ADDRESS);
-  vl53l4cx.VL53L4CX_WaitDeviceBooted();
-  vl53l4cx.VL53L4CX_DataInit();
-  vl53l4cx.VL53L4CX_SetDistanceMode(VL53L4CX_DISTANCEMODE_MEDIUM);
-  vl53l4cx.VL53L4CX_SetMeasurementTimingBudgetMicroSeconds(33000);
-
-  VL53L4CX_UserRoi_t roi = {
-      .TopLeftX = 6,
-      .TopLeftY = 6,
-      .BotRightX = 9,
-      .BotRightY = 9};
-
-  vl53l4cx.VL53L4CX_SetUserROI(&roi);
-  vl53l4cx.VL53L4CX_StartMeasurement();
-}
-
-static inline void quaternionMultiply(DataQuaternion &r, const DataQuaternion &q1, const DataQuaternion &q2)
+static inline void multiplyQuaternion(DataQuaternion &r, const DataQuaternion &q1, const DataQuaternion &q2)
 {
   r.w = q1.w * q2.w - q1.x * q2.x - q1.y * q2.y - q1.z * q2.z;
   r.x = q1.w * q2.x + q1.x * q2.w + q1.y * q2.z - q1.z * q2.y;
   r.y = q1.w * q2.y - q1.x * q2.z + q1.y * q2.w + q1.z * q2.x;
   r.z = q1.w * q2.z + q1.x * q2.y - q1.y * q2.x + q1.z * q2.w;
 
-  quaternionNormalize(r);
+  normalizeQuaternion(r);
 }
 
-static inline void quaternionNormalize(DataQuaternion &q)
+static inline void normalizeQuaternion(DataQuaternion &q)
 {
   const float mag = q.w * q.w + q.x * q.x + q.y * q.y + q.z * q.z;
   const float inv = 1.0f / __builtin_sqrtf(mag + __FLT_EPSILON__);
@@ -268,7 +258,7 @@ static inline void quaternionNormalize(DataQuaternion &q)
   q.z *= inv;
 }
 
-static inline void updateEsc(void)
+static inline void updateESC(void)
 {
   if (!fcu.active)
   {
@@ -288,7 +278,7 @@ static inline void updateEsc(void)
   NRF_PWM0->TASKS_SEQSTART[0] = 1;
 }
 
-static inline void updatePid(float setpoint, float value, float kp, float ki, float kd,
+static inline void updatePID(float setpoint, float value, float kp, float ki, float kd,
                              float *integral, float *prev_value, float *output)
 {
   const float error = setpoint - value;
@@ -305,7 +295,7 @@ static inline void updatePid(float setpoint, float value, float kp, float ki, fl
   *prev_value = value;
 }
 
-static inline void updateFlightControl(void)
+static inline void updateFCU(void)
 {
   fcu.pressure = pressure._value;
   fcu.temperature = temperature._value;
@@ -326,14 +316,14 @@ static inline void updateFlightControl(void)
 
   const DataQuaternion conjugate = {-quaternion._data.x, -quaternion._data.y, -quaternion._data.z, quaternion._data.w};
   DataQuaternion error;
-  quaternionMultiply(error, HoverQuaternion, conjugate);
+  multiplyQuaternion(error, HoverQuaternion, conjugate);
 
-  updatePid(fcu.roll_setpoint, error.x, fcu.roll_p, fcu.roll_i, fcu.roll_d, &roll_pid.integral, &roll_pid.prev, &roll_pid.output);
-  updatePid(fcu.pitch_setpoint, error.y, fcu.pitch_p, fcu.pitch_i, fcu.pitch_d, &pitch_pid.integral, &pitch_pid.prev, &pitch_pid.output);
-  updatePid(fcu.yaw_setpoint, error.z, fcu.yaw_p, fcu.yaw_i, fcu.yaw_d, &yaw_pid.integral, &yaw_pid.prev, &yaw_pid.output);
+  updatePID(fcu.roll_setpoint, error.x, fcu.roll_p, fcu.roll_i, fcu.roll_d, &roll_pid.integral, &roll_pid.prev, &roll_pid.output);
+  updatePID(fcu.pitch_setpoint, error.y, fcu.pitch_p, fcu.pitch_i, fcu.pitch_d, &pitch_pid.integral, &pitch_pid.prev, &pitch_pid.output);
+  updatePID(fcu.yaw_setpoint, error.z, fcu.yaw_p, fcu.yaw_i, fcu.yaw_d, &yaw_pid.integral, &yaw_pid.prev, &yaw_pid.output);
 }
 
-static inline void parseDataPacket(void)
+static inline void parseData(void)
 {
   if (rxPacket.node != NODE_ID || rxPacket.zone != ZONE_ID)
     return;
@@ -341,24 +331,24 @@ static inline void parseDataPacket(void)
   switch (rxPacket.type)
   {
   case TYPE_PID:
-    handlePidPacket();
+    handlePID();
     break;
   case TYPE_SETPOINT:
-    handleSetpointPacket();
+    handleSetpoint();
     break;
   case TYPE_THRUST:
-    handleThrustPacket();
+    handleThrust();
     break;
   case TYPE_SAVE:
-    handleSavePacket();
+    saveFlash();
     break;
   case TYPE_LOAD:
-    handleLoadPacket();
+    loadFlash();
     break;
   }
 }
 
-static inline void handlePidPacket(void)
+static inline void handlePID(void)
 {
   const uint8_t axis = rxPacket.data[0];
   const uint8_t gain = rxPacket.data[1];
@@ -367,7 +357,7 @@ static inline void handlePidPacket(void)
     return;
 
   float value = 0.0f;
-  extractFloatFromData(value, 2);
+  extractFloat(value, 2);
   value = constrain(value, GAIN_MIN, GAIN_MAX);
 
   switch (axis)
@@ -417,7 +407,7 @@ static inline void handlePidPacket(void)
   }
 }
 
-static inline void handleSetpointPacket(void)
+static inline void handleSetpoint(void)
 {
   const uint8_t axis = rxPacket.data[0];
 
@@ -425,7 +415,7 @@ static inline void handleSetpointPacket(void)
     return;
 
   float value = 0.0f;
-  extractFloatFromData(value, 1);
+  extractFloat(value, 1);
   value = constrain(value, SETPOINT_MIN, SETPOINT_MAX);
 
   switch (axis)
@@ -442,7 +432,7 @@ static inline void handleSetpointPacket(void)
   }
 }
 
-static inline void handleThrustPacket(void)
+static inline void handleThrust(void)
 {
   const uint16_t thrust = (rxPacket.data[1] << 8) | rxPacket.data[0];
   fcu.thrust = constrain(thrust, THRUST_MIN, THRUST_MAX);
@@ -453,7 +443,7 @@ static inline void handleThrustPacket(void)
     fcu.active = false;
 }
 
-static inline void extractFloatFromData(float &value, const uint8_t index)
+static inline void extractFloat(float &value, const uint8_t index)
 {
   uint8_t *bytes = (uint8_t *)&value;
   bytes[0] = rxPacket.data[index];
@@ -462,7 +452,7 @@ static inline void extractFloatFromData(float &value, const uint8_t index)
   bytes[3] = rxPacket.data[index + 3];
 }
 
-static inline void eraseUserData(void)
+static inline void eraseFlash(void)
 {
   NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Een;
   while (!NRF_NVMC->READY)
@@ -473,9 +463,9 @@ static inline void eraseUserData(void)
     __NOP();
 }
 
-static inline void handleSavePacket(void)
+static inline void saveFlash(void)
 {
-  eraseUserData();
+  eraseFlash();
 
   NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Wen;
   while (!NRF_NVMC->READY)
@@ -494,7 +484,7 @@ static inline void handleSavePacket(void)
   NVIC_SystemReset();
 }
 
-static inline void handleLoadPacket(void)
+static inline void loadFlash(void)
 {
   uint32_t *data = (uint32_t *)&fcu;
   for (uint8_t i = 0; i < UICR_BLOCK_WORDS; i++)

@@ -167,29 +167,29 @@ extern Pid roll_pid;
 extern Pid pitch_pid;
 extern Pid yaw_pid;
 
-void setup(void);
-void loop(void);
+// Control update functions
+static inline void updateESC(void);
+static inline void updateFCU(void);
+static inline void updatePID(float setpoint, float value, float kp, float ki, float kd, float *integral, float *prev_value, float *output);
 
-static inline void rcuInit(void);
-static inline void sendDataPacket(void);
-static inline void pwmInit(void);
-static inline void clkInit(void);
-static inline void sysInit(void);
-static inline void imuInit(void);
-static inline void tofInit(void);
-static inline void quaternionMultiply(DataQuaternion &r, const DataQuaternion &q1, const DataQuaternion &q2);
-static inline void quaternionNormalize(DataQuaternion &q);
-static inline void updateEsc(void);
-static inline void updatePid(float setpoint, float value, float kp, float ki, float kd, float *integral, float *prev_value, float *output);
-static inline void updateFlightControl(void);
-static inline void parseDataPacket(void);
-static inline void handlePidPacket(void);
-static inline void handleSetpointPacket(void);
-static inline void handleThrustPacket(void);
-static inline void extractFloatFromData(float &value, const uint8_t index);
-static inline void checkUsbAndCharge(void);
-static inline void eraseUserData(void);
-static inline void handleSavePacket(void);
-static inline void handleLoadPacket(void);
+// Data handling and communication
+static inline void extractFloat(float &value, const uint8_t index);
+static inline void parseData(void);
+static inline void sendData(void);
+
+// Flash operations
+static inline void eraseFlash(void);
+static inline void loadFlash(void);
+static inline void saveFlash(void);
+
+// Handler functions
+static inline void handleCharging(void);
+static inline void handlePID(void);
+static inline void handleSetpoint(void);
+static inline void handleThrust(void);
+
+// Quaternion math
+static inline void multiplyQuaternion(DataQuaternion &r, const DataQuaternion &q1, const DataQuaternion &q2);
+static inline void normalizeQuaternion(DataQuaternion &q);
 
 #endif
