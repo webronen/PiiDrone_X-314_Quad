@@ -1,30 +1,5 @@
 #include "main.h"
 
-Fcu fcu = {0};
-Esc esc = {
-    .m1 = 0x8000,
-    .m2 = 0x8000,
-    .m3 = 0x8000,
-    .m4 = 0x8000};
-
-const DataQuaternion HoverQuaternion = {
-    .x = 0.0f,
-    .y = 0.0f,
-    .z = 0.0f,
-    .w = 1.0f,
-    .accuracy = 0.0f};
-
-volatile DataPacket rxPacket;
-DataPacket txPacket = {
-    .node = NODE_ID,
-    .zone = ZONE_ID,
-    .type = TYPE_TELEMETRY,
-    .data = {0}};
-
-Pid roll_pid = {.integral = 0.0f, .output = 0.0f, .prev = 0.0f};
-Pid pitch_pid = {.integral = 0.0f, .output = 0.0f, .prev = 0.0f};
-Pid yaw_pid = {.integral = 0.0f, .output = 0.0f, .prev = 0.0f};
-
 void setup(void)
 {
   // CLOCK

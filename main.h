@@ -3,7 +3,6 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-// Project constants
 #define NODE_ID 1
 #define ZONE_ID 0
 
@@ -19,7 +18,6 @@
 
 #include <vl53l4cx_class.h>
 
-// Utility macros
 #define HZ_TO_US(Hz) (1000000.0f / (Hz))
 
 #define PWM_BASE_CLOCK 16000000UL
@@ -85,7 +83,6 @@
 #define UICR_BLOCK_WORDS 32
 #define UICR_BLOCK_BYTES (UICR_BLOCK_WORDS * 4)
 
-// Sensor instances
 SensorXYZ accelerometer(BHY2_SENSOR_ID_ACC);
 SensorXYZ gyroscope(BHY2_SENSOR_ID_GYRO);
 SensorXYZ magnetometer(BHY2_SENSOR_ID_MAG);
@@ -95,7 +92,6 @@ Sensor temperature(BHY2_SENSOR_ID_TEMP);
 SensorQuaternion quaternion(BHY2_SENSOR_ID_RV);
 VL53L4CX vl53l4cx(&Wire, NC);
 
-// Data structures
 typedef struct __attribute__((aligned(4), packed))
 {
   uint16_t thrust, distance;
@@ -130,37 +126,32 @@ typedef struct __attribute__((aligned(4), packed))
 
 static_assert(sizeof(Pid) == 12, "Pid struct must be 12 bytes (3 words)");
 
-extern Fcu fcu;
-extern Esc esc;
-extern volatile DataPacket rxPacket;
-extern DataPacket txPacket;
-extern const DataQuaternion HoverQuaternion;
-extern Pid roll_pid;
-extern Pid pitch_pid;
-extern Pid yaw_pid;
+Fcu fcu = {0};
+Esc esc = {0x8000, 0x8000, 0x8000, 0x8000};
+volatile DataPacket rxPacket;
+DataPacket txPacket = {NODE_ID, ZONE_ID, TYPE_TELEMETRY, {0}};
+const DataQuaternion HoverQuaternion = {0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
+Pid roll_pid = {0};
+Pid pitch_pid = {0};
+Pid yaw_pid = {0};
 
-// Control and update routines
 static inline void updateESC(void);
 static inline void updateFCU(void);
 static inline void updatePID(float setpoint, float value, float kp, float ki, float kd, float *integral, float *prev_value, float *output);
 
-// Data handling and communication
 static inline void extractFloat(float &value, const uint8_t index);
 static inline void parseRCU(void);
 static inline void sendRCU(void);
 
-// Flash operations
 static inline void eraseFlash(void);
 static inline void loadFlash(void);
 static inline void saveFlash(void);
 
-// Handler functions
 static inline void handleCharging(void);
 static inline void handlePID(void);
 static inline void handleSetpoint(void);
 static inline void handleThrust(void);
 
-// Quaternion math
 static inline void multiplyQuaternion(DataQuaternion &r, const DataQuaternion &q1, const DataQuaternion &q2);
 static inline void normalizeQuaternion(DataQuaternion &q);
 
