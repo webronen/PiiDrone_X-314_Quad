@@ -99,8 +99,7 @@ VL53L4CX vl53l4cx(&Wire, NC);
 // Data structures
 typedef struct __attribute__((aligned(4), packed))
 {
-  uint16_t thrust;
-  uint16_t distance;
+  uint16_t thrust, distance;
   float roll_p, roll_i, roll_d, roll_setpoint;
   float pitch_p, pitch_i, pitch_d, pitch_setpoint;
   float yaw_p, yaw_i, yaw_d, yaw_setpoint;
@@ -120,19 +119,14 @@ static_assert(sizeof(Esc) == 8, "Esc struct must be 8 bytes (2 words)");
 
 typedef struct __attribute__((aligned(1), packed))
 {
-  uint8_t node;
-  uint8_t zone;
-  uint8_t type;
-  uint8_t data[252];
+  uint8_t node, zone, type, data[252];
 } DataPacket;
 
 static_assert(sizeof(DataPacket) == 255, "DataPacket struct must be 255 bytes");
 
 typedef struct __attribute__((aligned(4), packed))
 {
-  float integral;
-  float output;
-  float prev;
+  float integral, output, prev;
 } Pid;
 
 static_assert(sizeof(Pid) == 12, "Pid struct must be 12 bytes (3 words)");

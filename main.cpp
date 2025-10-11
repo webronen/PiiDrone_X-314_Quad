@@ -191,12 +191,6 @@ void loop(void)
   handleCharging();
 }
 
-
-
-
-
-
-
 static inline void handleCharging()
 {
   const uint8_t status = nicla::_pmic.getStatusRegister();
