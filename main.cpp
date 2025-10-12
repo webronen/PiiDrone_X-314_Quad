@@ -427,9 +427,10 @@ static inline void saveFlash(void)
   while (!NRF_NVMC->READY)
     __NOP();
 
+  const uint32_t *data = (const uint32_t *)&fcu;
   for (uint8_t i = 0; i < FLASH_BLOCK_WORDS; i++)
   {
-    NRF_UICR->CUSTOMER[i] = ((const uint32_t *)&fcu)[i];
+    NRF_UICR->CUSTOMER[i] = data[i];
     while (!NRF_NVMC->READY)
       __NOP();
   }
@@ -439,6 +440,7 @@ static inline void saveFlash(void)
 
 static inline void loadFlash(void)
 {
+  uint32_t *data = (uint32_t *)&fcu;
   for (uint8_t i = 0; i < FLASH_BLOCK_WORDS; i++)
-    ((uint32_t *)&fcu)[i] = NRF_UICR->CUSTOMER[i];
+    data[i] = NRF_UICR->CUSTOMER[i];
 }
