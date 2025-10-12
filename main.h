@@ -86,6 +86,8 @@
 #define EMA_ALPHA 0.3f
 #define EMA_BETA (1.0f - EMA_ALPHA)
 
+#define TEMPERATURE_CORRECTION -3.8f
+
 SensorXYZ accelerometer(BHY2_SENSOR_ID_ACC);
 SensorXYZ gyroscope(BHY2_SENSOR_ID_GYRO);
 SensorXYZ magnetometer(BHY2_SENSOR_ID_MAG);

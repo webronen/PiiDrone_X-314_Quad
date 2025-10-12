@@ -250,7 +250,10 @@ static inline void updatePID(const float setpoint, const float value, const floa
 static inline void updateFCU(void)
 {
   fcu.pressure = EMA_ALPHA * pressure._value + EMA_BETA * fcu.pressure;
-  fcu.temperature = EMA_ALPHA * temperature._value + EMA_BETA * fcu.temperature;
+
+  const float _temperature = temperature._value + TEMPERATURE_CORRECTION;
+  fcu.temperature = EMA_ALPHA * _temperature + EMA_BETA * fcu.temperature;
+
   fcu.humidity = EMA_ALPHA * humidity._value + EMA_BETA * fcu.humidity;
 
   uint8_t ready = 0;
