@@ -249,9 +249,9 @@ static inline void updatePID(const float setpoint, const float value, const floa
 
 static inline void updateFCU(void)
 {
-  fcu.pressure = pressure._value;
-  fcu.temperature = temperature._value;
-  fcu.humidity = humidity._value;
+  fcu.pressure = EMA_ALPHA * pressure._value + EMA_BETA * fcu.pressure;
+  fcu.temperature = EMA_ALPHA * temperature._value + EMA_BETA * fcu.temperature;
+  fcu.humidity = EMA_ALPHA * humidity._value + EMA_BETA * fcu.humidity;
 
   uint8_t ready = 0;
   if (vl53l4cx.VL53L4CX_GetMeasurementDataReady(&ready) == VL53L4CX_ERROR_NONE && ready)
@@ -261,7 +261,7 @@ static inline void updateFCU(void)
         data.NumberOfObjectsFound > 0 &&
         data.RangeData[0].RangeStatus == 0)
     {
-      fcu.distance = data.RangeData[0].RangeMilliMeter;
+      fcu.distance = EMA_ALPHA * data.RangeData[0].RangeMilliMeter + EMA_BETA * fcu.distance;
     }
     vl53l4cx.VL53L4CX_ClearInterruptAndStartMeasurement();
   }

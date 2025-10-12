@@ -83,6 +83,9 @@
 #define FLASH_BLOCK_WORDS 32
 #define FLASH_BLOCK_BYTES (FLASH_BLOCK_WORDS * 4)
 
+#define EMA_ALPHA 0.3f
+#define EMA_BETA (1.0f - EMA_ALPHA)
+
 SensorXYZ accelerometer(BHY2_SENSOR_ID_ACC);
 SensorXYZ gyroscope(BHY2_SENSOR_ID_GYRO);
 SensorXYZ magnetometer(BHY2_SENSOR_ID_MAG);
