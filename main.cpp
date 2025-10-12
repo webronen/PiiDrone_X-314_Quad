@@ -163,24 +163,7 @@ void loop(void)
       fcu.active = false;
   }
 
-  handleCharging();
-}
-
-static inline void handleCharging(void)
-{
-  const uint8_t status = nicla::_pmic.getStatusRegister();
-  const bool usbPresent = ((status >> 2) & 0x01);
-  const bool chargeDone = (((status >> 6) & 0x03) == 2);
-
-  if (usbPresent && !chargeDone)
-    nicla::enableCharging(300);
-  else
-    nicla::disableCharging();
-
-  if (usbPresent && chargeDone)
-    nicla::leds.setColorRed();
-  else
-    nicla::leds.setColorRed(0);
+  fcu.battery = nicla::getCurrentBatteryVoltage();
 }
 
 static inline void sendRCU(void)

@@ -98,9 +98,9 @@ typedef struct __attribute__((aligned(4), packed))
   float roll_p, roll_i, roll_d, roll_setpoint;
   float pitch_p, pitch_i, pitch_d, pitch_setpoint;
   float yaw_p, yaw_i, yaw_d, yaw_setpoint;
-  float pressure, humidity, temperature;
+  float pressure, humidity, temperature, battery;
   bool active;
-  uint8_t _pad[63];
+  uint8_t _pad[56];
 } Fcu;
 
 static_assert(sizeof(Fcu) == FLASH_BLOCK_BYTES, "Fcu struct must be 128 bytes (32 words)");
@@ -147,7 +147,6 @@ static inline void eraseFlash(void);
 static inline void loadFlash(void);
 static inline void saveFlash(void);
 
-static inline void handleCharging(void);
 static inline void handlePID(void);
 static inline void handleSetpoint(void);
 static inline void handleThrust(void);
