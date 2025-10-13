@@ -295,26 +295,28 @@ static inline void normalize_quaternion(DataQuaternion &q)
 
 static void handle_power_failure(void)
 {
-  // Deactivate red LED if no power-fail event
-  nicla::leds.setColorRed(0);
-
-  // Read and store current battery voltage
+  // Always update battery voltage
   fcu.battery = nicla::getCurrentBatteryVoltage();
 
-  // Read Power-Fail Warning event status
-  fcu.power_failure = NRF_POWER->EVENTS_POFWARN;
-
-  // Check if Power-Fail Warning event has occurred
-  if (fcu.power_failure)
+  // Check Power-Fail Warning event
+  if (NRF_POWER->EVENTS_POFWARN)
   {
-    // Toggle red led to indicate power failure event at 2 Hz
+    // Clear the event flag
+    NRF_POWER->EVENTS_POFWARN = 0;
+
+    // Toggle red LED at 2 Hz to indicate power failure
     static bool led_state = false;
     led_state = !led_state;
-    nicla::leds.setColorRed(led_state * 255);
-  }
+    nicla::leds.setColorRed(led_state ? 255 : 0);
 
-  // Clear the power-fail event flag
-  NRF_POWER->EVENTS_POFWARN = 0;
+    fcu.power_failure = true;
+  }
+  else
+  {
+    // No power-fail event: LED off, flag false
+    nicla::leds.setColorRed(0);
+    fcu.power_failure = false;
+  }
 }
 
 static inline void update_pid(const float setpoint, const float value, const float kp, const float ki,
