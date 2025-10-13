@@ -66,7 +66,7 @@ void setup(void)
   nicla::disableLDO();
   delay(100); // Wait for LDO to be disabled
   nicla::enable3V3LDO();
-  delay(100); // Wait for LDO to be enabled
+  delay(100); // Wait for LDO to be stabilized
 
   // Configure PMIC (power management IC) for current and voltage limits
   uint8_t pmic_status = nicla::_pmic.readByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL);
