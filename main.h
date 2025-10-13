@@ -146,8 +146,8 @@ typedef struct
 
 Fcu fcu = {0};
 Esc esc = {0x8000, 0x8000, 0x8000, 0x8000};
-volatile DataPacket rxPacket;
-DataPacket txPacket = {NODE_ID, ZONE_ID, TYPE_TELEMETRY, {0}};
+volatile DataPacket received_packet;
+DataPacket transmit_packet = {NODE_ID, ZONE_ID, TYPE_TELEMETRY, {0}};
 const DataQuaternion HoverQuaternion = {0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
 Pid roll_pid = {0};
 Pid pitch_pid = {0};

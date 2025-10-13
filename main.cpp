@@ -20,7 +20,7 @@ void setup(void)
 
   // Configure radio for packet reception and transmission
   NRF_RADIO->SHORTS = (RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_START_Msk);
-  NRF_RADIO->PACKETPTR = (uint32_t)&rxPacket;
+  NRF_RADIO->PACKETPTR = (uint32_t)&received_packet;
   NRF_RADIO->TXPOWER = RADIO_TXPOWER_TXPOWER_Pos4dBm;
 
   NRF_RADIO->PCNF1 = (sizeof(DataPacket) << RADIO_PCNF1_MAXLEN_Pos) |
@@ -224,7 +224,7 @@ static void update_motor_speed(void)
 static void send_radio_packet(void)
 {
   fcu.battery = nicla::getCurrentBatteryVoltage();
-  memcpy(txPacket.data, &fcu, sizeof(Fcu));
+  memcpy(transmit_packet.data, &fcu, sizeof(Fcu));
 
   // Wait for previous radio transmission to finish
   while (!NRF_RADIO->EVENTS_END)
@@ -238,7 +238,7 @@ static void send_radio_packet(void)
     __NOP();
 
   // Set up for TX
-  NRF_RADIO->PACKETPTR = (uint32_t)&txPacket;
+  NRF_RADIO->PACKETPTR = (uint32_t)&transmit_packet;
   NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk;
   NRF_RADIO->TASKS_TXEN = 1;
 
@@ -247,7 +247,7 @@ static void send_radio_packet(void)
     __NOP();
 
   // Restore RX mode
-  NRF_RADIO->PACKETPTR = (uint32_t)&rxPacket;
+  NRF_RADIO->PACKETPTR = (uint32_t)&received_packet;
   NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_START_Msk;
   NRF_RADIO->TASKS_RXEN = 1;
 }
@@ -301,10 +301,10 @@ static inline void update_pid(const float setpoint, const float value, const flo
 static inline void read_radio_packet(void)
 {
   // Ignore packets not addressed to this node/zone
-  if (rxPacket.node != NODE_ID || rxPacket.zone != ZONE_ID)
+  if (received_packet.node != NODE_ID || received_packet.zone != ZONE_ID)
     return;
 
-  switch (rxPacket.type)
+  switch (received_packet.type)
   {
   case TYPE_PID:
     handle_pid_packet();
@@ -327,8 +327,8 @@ static inline void read_radio_packet(void)
 
 static inline void handle_pid_packet(void)
 {
-  const uint8_t axis = rxPacket.data[0];
-  const uint8_t gain = rxPacket.data[1];
+  const uint8_t axis = received_packet.data[0];
+  const uint8_t gain = received_packet.data[1];
 
   if (axis >= 3 || gain >= 3)
     return;
@@ -387,7 +387,7 @@ static inline void handle_pid_packet(void)
 
 static inline void handle_setpoint_packet(void)
 {
-  const uint8_t axis = rxPacket.data[0];
+  const uint8_t axis = received_packet.data[0];
 
   if (axis >= 3)
     return;
@@ -414,7 +414,7 @@ static inline void handle_setpoint_packet(void)
 static inline void handle_thrust_packet(void)
 {
   // Combine two bytes to form a 16-bit thrust value using little-endian format
-  const uint16_t thrust = (rxPacket.data[1] << 8) | rxPacket.data[0];
+  const uint16_t thrust = (received_packet.data[1] << 8) | received_packet.data[0];
   fcu.thrust = constrain(thrust, THRUST_MIN, THRUST_MAX);
 
   // Activate or deactivate FCU based on thrust
@@ -425,10 +425,10 @@ static inline void extract_float_bytes(float &value, const uint8_t index)
 {
   // Extract a float from rxPacket.data starting at index (little-endian)
   uint8_t *bytes = (uint8_t *)&value;
-  bytes[0] = rxPacket.data[index];
-  bytes[1] = rxPacket.data[index + 1];
-  bytes[2] = rxPacket.data[index + 2];
-  bytes[3] = rxPacket.data[index + 3];
+  bytes[0] = received_packet.data[index];
+  bytes[1] = received_packet.data[index + 1];
+  bytes[2] = received_packet.data[index + 2];
+  bytes[3] = received_packet.data[index + 3];
 }
 
 static inline void erase_user_flash(void)
