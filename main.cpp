@@ -59,13 +59,16 @@ void setup(void)
   NRF_PWM0->ENABLE = PWM_ENABLE_ENABLE_Enabled;
   NRF_PWM0->TASKS_SEQSTART[0] = 1;
 
+  // Configure Power-Fail Comparator to 2.7V for early warning of power loss.
+  NRF_POWER->POFCON = (POWER_POFCON_THRESHOLD_V27 << POWER_POFCON_THRESHOLD_Pos) | POWER_POFCON_POF_Enabled;
+
   // Initialize Nicla power and battery management
   nicla::begin(false);
   nicla::setBatteryNTCEnabled(false);
   nicla::disableCharging();
   nicla::disableLDO();
   nicla::enable3V3LDO();
-  
+
   // Configure PMIC (power management IC) for current and voltage limits
   uint8_t pmic_status = nicla::_pmic.readByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL);
   pmic_status = (pmic_status & ~0x3F) | 0x3F; // Set ILIM to 350mA (Max) and disable UVLO (Default is 50mA and UVLO 3.0V enabled)
@@ -276,6 +279,24 @@ static inline void normalize_quaternion(DataQuaternion &q)
   q.x *= inv;
   q.y *= inv;
   q.z *= inv;
+}
+
+static void handle_power_failure(void)
+{
+  // Deactivate red LED if no power-fail event
+  nicla::leds.setColorRed(0);
+
+  // Check if Power-Fail Warning event has occurred
+  if (NRF_POWER->EVENTS_POFWARN)
+  {
+    // Clear the event flag
+    NRF_POWER->EVENTS_POFWARN = 0;
+
+    // Toggle red led to indicate power failure event at 1 Hz
+    static bool led_state = false;
+    led_state = !led_state;
+    nicla::leds.setColorRed(led_state * 255);
+  }
 }
 
 static inline void update_pid(const float setpoint, const float value, const float kp, const float ki,
