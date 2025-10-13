@@ -423,7 +423,7 @@ static inline void handle_thrust_packet(void)
 
 static inline void extract_float_bytes(float &value, const uint8_t index)
 {
-  // Extract a float from rxPacket.data starting at index (little-endian)
+  // Extract a float from received_packet.data starting at index (little-endian)
   uint8_t *bytes = (uint8_t *)&value;
   bytes[0] = received_packet.data[index];
   bytes[1] = received_packet.data[index + 1];
