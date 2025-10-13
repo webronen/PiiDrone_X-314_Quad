@@ -18,7 +18,7 @@
 
 #include <vl53l4cx_class.h>
 
-#define HZ_TO_US(Hz) (1000000.0f / (Hz))
+#define HZ_TO_US(Hz) ((uint32_t)(1000000.0f / (Hz)))
 
 #define PWM_BASE_CLOCK 16000000UL
 #define PWM_FREQUENCY 20000UL
@@ -88,6 +88,8 @@
 
 #define TEMPERATURE_CORRECTION -3.8f
 
+#define SCHEDULER_TASK_COUNT 4
+
 SensorXYZ accelerometer(BHY2_SENSOR_ID_ACC);
 SensorXYZ gyroscope(BHY2_SENSOR_ID_GYRO);
 SensorXYZ magnetometer(BHY2_SENSOR_ID_MAG);
@@ -131,6 +133,13 @@ typedef struct __attribute__((aligned(4), packed))
 
 static_assert(sizeof(Pid) == 12, "Pid struct must be 12 bytes (3 words)");
 
+typedef struct
+{
+  const uint32_t interval_us;
+  uint32_t previous_us;
+  void (*task)(void);
+} Task;
+
 Fcu fcu = {0};
 Esc esc = {0x8000, 0x8000, 0x8000, 0x8000};
 volatile DataPacket rxPacket;
@@ -140,13 +149,24 @@ Pid roll_pid = {0};
 Pid pitch_pid = {0};
 Pid yaw_pid = {0};
 
-static inline void updateESC(void);
-static inline void updateFCU(void);
+static uint32_t global_time_us = 0;
+
+static inline void run_scheduler_tasks(void);
+static void update_inertial_measurement_unit(void);
+static void update_flight_control_unit(void);
+static void update_motor_speed(void);
+static void send_radio_packet(void);
+
+static Task tasks[SCHEDULER_TASK_COUNT] = {
+    {HZ_TO_US(401), 0, update_inertial_measurement_unit},
+    {HZ_TO_US(211), 0, update_flight_control_unit},
+    {HZ_TO_US(101), 0, update_motor_speed},
+    {HZ_TO_US(2), 0, send_radio_packet}};
+
 static inline void updatePID(const float setpoint, const float value, const float kp, const float ki, const float kd, float *integral, float *prev_value, float *output);
 
 static inline void extractFloat(float &value, const uint8_t index);
 static inline void readRCU(void);
-static inline void sendRCU(void);
 
 static inline void eraseFlash(void);
 static inline void loadFlash(void);

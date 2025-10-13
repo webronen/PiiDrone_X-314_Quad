@@ -66,6 +66,11 @@ void setup(void)
   nicla::disableLDO();
   nicla::enable3V3LDO();
 
+  // PMIC (BQ25120A)
+  uint8_t pmic_status = nicla::_pmic.readByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL);
+  pmic_status = (pmic_status & ~0x3F) | 0x3E; // Set ILIM to 350mA and UVLO to 2.2V
+  nicla::_pmic.writeByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL, pmic_status);
+
   // IMU
   sensortec.begin();
 
@@ -108,66 +113,109 @@ void setup(void)
 
 void loop(void)
 {
-  NRF_TIMER0->TASKS_CAPTURE[0] = 1;
-  const uint32_t loopTime = NRF_TIMER0->CC[0];
-
-  static uint32_t lastSensorUpdateTime = loopTime;
-  static uint32_t lastPidUpdateTime = loopTime;
-  static uint32_t lastMotorUpdateTime = loopTime;
-  static uint32_t lastPacketSendTime = loopTime;
-  static uint32_t lastPacketReceiveTime = loopTime;
-  static uint32_t startLandingTime = loopTime;
+  static uint32_t lastPacketReceiveTime = global_time_us;
+  static uint32_t startLandingTime = global_time_us;
 
   if (NRF_RADIO->EVENTS_CRCOK)
   {
     NRF_RADIO->EVENTS_CRCOK = 0;
-    lastPacketReceiveTime = loopTime + HZ_TO_US(0.1f);
+    lastPacketReceiveTime = global_time_us + HZ_TO_US(0.1f);
     readRCU();
   }
 
-  if (loopTime >= lastSensorUpdateTime)
+  run_scheduler_tasks();
+
+  /**
+   * Auto landing sequence
+   *
+   * If no packet received from RCU for 10 second and FCU is active, start landing sequence
+   * Decrease thrust by 10 every second until thrust is less than 10, then set FCU to inactive
+   * If packet is received from RCU, abort landing sequence and resume normal operation
+   */
+  if (fcu.active && global_time_us >= lastPacketReceiveTime && global_time_us >= startLandingTime)
   {
-    lastSensorUpdateTime += HZ_TO_US(401);
-    sensortec.update();
-  }
-
-  if (loopTime >= lastPidUpdateTime)
-  {
-    lastPidUpdateTime += HZ_TO_US(211);
-    updateFCU();
-  }
-
-  if (loopTime >= lastMotorUpdateTime)
-  {
-    lastMotorUpdateTime += HZ_TO_US(101);
-    updateESC();
-  }
-
-  if (loopTime >= lastPacketSendTime)
-  {
-    lastPacketSendTime += HZ_TO_US(2);
-
-    memcpy(txPacket.data, &fcu, sizeof(Fcu));
-    sendRCU();
-  }
-
-  if (fcu.active && loopTime >= lastPacketReceiveTime && loopTime >= startLandingTime)
-  {
-    startLandingTime = loopTime + HZ_TO_US(1);
-
+    startLandingTime = global_time_us + HZ_TO_US(1);
     fcu.roll_setpoint = fcu.pitch_setpoint = fcu.yaw_setpoint = 0.0f;
-
-    if (fcu.thrust >= 10)
-      fcu.thrust -= 10;
-    else
-      fcu.active = false;
+    (fcu.thrust >= 10) ? (fcu.thrust -= 10) : (fcu.active = false);
   }
-
-  fcu.battery = nicla::getCurrentBatteryVoltage();
 }
 
-static inline void sendRCU(void)
+static inline void run_scheduler_tasks(void)
 {
+  NRF_TIMER0->TASKS_CAPTURE[0] = 1;
+  global_time_us = NRF_TIMER0->CC[0];
+
+  for (uint8_t i = 0; i < SCHEDULER_TASK_COUNT; i++)
+  {
+    if (global_time_us >= tasks[i].previous_us)
+    {
+      tasks[i].previous_us += tasks[i].interval_us;
+      tasks[i].task();
+    }
+  }
+}
+
+static void update_inertial_measurement_unit(void)
+{
+  sensortec.update();
+}
+
+static void update_flight_control_unit(void)
+{
+  fcu.pressure = EMA_ALPHA * pressure._value + EMA_BETA * fcu.pressure;
+
+  const float _temperature = temperature._value + TEMPERATURE_CORRECTION;
+  fcu.temperature = EMA_ALPHA * _temperature + EMA_BETA * fcu.temperature;
+
+  fcu.humidity = EMA_ALPHA * humidity._value + EMA_BETA * fcu.humidity;
+
+  uint8_t ready = 0;
+  if (vl53l4cx.VL53L4CX_GetMeasurementDataReady(&ready) == VL53L4CX_ERROR_NONE && ready)
+  {
+    VL53L4CX_MultiRangingData_t data;
+    if (vl53l4cx.VL53L4CX_GetMultiRangingData(&data) == VL53L4CX_ERROR_NONE &&
+        data.NumberOfObjectsFound > 0 &&
+        data.RangeData[0].RangeStatus == 0)
+    {
+      fcu.distance = EMA_ALPHA * data.RangeData[0].RangeMilliMeter + EMA_BETA * fcu.distance;
+    }
+    vl53l4cx.VL53L4CX_ClearInterruptAndStartMeasurement();
+  }
+
+  const DataQuaternion conjugate = {-quaternion._data.x, -quaternion._data.y, -quaternion._data.z, quaternion._data.w};
+  DataQuaternion error;
+  multiplyQuaternion(error, HoverQuaternion, conjugate);
+
+  updatePID(fcu.roll_setpoint, error.x, fcu.roll_p, fcu.roll_i, fcu.roll_d, &roll_pid.integral, &roll_pid.prev, &roll_pid.output);
+  updatePID(fcu.pitch_setpoint, error.y, fcu.pitch_p, fcu.pitch_i, fcu.pitch_d, &pitch_pid.integral, &pitch_pid.prev, &pitch_pid.output);
+  updatePID(fcu.yaw_setpoint, error.z, fcu.yaw_p, fcu.yaw_i, fcu.yaw_d, &yaw_pid.integral, &yaw_pid.prev, &yaw_pid.output);
+}
+
+static void update_motor_speed(void)
+{
+  if (!fcu.active)
+  {
+    fcu.thrust = 0;
+    fcu.roll_setpoint = fcu.pitch_setpoint = fcu.yaw_setpoint = 0.0f;
+    memset(&roll_pid, 0, sizeof(Pid));
+    memset(&pitch_pid, 0, sizeof(Pid));
+    memset(&yaw_pid, 0, sizeof(Pid));
+  }
+
+  esc.m1 = 0x8000 | (uint16_t)constrain(fcu.thrust + roll_pid.output - pitch_pid.output - yaw_pid.output, THRUST_MIN, THRUST_MAX);
+  esc.m2 = 0x8000 | (uint16_t)constrain(fcu.thrust - roll_pid.output - pitch_pid.output + yaw_pid.output, THRUST_MIN, THRUST_MAX);
+  esc.m3 = 0x8000 | (uint16_t)constrain(fcu.thrust + roll_pid.output + pitch_pid.output + yaw_pid.output, THRUST_MIN, THRUST_MAX);
+  esc.m4 = 0x8000 | (uint16_t)constrain(fcu.thrust - roll_pid.output + pitch_pid.output - yaw_pid.output, THRUST_MIN, THRUST_MAX);
+
+  __DMB();
+  NRF_PWM0->TASKS_SEQSTART[0] = 1;
+}
+
+static void send_radio_packet(void)
+{
+  fcu.battery = nicla::getCurrentBatteryVoltage();
+  memcpy(txPacket.data, &fcu, sizeof(Fcu));
+
   while (!NRF_RADIO->EVENTS_END)
     __NOP();
 
@@ -210,26 +258,6 @@ static inline void normalizeQuaternion(DataQuaternion &q)
   q.z *= inv;
 }
 
-static inline void updateESC(void)
-{
-  if (!fcu.active)
-  {
-    fcu.thrust = 0;
-    fcu.roll_setpoint = fcu.pitch_setpoint = fcu.yaw_setpoint = 0.0f;
-    memset(&roll_pid, 0, sizeof(Pid));
-    memset(&pitch_pid, 0, sizeof(Pid));
-    memset(&yaw_pid, 0, sizeof(Pid));
-  }
-
-  esc.m1 = 0x8000 | (uint16_t)constrain(fcu.thrust + roll_pid.output - pitch_pid.output - yaw_pid.output, THRUST_MIN, THRUST_MAX);
-  esc.m2 = 0x8000 | (uint16_t)constrain(fcu.thrust - roll_pid.output - pitch_pid.output + yaw_pid.output, THRUST_MIN, THRUST_MAX);
-  esc.m3 = 0x8000 | (uint16_t)constrain(fcu.thrust + roll_pid.output + pitch_pid.output + yaw_pid.output, THRUST_MIN, THRUST_MAX);
-  esc.m4 = 0x8000 | (uint16_t)constrain(fcu.thrust - roll_pid.output + pitch_pid.output - yaw_pid.output, THRUST_MIN, THRUST_MAX);
-
-  __DMB();
-  NRF_PWM0->TASKS_SEQSTART[0] = 1;
-}
-
 static inline void updatePID(const float setpoint, const float value, const float kp, const float ki,
                              const float kd, float *integral, float *prev_value, float *output)
 {
@@ -245,37 +273,6 @@ static inline void updatePID(const float setpoint, const float value, const floa
   *output = constrain(*output, PID_MIN, PID_MAX);
 
   *prev_value = value;
-}
-
-static inline void updateFCU(void)
-{
-  fcu.pressure = EMA_ALPHA * pressure._value + EMA_BETA * fcu.pressure;
-
-  const float _temperature = temperature._value + TEMPERATURE_CORRECTION;
-  fcu.temperature = EMA_ALPHA * _temperature + EMA_BETA * fcu.temperature;
-
-  fcu.humidity = EMA_ALPHA * humidity._value + EMA_BETA * fcu.humidity;
-
-  uint8_t ready = 0;
-  if (vl53l4cx.VL53L4CX_GetMeasurementDataReady(&ready) == VL53L4CX_ERROR_NONE && ready)
-  {
-    VL53L4CX_MultiRangingData_t data;
-    if (vl53l4cx.VL53L4CX_GetMultiRangingData(&data) == VL53L4CX_ERROR_NONE &&
-        data.NumberOfObjectsFound > 0 &&
-        data.RangeData[0].RangeStatus == 0)
-    {
-      fcu.distance = EMA_ALPHA * data.RangeData[0].RangeMilliMeter + EMA_BETA * fcu.distance;
-    }
-    vl53l4cx.VL53L4CX_ClearInterruptAndStartMeasurement();
-  }
-
-  const DataQuaternion conjugate = {-quaternion._data.x, -quaternion._data.y, -quaternion._data.z, quaternion._data.w};
-  DataQuaternion error;
-  multiplyQuaternion(error, HoverQuaternion, conjugate);
-
-  updatePID(fcu.roll_setpoint, error.x, fcu.roll_p, fcu.roll_i, fcu.roll_d, &roll_pid.integral, &roll_pid.prev, &roll_pid.output);
-  updatePID(fcu.pitch_setpoint, error.y, fcu.pitch_p, fcu.pitch_i, fcu.pitch_d, &pitch_pid.integral, &pitch_pid.prev, &pitch_pid.output);
-  updatePID(fcu.yaw_setpoint, error.z, fcu.yaw_p, fcu.yaw_i, fcu.yaw_d, &yaw_pid.integral, &yaw_pid.prev, &yaw_pid.output);
 }
 
 static inline void readRCU(void)
