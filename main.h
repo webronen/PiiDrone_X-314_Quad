@@ -18,6 +18,7 @@
 
 #include <vl53l4cx_class.h>
 
+// Convert frequency in Hz to microseconds period (supports float Hz)
 #define HZ_TO_US(Hz) ((uint32_t)(1000000.0f / (Hz)))
 
 #define PWM_BASE_CLOCK 16000000UL
@@ -86,10 +87,12 @@
 #define EMA_ALPHA 0.3f
 #define EMA_BETA (1.0f - EMA_ALPHA)
 
+// Empirical temperature correction for sensor offset
 #define TEMPERATURE_CORRECTION -3.8f
 
 #define SCHEDULER_TASK_COUNT 4
 
+// Sensor objects for IMU and environment
 SensorXYZ accelerometer(BHY2_SENSOR_ID_ACC);
 SensorXYZ gyroscope(BHY2_SENSOR_ID_GYRO);
 SensorXYZ magnetometer(BHY2_SENSOR_ID_MAG);
@@ -99,6 +102,7 @@ Sensor temperature(BHY2_SENSOR_ID_TEMP);
 SensorQuaternion quaternion(BHY2_SENSOR_ID_RV);
 VL53L4CX vl53l4cx(&Wire, NC);
 
+// Main flight control unit state (128 bytes, see static_assert)
 typedef struct __attribute__((aligned(4), packed))
 {
   uint16_t thrust, distance;
@@ -107,7 +111,7 @@ typedef struct __attribute__((aligned(4), packed))
   float yaw_p, yaw_i, yaw_d, yaw_setpoint;
   float pressure, humidity, temperature, battery;
   bool active;
-  uint8_t _pad[56];
+  uint8_t _pad[56]; // Padding to ensure struct is exactly 128 bytes
 } Fcu;
 
 static_assert(sizeof(Fcu) == FLASH_BLOCK_BYTES, "Fcu struct must be 128 bytes (32 words)");
@@ -152,31 +156,33 @@ Pid yaw_pid = {0};
 static uint32_t global_time_us = 0;
 
 static inline void run_scheduler_tasks(void);
+
 static void update_inertial_measurement_unit(void);
 static void update_flight_control_unit(void);
 static void update_motor_speed(void);
+
 static void send_radio_packet(void);
+static void read_radio_packet(void);
 
 static Task tasks[SCHEDULER_TASK_COUNT] = {
-    {HZ_TO_US(401), 0, update_inertial_measurement_unit},
-    {HZ_TO_US(211), 0, update_flight_control_unit},
-    {HZ_TO_US(101), 0, update_motor_speed},
-    {HZ_TO_US(2), 0, send_radio_packet}};
+    {HZ_TO_US(401), 0, update_inertial_measurement_unit}, // IMU update at 401 Hz
+    {HZ_TO_US(211), 0, update_flight_control_unit},       // FCU update at 211 Hz
+    {HZ_TO_US(101), 0, update_motor_speed},               // Motor update at 101 Hz
+    {HZ_TO_US(2), 0, send_radio_packet}};                 // Telemetry at 2 Hz
 
-static inline void updatePID(const float setpoint, const float value, const float kp, const float ki, const float kd, float *integral, float *prev_value, float *output);
+static inline void update_pid(const float setpoint, const float value, const float kp, const float ki, const float kd, float *integral, float *prev_value, float *output);
 
-static inline void extractFloat(float &value, const uint8_t index);
-static inline void readRCU(void);
+static inline void extract_float_bytes(float &value, const uint8_t index);
 
-static inline void eraseFlash(void);
-static inline void loadFlash(void);
-static inline void saveFlash(void);
+static inline void erase_user_flash(void);
+static inline void load_user_flash(void);
+static inline void save_user_flash(void);
 
-static inline void handlePID(void);
-static inline void handleSetpoint(void);
-static inline void handleThrust(void);
+static inline void handle_pid_packet(void);
+static inline void handle_setpoint_packet(void);
+static inline void handle_thrust_packet(void);
 
-static inline void multiplyQuaternion(DataQuaternion &r, const DataQuaternion &q1, const DataQuaternion &q2);
-static inline void normalizeQuaternion(DataQuaternion &q);
+static inline void multiply_quaternion(DataQuaternion &r, const DataQuaternion &q1, const DataQuaternion &q2);
+static inline void normalize_quaternion(DataQuaternion &q);
 
 #endif

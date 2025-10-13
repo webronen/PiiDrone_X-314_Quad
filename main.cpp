@@ -2,23 +2,23 @@
 
 void setup(void)
 {
-  // CLOCK
+  // Start high-frequency clock for peripherals
   NRF_CLOCK->TASKS_HFCLKSTART = 1;
   while (!NRF_CLOCK->EVENTS_HFCLKSTARTED)
     __NOP();
 
-  // TIMER
+  // Configure 32-bit timer with prescaler
   NRF_TIMER0->BITMODE = TIMER_BITMODE_BITMODE_32Bit;
   NRF_TIMER0->PRESCALER = 4;
   NRF_TIMER0->TASKS_START = 1;
 
-  // GPIO
+  // Configure motor GPIOs for high-drive output
   NRF_P0->PIN_CNF[MOTOR1_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) | (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
   NRF_P0->PIN_CNF[MOTOR2_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) | (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
   NRF_P0->PIN_CNF[MOTOR3_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) | (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
   NRF_P0->PIN_CNF[MOTOR4_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) | (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
 
-  // RADIO
+  // Configure radio for packet reception and transmission
   NRF_RADIO->SHORTS = (RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_START_Msk);
   NRF_RADIO->PACKETPTR = (uint32_t)&rxPacket;
   NRF_RADIO->TXPOWER = RADIO_TXPOWER_TXPOWER_Pos4dBm;
@@ -45,7 +45,7 @@ void setup(void)
 
   NRF_RADIO->TASKS_RXEN = 1;
 
-  // PWM
+  // Configure PWM for motor control
   NRF_PWM0->COUNTERTOP = PWM_TOP;
   NRF_PWM0->PRESCALER = PWM_PRESCALER_PRESCALER_DIV_1;
   NRF_PWM0->DECODER = PWM_DECODER_LOAD_Individual;
@@ -59,19 +59,21 @@ void setup(void)
   NRF_PWM0->ENABLE = PWM_ENABLE_ENABLE_Enabled;
   NRF_PWM0->TASKS_SEQSTART[0] = 1;
 
-  // NICLA
+  // Initialize Nicla power and battery management
   nicla::begin(false);
   nicla::setBatteryNTCEnabled(false);
   nicla::disableCharging();
   nicla::disableLDO();
+  delay(100); // Wait for LDO to be disabled
   nicla::enable3V3LDO();
+  delay(100); // Wait for LDO to be enabled
 
-  // PMIC (BQ25120A)
+  // Configure PMIC (power management IC) for current and voltage limits
   uint8_t pmic_status = nicla::_pmic.readByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL);
   pmic_status = (pmic_status & ~0x3F) | 0x3E; // Set ILIM to 350mA and UVLO to 2.2V
   nicla::_pmic.writeByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL, pmic_status);
 
-  // IMU
+  // Initialize IMU and sensors
   sensortec.begin();
 
   accelerometer.begin(ACCELEROMETER_HZ, ACCELEROMETER_LATENCY);
@@ -88,7 +90,7 @@ void setup(void)
   humidity.begin(HUMIDITY_HZ, HUMIDITY_LATENCY);
   temperature.begin(TEMPERATURE_HZ, TEMPERATURE_LATENCY);
 
-  // TOF
+  // Initialize ToF (Time-of-Flight) distance sensor
   Wire.begin();
   Wire.setClock(400000);
 
@@ -107,34 +109,36 @@ void setup(void)
   vl53l4cx.VL53L4CX_SetUserROI(&roi);
   vl53l4cx.VL53L4CX_StartMeasurement();
 
-  // FLASH
-  loadFlash();
+  // Load configuration/state from flash memory
+  load_user_flash();
 }
 
 void loop(void)
 {
-  static uint32_t lastPacketReceiveTime = global_time_us;
-  static uint32_t startLandingTime = global_time_us;
+  // Variables for auto landing sequence, if connection to RCU is lost
+  static uint32_t packet_time_us = global_time_us;
+  static uint32_t landing_time_us = global_time_us;
 
+  // Check for received radio packet and read if available
   if (NRF_RADIO->EVENTS_CRCOK)
   {
     NRF_RADIO->EVENTS_CRCOK = 0;
-    lastPacketReceiveTime = global_time_us + HZ_TO_US(0.1f);
-    readRCU();
+    packet_time_us = global_time_us + HZ_TO_US(0.1f);
+    read_radio_packet();
   }
 
+  // Run simple scheduler for periodic tasks
   run_scheduler_tasks();
 
   /**
-   * Auto landing sequence
-   *
-   * If no packet received from RCU for 10 second and FCU is active, start landing sequence
-   * Decrease thrust by 10 every second until thrust is less than 10, then set FCU to inactive
-   * If packet is received from RCU, abort landing sequence and resume normal operation
+   * Auto landing sequence:
+   * If no packet received from RCU for 10 seconds and FCU is active, start landing sequence.
+   * Decrease thrust by 10 every second until thrust is less than 10, then set FCU to inactive.
+   * If packet is received from RCU anytime during landing sequence, return to normal operation.
    */
-  if (fcu.active && global_time_us >= lastPacketReceiveTime && global_time_us >= startLandingTime)
+  if (fcu.active && global_time_us >= packet_time_us && global_time_us >= landing_time_us)
   {
-    startLandingTime = global_time_us + HZ_TO_US(1);
+    landing_time_us = global_time_us + HZ_TO_US(1);
     fcu.roll_setpoint = fcu.pitch_setpoint = fcu.yaw_setpoint = 0.0f;
     (fcu.thrust >= 10) ? (fcu.thrust -= 10) : (fcu.active = false);
   }
@@ -145,6 +149,7 @@ static inline void run_scheduler_tasks(void)
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
   global_time_us = NRF_TIMER0->CC[0];
 
+  // Run all scheduled tasks whose time has come
   for (uint8_t i = 0; i < SCHEDULER_TASK_COUNT; i++)
   {
     if (global_time_us >= tasks[i].previous_us)
@@ -162,6 +167,7 @@ static void update_inertial_measurement_unit(void)
 
 static void update_flight_control_unit(void)
 {
+  // Exponential Moving Average (EMA) filter for sensor readings
   fcu.pressure = EMA_ALPHA * pressure._value + EMA_BETA * fcu.pressure;
 
   const float _temperature = temperature._value + TEMPERATURE_CORRECTION;
@@ -169,6 +175,7 @@ static void update_flight_control_unit(void)
 
   fcu.humidity = EMA_ALPHA * humidity._value + EMA_BETA * fcu.humidity;
 
+  // Read and filter distance from ToF sensor if new data is ready
   uint8_t ready = 0;
   if (vl53l4cx.VL53L4CX_GetMeasurementDataReady(&ready) == VL53L4CX_ERROR_NONE && ready)
   {
@@ -182,13 +189,15 @@ static void update_flight_control_unit(void)
     vl53l4cx.VL53L4CX_ClearInterruptAndStartMeasurement();
   }
 
+  // Calculate attitude error quaternion (desired - measured)
   const DataQuaternion conjugate = {-quaternion._data.x, -quaternion._data.y, -quaternion._data.z, quaternion._data.w};
   DataQuaternion error;
-  multiplyQuaternion(error, HoverQuaternion, conjugate);
+  multiply_quaternion(error, HoverQuaternion, conjugate);
 
-  updatePID(fcu.roll_setpoint, error.x, fcu.roll_p, fcu.roll_i, fcu.roll_d, &roll_pid.integral, &roll_pid.prev, &roll_pid.output);
-  updatePID(fcu.pitch_setpoint, error.y, fcu.pitch_p, fcu.pitch_i, fcu.pitch_d, &pitch_pid.integral, &pitch_pid.prev, &pitch_pid.output);
-  updatePID(fcu.yaw_setpoint, error.z, fcu.yaw_p, fcu.yaw_i, fcu.yaw_d, &yaw_pid.integral, &yaw_pid.prev, &yaw_pid.output);
+  // Update PID controllers for roll, pitch, and yaw
+  update_pid(fcu.roll_setpoint, error.x, fcu.roll_p, fcu.roll_i, fcu.roll_d, &roll_pid.integral, &roll_pid.prev, &roll_pid.output);
+  update_pid(fcu.pitch_setpoint, error.y, fcu.pitch_p, fcu.pitch_i, fcu.pitch_d, &pitch_pid.integral, &pitch_pid.prev, &pitch_pid.output);
+  update_pid(fcu.yaw_setpoint, error.z, fcu.yaw_p, fcu.yaw_i, fcu.yaw_d, &yaw_pid.integral, &yaw_pid.prev, &yaw_pid.output);
 }
 
 static void update_motor_speed(void)
@@ -202,12 +211,13 @@ static void update_motor_speed(void)
     memset(&yaw_pid, 0, sizeof(Pid));
   }
 
+  // Mix PID outputs and thrust to generate ESC signals for each motor
   esc.m1 = 0x8000 | (uint16_t)constrain(fcu.thrust + roll_pid.output - pitch_pid.output - yaw_pid.output, THRUST_MIN, THRUST_MAX);
   esc.m2 = 0x8000 | (uint16_t)constrain(fcu.thrust - roll_pid.output - pitch_pid.output + yaw_pid.output, THRUST_MIN, THRUST_MAX);
   esc.m3 = 0x8000 | (uint16_t)constrain(fcu.thrust + roll_pid.output + pitch_pid.output + yaw_pid.output, THRUST_MIN, THRUST_MAX);
   esc.m4 = 0x8000 | (uint16_t)constrain(fcu.thrust - roll_pid.output + pitch_pid.output - yaw_pid.output, THRUST_MIN, THRUST_MAX);
 
-  __DMB();
+  __DMB(); // Data Memory Barrier before starting PWM
   NRF_PWM0->TASKS_SEQSTART[0] = 1;
 }
 
@@ -216,51 +226,64 @@ static void send_radio_packet(void)
   fcu.battery = nicla::getCurrentBatteryVoltage();
   memcpy(txPacket.data, &fcu, sizeof(Fcu));
 
+  // Wait for previous radio transmission to finish
   while (!NRF_RADIO->EVENTS_END)
     __NOP();
 
   NRF_RADIO->EVENTS_END = 0;
   NRF_RADIO->TASKS_DISABLE = 1;
 
+  // Wait for radio to be fully disabled
   while (NRF_RADIO->STATE)
     __NOP();
 
+  // Set up for TX
   NRF_RADIO->PACKETPTR = (uint32_t)&txPacket;
   NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk;
   NRF_RADIO->TASKS_TXEN = 1;
 
+  // Wait for TX to finish
   while (NRF_RADIO->STATE)
     __NOP();
 
+  // Restore RX mode
   NRF_RADIO->PACKETPTR = (uint32_t)&rxPacket;
   NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_START_Msk;
   NRF_RADIO->TASKS_RXEN = 1;
 }
 
-static inline void multiplyQuaternion(DataQuaternion &r, const DataQuaternion &q1, const DataQuaternion &q2)
+static inline void multiply_quaternion(DataQuaternion &r, const DataQuaternion &q1, const DataQuaternion &q2)
 {
+  // Hamilton product: r = q1 * q2
+  // This combines two rotations represented by quaternions q1 and q2.
   r.w = q1.w * q2.w - q1.x * q2.x - q1.y * q2.y - q1.z * q2.z;
   r.x = q1.w * q2.x + q1.x * q2.w + q1.y * q2.z - q1.z * q2.y;
   r.y = q1.w * q2.y - q1.x * q2.z + q1.y * q2.w + q1.z * q2.x;
   r.z = q1.w * q2.z + q1.x * q2.y - q1.y * q2.x + q1.z * q2.w;
 
-  normalizeQuaternion(r);
+  // Normalize the resulting quaternion to maintain unit length
+  normalize_quaternion(r);
 }
 
-static inline void normalizeQuaternion(DataQuaternion &q)
+static inline void normalize_quaternion(DataQuaternion &q)
 {
+  // Compute the squared magnitude (norm) of the quaternion
   const float mag = q.w * q.w + q.x * q.x + q.y * q.y + q.z * q.z;
+
+  // Compute the inverse of the magnitude, adding epsilon to avoid division by zero
   const float inv = 1.0f / __builtin_sqrtf(mag + __FLT_EPSILON__);
 
+  // Scale each component to normalize the quaternion (unit length)
   q.w *= inv;
   q.x *= inv;
   q.y *= inv;
   q.z *= inv;
 }
 
-static inline void updatePID(const float setpoint, const float value, const float kp, const float ki,
-                             const float kd, float *integral, float *prev_value, float *output)
+static inline void update_pid(const float setpoint, const float value, const float kp, const float ki,
+                              const float kd, float *integral, float *prev_value, float *output)
 {
+  // Standard PID controller with anti-windup and output limiting
   const float error = setpoint - value;
   const float derivative = -(value - *prev_value) * PID_LOOP_HZ;
   const float outputNoI = (kp * error) + (kd * derivative);
@@ -275,33 +298,34 @@ static inline void updatePID(const float setpoint, const float value, const floa
   *prev_value = value;
 }
 
-static inline void readRCU(void)
+static inline void read_radio_packet(void)
 {
+  // Ignore packets not addressed to this node/zone
   if (rxPacket.node != NODE_ID || rxPacket.zone != ZONE_ID)
     return;
 
   switch (rxPacket.type)
   {
   case TYPE_PID:
-    handlePID();
+    handle_pid_packet();
     break;
   case TYPE_SETPOINT:
-    handleSetpoint();
+    handle_setpoint_packet();
     break;
   case TYPE_THRUST:
-    handleThrust();
+    handle_thrust_packet();
     break;
   case TYPE_SAVE:
     fcu.active = false;
-    saveFlash();
+    save_user_flash();
     break;
   case TYPE_LOAD:
-    loadFlash();
+    load_user_flash();
     break;
   }
 }
 
-static inline void handlePID(void)
+static inline void handle_pid_packet(void)
 {
   const uint8_t axis = rxPacket.data[0];
   const uint8_t gain = rxPacket.data[1];
@@ -310,9 +334,10 @@ static inline void handlePID(void)
     return;
 
   float value = 0.0f;
-  extractFloat(value, 2);
+  extract_float_bytes(value, 2);
   value = constrain(value, GAIN_MIN, GAIN_MAX);
 
+  // Update the selected PID gain for the specified axis
   switch (axis)
   {
   case AXIS_PITCH:
@@ -360,7 +385,7 @@ static inline void handlePID(void)
   }
 }
 
-static inline void handleSetpoint(void)
+static inline void handle_setpoint_packet(void)
 {
   const uint8_t axis = rxPacket.data[0];
 
@@ -368,9 +393,10 @@ static inline void handleSetpoint(void)
     return;
 
   float value = 0.0f;
-  extractFloat(value, 1);
+  extract_float_bytes(value, 1);
   value = constrain(value, SETPOINT_MIN, SETPOINT_MAX);
 
+  // Update the setpoint for the specified axis
   switch (axis)
   {
   case AXIS_PITCH:
@@ -385,19 +411,19 @@ static inline void handleSetpoint(void)
   }
 }
 
-static inline void handleThrust(void)
+static inline void handle_thrust_packet(void)
 {
+  // Combine two bytes to form a 16-bit thrust value using little-endian format
   const uint16_t thrust = (rxPacket.data[1] << 8) | rxPacket.data[0];
   fcu.thrust = constrain(thrust, THRUST_MIN, THRUST_MAX);
 
-  if (fcu.thrust > THRUST_MIN)
-    fcu.active = true;
-  else
-    fcu.active = false;
+  // Activate or deactivate FCU based on thrust
+  fcu.active = (fcu.thrust > THRUST_MIN);
 }
 
-static inline void extractFloat(float &value, const uint8_t index)
+static inline void extract_float_bytes(float &value, const uint8_t index)
 {
+  // Extract a float from rxPacket.data starting at index (little-endian)
   uint8_t *bytes = (uint8_t *)&value;
   bytes[0] = rxPacket.data[index];
   bytes[1] = rxPacket.data[index + 1];
@@ -405,7 +431,7 @@ static inline void extractFloat(float &value, const uint8_t index)
   bytes[3] = rxPacket.data[index + 3];
 }
 
-static inline void eraseFlash(void)
+static inline void erase_user_flash(void)
 {
   NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Een;
   while (!NRF_NVMC->READY)
@@ -416,14 +442,15 @@ static inline void eraseFlash(void)
     __NOP();
 }
 
-static inline void saveFlash(void)
+static inline void save_user_flash(void)
 {
-  eraseFlash();
+  erase_user_flash();
 
   NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Wen;
   while (!NRF_NVMC->READY)
     __NOP();
 
+  // Write FCU struct to flash word by word
   const uint32_t *data = (const uint32_t *)&fcu;
   for (uint8_t i = 0; i < FLASH_BLOCK_WORDS; i++)
   {
@@ -432,11 +459,12 @@ static inline void saveFlash(void)
       __NOP();
   }
 
-  NVIC_SystemReset();
+  NVIC_SystemReset(); // Reset to reload configuration
 }
 
-static inline void loadFlash(void)
+static inline void load_user_flash(void)
 {
+  // Load FCU struct from flash
   uint32_t *data = (uint32_t *)&fcu;
   for (uint8_t i = 0; i < FLASH_BLOCK_WORDS; i++)
     data[i] = NRF_UICR->CUSTOMER[i];
