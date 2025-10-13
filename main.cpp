@@ -192,7 +192,7 @@ static void update_flight_control_unit(void)
   // Calculate attitude error quaternion (desired - measured)
   const DataQuaternion conjugate = {-quaternion._data.x, -quaternion._data.y, -quaternion._data.z, quaternion._data.w};
   DataQuaternion error;
-  multiply_quaternion(error, HoverQuaternion, conjugate);
+  multiply_quaternion(error, hover_quaternion, conjugate);
 
   // Update PID controllers for roll, pitch, and yaw
   update_pid(fcu.roll_setpoint, error.x, fcu.roll_p, fcu.roll_i, fcu.roll_d, &roll_pid.integral, &roll_pid.prev, &roll_pid.output);
