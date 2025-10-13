@@ -23,8 +23,8 @@ void setup(void)
   NRF_RADIO->PACKETPTR = (uint32_t)&received_packet;
   NRF_RADIO->TXPOWER = RADIO_TXPOWER_TXPOWER_Pos4dBm;
 
-  NRF_RADIO->PCNF1 = (sizeof(DataPacket) << RADIO_PCNF1_MAXLEN_Pos) |
-                     (sizeof(DataPacket) << RADIO_PCNF1_STATLEN_Pos) |
+  NRF_RADIO->PCNF1 = (sizeof(Rcu) << RADIO_PCNF1_MAXLEN_Pos) |
+                     (sizeof(Rcu) << RADIO_PCNF1_STATLEN_Pos) |
                      (2 << RADIO_PCNF1_BALEN_Pos) |
                      (RADIO_PCNF1_WHITEEN_Enabled << RADIO_PCNF1_WHITEEN_Pos);
 

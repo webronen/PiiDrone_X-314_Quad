@@ -138,9 +138,9 @@ static_assert(sizeof(Esc) == 8, "Esc struct must be 8 bytes (2 words)");
 typedef struct __attribute__((aligned(1), packed))
 {
   uint8_t node, zone, type, data[252];
-} DataPacket;
+} Rcu;
 
-static_assert(sizeof(DataPacket) == 255, "DataPacket struct must be 255 bytes");
+static_assert(sizeof(Rcu) == 255, "DataPacket struct must be 255 bytes");
 
 typedef struct __attribute__((aligned(4), packed))
 {
@@ -159,8 +159,8 @@ typedef struct
 
 Fcu fcu = {0};
 Esc esc = {0x8000, 0x8000, 0x8000, 0x8000};
-volatile DataPacket received_packet;
-DataPacket transmit_packet = {NODE_ID, ZONE_ID, TYPE_TELEMETRY, {0}};
+volatile Rcu received_packet;
+Rcu transmit_packet = {NODE_ID, ZONE_ID, TYPE_TELEMETRY, {0}};
 const DataQuaternion hover_quaternion = {0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
 Pid roll_pid = {0};
 Pid pitch_pid = {0};
