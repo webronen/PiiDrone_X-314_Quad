@@ -149,7 +149,7 @@ void loop(void)
   }
 }
 
-static inline void run_scheduler_tasks(uint32_t global_time_us)
+static inline void run_scheduler_tasks(const uint32_t global_time_us)
 {
   // Run all scheduled tasks whose time has come
   for (uint8_t i = 0; i < SCHEDULER_TASK_COUNT; i++)
@@ -304,7 +304,7 @@ static void handle_power_failure(void)
     // Clear the event flag
     NRF_POWER->EVENTS_POFWARN = 0;
 
-    // Toggle red led to indicate power failure event at 1 Hz
+    // Toggle red led to indicate power failure event at 2 Hz
     static bool led_state = false;
     led_state = !led_state;
     nicla::leds.setColorRed(led_state * 255);

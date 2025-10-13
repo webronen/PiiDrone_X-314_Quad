@@ -166,7 +166,7 @@ Pid roll_pid = {0};
 Pid pitch_pid = {0};
 Pid yaw_pid = {0};
 
-static inline void run_scheduler_tasks(uint32_t global_time_us);
+static inline void run_scheduler_tasks(const uint32_t global_time_us);
 
 static void update_inertial_measurement_unit(void);
 static void update_flight_control_unit(void);
@@ -181,8 +181,8 @@ static Task tasks[SCHEDULER_TASK_COUNT] = {
     {HZ_TO_US(211), 0, "FCU", update_flight_control_unit},       // FCU update at 211 Hz
     {HZ_TO_US(101), 0, "ESC", update_motor_speed},               // ESC update at 101 Hz
     {HZ_TO_US(31), 0, "TOF", update_distance_sensor},            // TOF update at 31 Hz
-    {HZ_TO_US(2), 0, "TEL", send_radio_packet},                  // TEL update at 2 Hz
-    {HZ_TO_US(1), 0, "POF", handle_power_failure}};              // POF update at 1 Hz
+    {HZ_TO_US(3), 0, "TEL", send_radio_packet},                  // TEL update at 3 Hz
+    {HZ_TO_US(2), 0, "POF", handle_power_failure}};              // POF update at 2 Hz
 
 static inline void update_pid(const float setpoint, const float value, const float kp, const float ki, const float kd, float *integral, float *prev_value, float *output);
 static inline void read_radio_packet(void);
