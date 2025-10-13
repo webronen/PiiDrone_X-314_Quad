@@ -122,8 +122,8 @@ typedef struct __attribute__((aligned(4), packed))
   float pitch_p, pitch_i, pitch_d, pitch_setpoint;
   float yaw_p, yaw_i, yaw_d, yaw_setpoint;
   float pressure, humidity, temperature, battery;
-  bool active;
-  uint8_t _pad[56]; // Padding to ensure struct is exactly 128 bytes
+  bool active, power_failure;
+  uint8_t _pad[58]; // Padding to ensure struct is exactly 128 bytes
 } Fcu;
 
 static_assert(sizeof(Fcu) == FLASH_BLOCK_BYTES, "Fcu struct must be 128 bytes (32 words)");

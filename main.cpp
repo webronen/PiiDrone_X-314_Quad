@@ -298,17 +298,20 @@ static void handle_power_failure(void)
   // Deactivate red LED if no power-fail event
   nicla::leds.setColorRed(0);
 
-  // Check if Power-Fail Warning event has occurred
-  if (NRF_POWER->EVENTS_POFWARN)
-  {
-    // Clear the event flag
-    NRF_POWER->EVENTS_POFWARN = 0;
+  // Read Power-Fail Warning event status
+  fcu.power_failure = NRF_POWER->EVENTS_POFWARN;
 
+  // Check if Power-Fail Warning event has occurred
+  if (fcu.power_failure)
+  {
     // Toggle red led to indicate power failure event at 2 Hz
     static bool led_state = false;
     led_state = !led_state;
     nicla::leds.setColorRed(led_state * 255);
   }
+
+  // Clear the power-fail event flag
+  NRF_POWER->EVENTS_POFWARN = 0;
 }
 
 static inline void update_pid(const float setpoint, const float value, const float kp, const float ki,
