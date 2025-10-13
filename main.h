@@ -3,6 +3,7 @@
 #ifndef MAIN_H
 #define MAIN_H
 
+//#define DEBUG
 #define NODE_ID 1
 #define ZONE_ID 0
 
@@ -90,7 +91,18 @@
 // Empirical temperature correction for sensor offset
 #define TEMPERATURE_CORRECTION -3.8f
 
-#define SCHEDULER_TASK_COUNT 5
+#define SCHEDULER_TASK_COUNT 6
+
+#ifdef DEBUG
+#define DEBUG_FUNC_TIME_START()     \
+  NRF_TIMER0->TASKS_CAPTURE[1] = 1; \
+  uint32_t __start_us = NRF_TIMER0->CC[1];
+
+#define DEBUG_FUNC_TIME_END(msg)         \
+  NRF_TIMER0->TASKS_CAPTURE[2] = 1;      \
+  uint32_t __end_us = NRF_TIMER0->CC[2]; \
+  printf("%s: %lu us\n", msg, (__end_us - __start_us));
+#endif // DEBUG
 
 // Sensor objects for IMU and environment
 SensorXYZ accelerometer(BHY2_SENSOR_ID_ACC);
@@ -141,6 +153,7 @@ typedef struct
 {
   const uint32_t interval_us;
   uint32_t previous_us;
+  const char *name;
   void (*task)(void);
 } Task;
 
@@ -158,16 +171,18 @@ static inline void run_scheduler_tasks(uint32_t global_time_us);
 static void update_inertial_measurement_unit(void);
 static void update_flight_control_unit(void);
 static void update_motor_speed(void);
+static void update_distance_sensor(void);
 
 static void send_radio_packet(void);
 static void handle_power_failure(void);
 
 static Task tasks[SCHEDULER_TASK_COUNT] = {
-    {HZ_TO_US(401), 0, update_inertial_measurement_unit}, // IMU update at 401 Hz
-    {HZ_TO_US(211), 0, update_flight_control_unit},       // FCU update at 211 Hz
-    {HZ_TO_US(101), 0, update_motor_speed},               // ESC update at 101 Hz
-    {HZ_TO_US(2), 0, send_radio_packet},                  // Telemetry update at 2 Hz
-    {HZ_TO_US(1), 0, handle_power_failure}};              // Check power failure at 1 Hz
+    {HZ_TO_US(401), 0, "IMU", update_inertial_measurement_unit}, // IMU update at 401 Hz
+    {HZ_TO_US(211), 0, "FCU", update_flight_control_unit},       // FCU update at 211 Hz
+    {HZ_TO_US(101), 0, "ESC", update_motor_speed},               // ESC update at 101 Hz
+    {HZ_TO_US(31), 0, "TOF", update_distance_sensor},            // TOF update at 31 Hz
+    {HZ_TO_US(2), 0, "TEL", send_radio_packet},                  // TEL update at 2 Hz
+    {HZ_TO_US(1), 0, "POF", handle_power_failure}};              // POF update at 1 Hz
 
 static inline void update_pid(const float setpoint, const float value, const float kp, const float ki, const float kd, float *integral, float *prev_value, float *output);
 static inline void read_radio_packet(void);

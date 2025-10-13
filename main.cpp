@@ -156,8 +156,16 @@ static inline void run_scheduler_tasks(uint32_t global_time_us)
   {
     if (global_time_us >= tasks[i].previous_us)
     {
+#ifdef DEBUG
+      DEBUG_FUNC_TIME_START();
+#endif // DEBUG
+
       tasks[i].previous_us += tasks[i].interval_us;
       tasks[i].task();
+
+#ifdef DEBUG
+      DEBUG_FUNC_TIME_END(tasks[i].name);
+#endif // DEBUG
     }
   }
 }
@@ -176,20 +184,6 @@ static void update_flight_control_unit(void)
   fcu.temperature = EMA_ALPHA * _temperature + EMA_BETA * fcu.temperature;
 
   fcu.humidity = EMA_ALPHA * humidity._value + EMA_BETA * fcu.humidity;
-
-  // Read and filter distance from ToF sensor if new data is ready
-  uint8_t ready = 0;
-  if (vl53l4cx.VL53L4CX_GetMeasurementDataReady(&ready) == VL53L4CX_ERROR_NONE && ready)
-  {
-    VL53L4CX_MultiRangingData_t data;
-    if (vl53l4cx.VL53L4CX_GetMultiRangingData(&data) == VL53L4CX_ERROR_NONE &&
-        data.NumberOfObjectsFound > 0 &&
-        data.RangeData[0].RangeStatus == 0)
-    {
-      fcu.distance = EMA_ALPHA * data.RangeData[0].RangeMilliMeter + EMA_BETA * fcu.distance;
-    }
-    vl53l4cx.VL53L4CX_ClearInterruptAndStartMeasurement();
-  }
 
   // Calculate attitude error quaternion (desired - measured)
   const DataQuaternion conjugate = {-quaternion._data.x, -quaternion._data.y, -quaternion._data.z, quaternion._data.w};
@@ -221,6 +215,23 @@ static void update_motor_speed(void)
 
   __DMB(); // Data Memory Barrier before starting PWM
   NRF_PWM0->TASKS_SEQSTART[0] = 1;
+}
+
+static void update_distance_sensor(void)
+{
+  // Read and filter distance from ToF sensor if new data is ready
+  uint8_t ready = 0;
+  if (vl53l4cx.VL53L4CX_GetMeasurementDataReady(&ready) == VL53L4CX_ERROR_NONE && ready)
+  {
+    VL53L4CX_MultiRangingData_t data;
+    if (vl53l4cx.VL53L4CX_GetMultiRangingData(&data) == VL53L4CX_ERROR_NONE &&
+        data.NumberOfObjectsFound > 0 &&
+        data.RangeData[0].RangeStatus == 0)
+    {
+      fcu.distance = EMA_ALPHA * data.RangeData[0].RangeMilliMeter + EMA_BETA * fcu.distance;
+    }
+    vl53l4cx.VL53L4CX_ClearInterruptAndStartMeasurement();
+  }
 }
 
 static void send_radio_packet(void)
