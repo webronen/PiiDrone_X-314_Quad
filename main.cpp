@@ -413,7 +413,7 @@ static inline void handle_setpoint_packet(void)
 
 static inline void handle_thrust_packet(void)
 {
-  // Combine two bytes to form a 16-bit thrust value using little-endian byte order
+  // Combine two bytes to form a unsigned 16-bit thrust value using little-endian byte order
   const uint16_t thrust = (received_packet.data[1] << 8) | received_packet.data[0];
   fcu.thrust = constrain(thrust, THRUST_MIN, THRUST_MAX);
 
