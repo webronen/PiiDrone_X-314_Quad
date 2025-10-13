@@ -68,7 +68,7 @@ void setup(void)
   
   // Configure PMIC (power management IC) for current and voltage limits
   uint8_t pmic_status = nicla::_pmic.readByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL);
-  pmic_status = (pmic_status & ~0x3F) | 0x3F; // Set ILIM to 350mA (Max) and disable UVLO (Default is 50mA and UVLO enabled)
+  pmic_status = (pmic_status & ~0x3F) | 0x3F; // Set ILIM to 350mA (Max) and disable UVLO (Default is 50mA and UVLO 3.0V enabled)
   nicla::_pmic.writeByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL, pmic_status);
 
   // Initialize IMU and sensors
