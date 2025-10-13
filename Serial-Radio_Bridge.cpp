@@ -12,8 +12,8 @@ typedef struct __attribute__((aligned(1), packed)) {
 
 static_assert(sizeof(DataPacket) == 255, "DataPacket struct must be 255 bytes");
 
-volatile static DataPacket rxPacket;
-static DataPacket txPacket;
+volatile static DataPacket received_packet;
+static DataPacket transmit_packet;
 
 static inline void radioInit(void);
 static inline void sendDataPacket(void);
@@ -33,13 +33,13 @@ void loop(void)
   {
     NRF_RADIO->EVENTS_CRCOK = 0;
     
-    tud_cdc_n_write(0, (uint8_t *)&rxPacket, sizeof(DataPacket));
+    tud_cdc_n_write(0, (uint8_t *)&received_packet, sizeof(DataPacket));
     tud_cdc_n_write_flush(0);
   }
   
   if (tud_cdc_n_available(0) >= sizeof(DataPacket))
   {
-    tud_cdc_n_read(0, (uint8_t *)&txPacket, sizeof(DataPacket));
+    tud_cdc_n_read(0, (uint8_t *)&transmit_packet, sizeof(DataPacket));
     sendDataPacket();
   }
 }
@@ -51,7 +51,7 @@ static inline void radioInit(void)
     __NOP();
 
   NRF_RADIO->SHORTS = (RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_START_Msk);
-  NRF_RADIO->PACKETPTR = (uint32_t)&rxPacket;
+  NRF_RADIO->PACKETPTR = (uint32_t)&received_packet;
   NRF_RADIO->TXPOWER = RADIO_TXPOWER_TXPOWER_Pos8dBm;
 
   NRF_RADIO->PCNF1 = (sizeof(DataPacket) << RADIO_PCNF1_MAXLEN_Pos) |           // Maximum length of packet payload
@@ -89,14 +89,14 @@ static inline void sendDataPacket(void)
   while (NRF_RADIO->STATE)
     __NOP();
   
-  NRF_RADIO->PACKETPTR = (uint32_t)&txPacket;
+  NRF_RADIO->PACKETPTR = (uint32_t)&transmit_packet;
   NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk;
   NRF_RADIO->TASKS_TXEN = 1;
   
   while (NRF_RADIO->STATE)
     __NOP();
 
-  NRF_RADIO->PACKETPTR = (uint32_t)&rxPacket;
+  NRF_RADIO->PACKETPTR = (uint32_t)&received_packet;
   NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_START_Msk;
   NRF_RADIO->TASKS_RXEN = 1;
 }
