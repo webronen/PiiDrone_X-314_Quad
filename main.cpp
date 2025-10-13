@@ -217,7 +217,7 @@ static void update_motor_speed(void)
   NRF_PWM0->TASKS_SEQSTART[0] = 1;
 }
 
-static void update_distance_sensor(void)
+static void update_altitude_sensor(void)
 {
   // Read and filter distance from ToF sensor if new data is ready
   uint8_t ready = 0;
@@ -236,7 +236,6 @@ static void update_distance_sensor(void)
 
 static void send_radio_packet(void)
 {
-  fcu.battery = nicla::getCurrentBatteryVoltage();
   memcpy(transmit_packet.data, &fcu, sizeof(Fcu));
 
   // Wait for previous radio transmission to finish
@@ -297,6 +296,9 @@ static void handle_power_failure(void)
 {
   // Deactivate red LED if no power-fail event
   nicla::leds.setColorRed(0);
+
+  // Read and store current battery voltage
+  fcu.battery = nicla::getCurrentBatteryVoltage();
 
   // Read Power-Fail Warning event status
   fcu.power_failure = NRF_POWER->EVENTS_POFWARN;
