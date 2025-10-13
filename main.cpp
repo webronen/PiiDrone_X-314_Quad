@@ -211,7 +211,7 @@ static void update_motor_speed(void)
     memset(&yaw_pid, 0, sizeof(Pid));
   }
 
-  // Mix PID outputs and thrust to generate ESC signals for each motor
+  // Mix PID outputs and thrust to generate PWM for each motor
   esc.m1 = 0x8000 | (uint16_t)constrain(fcu.thrust + roll_pid.output - pitch_pid.output - yaw_pid.output, THRUST_MIN, THRUST_MAX);
   esc.m2 = 0x8000 | (uint16_t)constrain(fcu.thrust - roll_pid.output - pitch_pid.output + yaw_pid.output, THRUST_MIN, THRUST_MAX);
   esc.m3 = 0x8000 | (uint16_t)constrain(fcu.thrust + roll_pid.output + pitch_pid.output + yaw_pid.output, THRUST_MIN, THRUST_MAX);
