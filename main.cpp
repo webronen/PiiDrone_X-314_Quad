@@ -303,7 +303,7 @@ static void handle_power_failure(void)
 static inline void update_pid(const float setpoint, const float value, const float kp, const float ki,
                               const float kd, float *integral, float *prev_value, float *output)
 {
-  // Standard PID controller with anti-windup and output limiting
+  // Standard PID controller with anti-windup, integral auto-scaling, and output limiting
   const float error = setpoint - value;
   const float derivative = -(value - *prev_value) * PID_LOOP_HZ;
   const float outputNoI = (kp * error) + (kd * derivative);
