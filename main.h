@@ -153,9 +153,7 @@ Pid roll_pid = {0};
 Pid pitch_pid = {0};
 Pid yaw_pid = {0};
 
-static uint32_t global_time_us = 0;
-
-static inline void run_scheduler_tasks(void);
+static inline void run_scheduler_tasks(uint32_t global_time_us);
 
 static void update_inertial_measurement_unit(void);
 static void update_flight_control_unit(void);

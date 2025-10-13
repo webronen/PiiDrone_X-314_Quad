@@ -116,6 +116,10 @@ void setup(void)
 
 void loop(void)
 {
+  // Capture current time in microseconds
+  NRF_TIMER0->TASKS_CAPTURE[0] = 1;
+  const uint32_t global_time_us = NRF_TIMER0->CC[0];
+
   // Variables for auto landing sequence, if connection to RCU is lost
   static uint32_t packet_time_us = global_time_us;
   static uint32_t landing_time_us = global_time_us;
@@ -129,7 +133,7 @@ void loop(void)
   }
 
   // Run simple scheduler for periodic tasks
-  run_scheduler_tasks();
+  run_scheduler_tasks(global_time_us);
 
   /**
    * Auto landing sequence:
@@ -145,11 +149,8 @@ void loop(void)
   }
 }
 
-static inline void run_scheduler_tasks(void)
+static inline void run_scheduler_tasks(uint32_t global_time_us)
 {
-  NRF_TIMER0->TASKS_CAPTURE[0] = 1;
-  global_time_us = NRF_TIMER0->CC[0];
-
   // Run all scheduled tasks whose time has come
   for (uint8_t i = 0; i < SCHEDULER_TASK_COUNT; i++)
   {
