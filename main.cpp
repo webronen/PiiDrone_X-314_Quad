@@ -321,27 +321,27 @@ static inline void update_pid(const float setpoint, const float value, const flo
 static inline void read_radio_packet(void)
 {
   // Ignore packets not addressed to this node/zone
-  if (received_packet.node != NODE_ID || received_packet.zone != ZONE_ID)
-    return;
-
-  switch (received_packet.type)
+  if (received_packet.node == NODE_ID && received_packet.zone == ZONE_ID)
   {
-  case TYPE_PID:
-    handle_pid_packet();
-    break;
-  case TYPE_SETPOINT:
-    handle_setpoint_packet();
-    break;
-  case TYPE_THRUST:
-    handle_thrust_packet();
-    break;
-  case TYPE_SAVE:
-    fcu.active = false;
-    save_user_flash();
-    break;
-  case TYPE_LOAD:
-    load_user_flash();
-    break;
+    switch (received_packet.type)
+    {
+    case TYPE_PID:
+      handle_pid_packet();
+      break;
+    case TYPE_SETPOINT:
+      handle_setpoint_packet();
+      break;
+    case TYPE_THRUST:
+      handle_thrust_packet();
+      break;
+    case TYPE_SAVE:
+      fcu.active = false;
+      save_user_flash();
+      break;
+    case TYPE_LOAD:
+      load_user_flash();
+      break;
+    }
   }
 }
 
@@ -350,58 +350,58 @@ static inline void handle_pid_packet(void)
   const uint8_t axis = received_packet.data[0];
   const uint8_t gain = received_packet.data[1];
 
-  if (axis >= 3 || gain >= 3)
-    return;
-
-  float value = 0.0f;
-  extract_float_bytes(value, 2);
-  value = constrain(value, GAIN_MIN, GAIN_MAX);
-
-  // Update the selected PID gain for the specified axis
-  switch (axis)
+  if (axis < 3 && gain < 3)
   {
-  case AXIS_PITCH:
-    switch (gain)
+    float value = 0.0f;
+    extract_float_bytes(value, 2);
+    value = constrain(value, GAIN_MIN, GAIN_MAX);
+
+    // Update the selected PID gain for the specified axis
+    switch (axis)
     {
-    case GAIN_KP:
-      fcu.pitch_p = value;
+    case AXIS_PITCH:
+      switch (gain)
+      {
+      case GAIN_KP:
+        fcu.pitch_p = value;
+        break;
+      case GAIN_KI:
+        fcu.pitch_i = value;
+        break;
+      case GAIN_KD:
+        fcu.pitch_d = value;
+        break;
+      }
       break;
-    case GAIN_KI:
-      fcu.pitch_i = value;
+    case AXIS_ROLL:
+      switch (gain)
+      {
+      case GAIN_KP:
+        fcu.roll_p = value;
+        break;
+      case GAIN_KI:
+        fcu.roll_i = value;
+        break;
+      case GAIN_KD:
+        fcu.roll_d = value;
+        break;
+      }
       break;
-    case GAIN_KD:
-      fcu.pitch_d = value;
+    case AXIS_YAW:
+      switch (gain)
+      {
+      case GAIN_KP:
+        fcu.yaw_p = value;
+        break;
+      case GAIN_KI:
+        fcu.yaw_i = value;
+        break;
+      case GAIN_KD:
+        fcu.yaw_d = value;
+        break;
+      }
       break;
     }
-    break;
-  case AXIS_ROLL:
-    switch (gain)
-    {
-    case GAIN_KP:
-      fcu.roll_p = value;
-      break;
-    case GAIN_KI:
-      fcu.roll_i = value;
-      break;
-    case GAIN_KD:
-      fcu.roll_d = value;
-      break;
-    }
-    break;
-  case AXIS_YAW:
-    switch (gain)
-    {
-    case GAIN_KP:
-      fcu.yaw_p = value;
-      break;
-    case GAIN_KI:
-      fcu.yaw_i = value;
-      break;
-    case GAIN_KD:
-      fcu.yaw_d = value;
-      break;
-    }
-    break;
   }
 }
 
@@ -409,25 +409,25 @@ static inline void handle_setpoint_packet(void)
 {
   const uint8_t axis = received_packet.data[0];
 
-  if (axis >= 3)
-    return;
-
-  float value = 0.0f;
-  extract_float_bytes(value, 1);
-  value = constrain(value, SETPOINT_MIN, SETPOINT_MAX);
-
-  // Update the setpoint for the specified axis
-  switch (axis)
+  if (axis < 3)
   {
-  case AXIS_PITCH:
-    fcu.pitch_setpoint = value;
-    break;
-  case AXIS_ROLL:
-    fcu.roll_setpoint = value;
-    break;
-  case AXIS_YAW:
-    fcu.yaw_setpoint = value;
-    break;
+    float value = 0.0f;
+    extract_float_bytes(value, 1);
+    value = constrain(value, SETPOINT_MIN, SETPOINT_MAX);
+
+    // Update the setpoint for the specified axis
+    switch (axis)
+    {
+    case AXIS_PITCH:
+      fcu.pitch_setpoint = value;
+      break;
+    case AXIS_ROLL:
+      fcu.roll_setpoint = value;
+      break;
+    case AXIS_YAW:
+      fcu.yaw_setpoint = value;
+      break;
+    }
   }
 }
 
