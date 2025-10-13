@@ -165,8 +165,8 @@ static void handle_power_failure(void);
 static Task tasks[SCHEDULER_TASK_COUNT] = {
     {HZ_TO_US(401), 0, update_inertial_measurement_unit}, // IMU update at 401 Hz
     {HZ_TO_US(211), 0, update_flight_control_unit},       // FCU update at 211 Hz
-    {HZ_TO_US(101), 0, update_motor_speed},               // Motor update at 101 Hz
-    {HZ_TO_US(2), 0, send_radio_packet},                  // Telemetry at 2 Hz
+    {HZ_TO_US(101), 0, update_motor_speed},               // ESC update at 101 Hz
+    {HZ_TO_US(2), 0, send_radio_packet},                  // Telemetry update at 2 Hz
     {HZ_TO_US(1), 0, handle_power_failure}};              // Check power failure at 1 Hz
 
 static inline void update_pid(const float setpoint, const float value, const float kp, const float ki, const float kd, float *integral, float *prev_value, float *output);
