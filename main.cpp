@@ -236,6 +236,7 @@ static void update_altitude_sensor(void)
 
 static void send_radio_packet(void)
 {
+  // Move current FCU state into transmit buffer
   memcpy(transmit_packet.data, &fcu, sizeof(Fcu));
 
   // Wait for previous radio transmission to finish
