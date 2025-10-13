@@ -91,6 +91,9 @@
 // Empirical temperature correction for sensor offset
 #define TEMPERATURE_CORRECTION -3.8f
 
+// Empirical distance correction for sensor offset
+#define DISTANCE_CORRECTION -20
+
 #define SCHEDULER_TASK_COUNT 6
 
 #ifdef DEBUG
