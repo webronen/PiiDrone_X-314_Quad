@@ -167,7 +167,7 @@ static inline void update_imu(void)
 static inline void update_fcu(void)
 {
   fcu.pressure = EMA_ALPHA * pressure._value + EMA_BETA * fcu.pressure;
-  const float _temperature = temperature._value + TEMP_CORRECTION;
+  const float _temperature = temperature._value + TEMPERATURE_OFFSET;
   fcu.temperature = EMA_ALPHA * _temperature + EMA_BETA * fcu.temperature;
   fcu.humidity = EMA_ALPHA * humidity._value + EMA_BETA * fcu.humidity;
 
