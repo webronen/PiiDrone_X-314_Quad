@@ -115,7 +115,7 @@ typedef struct __attribute__((packed, aligned(4)))
   float battery;
   uint16_t thrust;
   uint16_t distance;
-  uint8_t status; // bit 0: Active, bit 1: Power Failure
+  uint8_t status;
   uint8_t reserved[59];
 } Fcu;
 
@@ -190,4 +190,4 @@ static inline void handle_thrust_request(void);
 static inline void multiply_quaternion(DataQuaternion &r, const DataQuaternion &q1, const DataQuaternion &q2);
 static inline void normalize_quaternion(DataQuaternion &q);
 
-#endif
+#endif // MAIN_H

@@ -200,7 +200,6 @@ static inline void update_esc(void)
   esc.m3 = 0x8000 | (uint16_t)constrain(fcu.thrust + pid_state[0].output + pid_state[1].output + pid_state[2].output, THRUST_MIN, THRUST_MAX);
   esc.m4 = 0x8000 | (uint16_t)constrain(fcu.thrust - pid_state[0].output + pid_state[1].output - pid_state[2].output, THRUST_MIN, THRUST_MAX);
 
-  __DMB();
   NRF_PWM0->TASKS_SEQSTART[0] = 1;
 }
 
