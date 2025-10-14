@@ -41,6 +41,16 @@
 #define SETPOINT_MIN -1.0f
 #define THRUST_MAX 800
 #define THRUST_MIN 0
+#define FLASH_BLOCK_WORDS 32
+#define FLASH_BLOCK_BYTES (FLASH_BLOCK_WORDS * 4)
+#define EMA_ALPHA 0.3f
+#define EMA_BETA (1.0f - EMA_ALPHA)
+#define TEMP_CORRECTION -3.8f
+#define DIST_CORRECTION -20
+#define DIST_MAX 4000
+#define DIST_MIN 20
+#define BAT_V_MAX 4.2f
+#define BAT_V_MIN 0.0f
 
 #define HANDLER_TABLE_SIZE 5
 #define TYPE_PID 0
@@ -73,17 +83,6 @@
 
 #define QUATERNION_HZ 400
 #define QUATERNION_LATENCY 1
-
-#define FLASH_BLOCK_WORDS 32
-#define FLASH_BLOCK_BYTES (FLASH_BLOCK_WORDS * 4)
-
-#define EMA_ALPHA 0.3f
-#define EMA_BETA (1.0f - EMA_ALPHA)
-
-#define TEMPERATURE_CORRECTION -3.8f
-#define DISTANCE_CORRECTION -20
-
-#define SCHEDULER_TASK_COUNT 6
 
 #ifdef DEBUG
 #define DEBUG_FUNC_TIME_START()     \
