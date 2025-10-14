@@ -9,15 +9,31 @@
 
 #include <nrf.h>
 #include <Nicla_System.h>
-#include <sensors/Sensor.h>
-#include <sensors/SensorQuaternion.h>
+
 #include <sensors/SensorXYZ.h>
+SensorXYZ accelerometer(BHY2_SENSOR_ID_ACC);
+SensorXYZ gyroscope(BHY2_SENSOR_ID_GYRO);
+SensorXYZ magnetometer(BHY2_SENSOR_ID_MAG);
+
+#include <sensors/Sensor.h>
+Sensor pressure(BHY2_SENSOR_ID_BARO);
+Sensor humidity(BHY2_SENSOR_ID_HUM);
+Sensor temperature(BHY2_SENSOR_ID_TEMP);
+
+#include <sensors/SensorQuaternion.h>
+SensorQuaternion quaternion(BHY2_SENSOR_ID_RV);
 
 #ifdef Mode
 #undef Mode
 #endif
 
 #include <vl53l4cx_class.h>
+VL53L4CX vl53l4cx(&Wire, NC);
+
+#define MOTOR1_PIN 11
+#define MOTOR2_PIN 28
+#define MOTOR3_PIN 27
+#define MOTOR4_PIN 29
 
 #define HZ_TO_US(Hz) ((uint32_t)(1000000.0f / (Hz)))
 
@@ -25,35 +41,37 @@
 #define PWM_FREQUENCY 20000UL
 #define PWM_TOP (PWM_BASE_CLOCK / PWM_FREQUENCY)
 
-#define MOTOR1_PIN 11
-#define MOTOR2_PIN 28
-#define MOTOR3_PIN 27
-#define MOTOR4_PIN 29
-
 #define PID_LOOP_HZ 211.0f
 #define PID_LOOP_PERIOD (1.0f / PID_LOOP_HZ)
-
 #define PID_MAX 800.0f
 #define PID_MIN -800.0f
+
 #define GAIN_MAX 100.0f
 #define GAIN_MIN 0.0f
+
 #define SETPOINT_MAX 1.0f
 #define SETPOINT_MIN -1.0f
+
 #define THRUST_MAX 800
 #define THRUST_MIN 0
+
 #define FLASH_BLOCK_WORDS 32
 #define FLASH_BLOCK_BYTES (FLASH_BLOCK_WORDS * 4)
+
 #define EMA_ALPHA 0.3f
 #define EMA_BETA (1.0f - EMA_ALPHA)
-#define TEMP_CORRECTION -3.8f
-#define DIST_CORRECTION -20
-#define DIST_MAX 4000
-#define DIST_MIN 20
-#define BAT_V_MAX 4.2f
-#define BAT_V_MIN 0.0f
+
+#define TEMPERATURE_OFFSET -3.8f
+#define DISTANCE_OFFSET -20
+
+#define DISTANCE_MAX 4000
+#define DISTANCE_MIN 20
+#define VOLTAGE_MAX 4.2f
+#define VOLTAGE_MIN 2.7f
 
 #define SCHEDULER_TASK_COUNT 6
 #define HANDLER_TABLE_SIZE 5
+
 #define TYPE_PID 0
 #define TYPE_SETPOINT 1
 #define TYPE_THRUST 2
@@ -95,15 +113,6 @@
   uint32_t __end_us = NRF_TIMER0->CC[2]; \
   printf("%s: %lu us\n", msg, (__end_us - __start_us));
 #endif
-
-SensorXYZ accelerometer(BHY2_SENSOR_ID_ACC);
-SensorXYZ gyroscope(BHY2_SENSOR_ID_GYRO);
-SensorXYZ magnetometer(BHY2_SENSOR_ID_MAG);
-Sensor pressure(BHY2_SENSOR_ID_BARO);
-Sensor humidity(BHY2_SENSOR_ID_HUM);
-Sensor temperature(BHY2_SENSOR_ID_TEMP);
-SensorQuaternion quaternion(BHY2_SENSOR_ID_RV);
-VL53L4CX vl53l4cx(&Wire, NC);
 
 typedef struct __attribute__((packed, aligned(4)))
 {

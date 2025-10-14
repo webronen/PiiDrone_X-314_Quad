@@ -384,20 +384,4 @@ static inline void handle_load_request(void)
 {
   for (uint8_t i = 0; i < FLASH_BLOCK_WORDS; i++)
     ((uint32_t *)&fcu)[i] = NRF_UICR->CUSTOMER[i];
-
-  // Validate loaded parameters
-  for (uint8_t i = 0; i < 3; i++)
-  {
-    for (uint8_t j = 0; j < 3; j++)
-      fcu.pid[i][j] = constrain(fcu.pid[i][j], GAIN_MIN, GAIN_MAX);
-
-    fcu.setpoint[i] = constrain(fcu.setpoint[i], SETPOINT_MIN, SETPOINT_MAX);
-  }
-
-  fcu.battery = constrain(fcu.battery, BAT_V_MIN, BAT_V_MAX);
-  fcu.thrust = constrain(fcu.thrust, THRUST_MIN, THRUST_MAX);
-  fcu.distance = constrain(fcu.distance, DIST_MIN, DIST_MAX);
-  fcu.status &= ~0x01;
-  fcu.status &= ~0x02;
-  memset(&fcu.reserved, 0, sizeof(fcu.reserved));
 }
