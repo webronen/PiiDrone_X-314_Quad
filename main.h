@@ -52,6 +52,7 @@
 #define BAT_V_MAX 4.2f
 #define BAT_V_MIN 0.0f
 
+#define SCHEDULER_TASK_COUNT 6
 #define HANDLER_TABLE_SIZE 5
 #define TYPE_PID 0
 #define TYPE_SETPOINT 1
