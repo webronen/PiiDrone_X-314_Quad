@@ -11,7 +11,7 @@ typedef struct __attribute__((packet, aligned(1)))
   uint8_t data[252];
 } Rcu;
 
-static_assert(sizeof(Rcu) == 255, "DataPacket struct must be 255 bytes");
+static_assert(sizeof(Rcu) == 255, "Rcu struct must be 255 bytes");
 
 volatile static Rcu received_packet;
 static Rcu transmit_packet;
