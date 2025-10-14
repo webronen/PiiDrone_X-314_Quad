@@ -155,11 +155,11 @@ typedef struct __attribute__((packed, aligned(4)))
 
 static_assert(sizeof(Task) == 16, "Task struct must be 16 bytes (4 words)");
 
-Fcu fcu = {0};
-Esc esc = {0x8000, 0x8000, 0x8000, 0x8000};
+static Fcu fcu = {0};
+static Esc esc = {0x8000, 0x8000, 0x8000, 0x8000};
 volatile Rcu received_packet;
-Rcu transmit_packet = {NODE_ID, ZONE_ID, TYPE_TELEMETRY, {0}};
-Pid pid_state[3] = {0};
+static Rcu transmit_packet = {NODE_ID, ZONE_ID, TYPE_TELEMETRY, {0}};
+static Pid pid_state[3] = {0};
 const DataQuaternion hover_quaternion = {0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
 
 static inline void run_tasks(const uint32_t now_us);
