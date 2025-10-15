@@ -108,7 +108,7 @@ void setup(void)
   vl53l4cx.VL53L4CX_StartMeasurement();
 
   // Load PID gains from flash
-  memcpy(fcu.pid_gain, (const void *)NRF_UICR->CUSTOMER, PID_GAIN_BYTES);
+  memcpy(fcu.pid_gain, (const void *)NRF_UICR->CUSTOMER, sizeof(fcu.pid_gain));
 }
 
 void loop(void)
@@ -387,7 +387,7 @@ static inline void handle_save_request(void)
 
   // Write PID gains to flash
   const uint32_t *gain = (const uint32_t *)fcu.pid_gain;
-  for (uint8_t i = 0; i < PID_GAIN_WORDS; i++)
+  for (uint8_t i = 0; i < sizeof(fcu.pid_gain) / 4; i++)
   {
     // Write each word to the UICR
     NRF_UICR->CUSTOMER[i] = gain[i];
