@@ -70,9 +70,8 @@ VL53L4CX vl53l4cx(&Wire, NC);
 #define TYPE_PID 0
 #define TYPE_SETPOINT 1
 #define TYPE_THRUST 2
-#define TYPE_LOAD 3
-#define TYPE_SAVE 4
-#define TYPE_TELEMETRY 5
+#define TYPE_SAVE 3
+#define TYPE_TELEMETRY 4
 
 #define ACCELEROMETER_HZ 400
 #define ACCELEROMETER_LATENCY 1
