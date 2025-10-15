@@ -58,6 +58,7 @@ void setup(void)
   NRF_PWM0->ENABLE = PWM_ENABLE_ENABLE_Enabled;
   NRF_PWM0->TASKS_SEQSTART[0] = 1;
 
+  // Set power failure threshold to 2.7V and enable power failure detection for battery monitoring and early warning
   NRF_POWER->POFCON = (POWER_POFCON_THRESHOLD_V27 << POWER_POFCON_THRESHOLD_Pos) |
                       POWER_POFCON_POF_Enabled;
 
@@ -112,12 +113,14 @@ void setup(void)
 
 void loop(void)
 {
+  // Capture current timer value and update global time variable
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
   time_us = NRF_TIMER0->CC[0];
 
   static uint32_t packet_time_us = time_us;
   static uint32_t landing_time_us = time_us;
 
+  // Check if a packet has been received
   if (NRF_RADIO->EVENTS_CRCOK)
   {
     NRF_RADIO->EVENTS_CRCOK = 0;
@@ -125,8 +128,16 @@ void loop(void)
     read_rcu();
   }
 
+  // Run periodic (scheduled) tasks
   run_scheduler_tasks();
 
+  /**
+   * Automatic landing sequence
+   *
+   * If FCU is active, and no new RCU packet has been received for 10 seconds, initiate landing sequence
+   * by gradually reducing thrust to zero at a rate of 10 units per second. If a new packet is received same
+   * time, landing sequence is aborted. When thrust reaches zero, FCU active bit is cleared.
+   */
   if ((fcu.status & 0x01) &&
       time_us >= packet_time_us &&
       time_us >= landing_time_us)
@@ -267,20 +278,22 @@ static inline void normalize_quaternion(DataQuaternion &q)
 
 static inline void task_handle_pof(void)
 {
+  // Update battery voltage for telemetry
   fcu.battery = nicla::getCurrentBatteryVoltage();
 
+  // Handle power failure event
   if (NRF_POWER->EVENTS_POFWARN)
   {
-    NRF_POWER->EVENTS_POFWARN = 0;
+    NRF_POWER->EVENTS_POFWARN = 0; // Clear event flag
     static bool led_state = false;
     led_state = !led_state;
     nicla::leds.setColorRed(led_state ? 255 : 0);
-    fcu.status |= 0x02; // Set power failure warning bit
+    fcu.status |= 0x02; // Set power failure warning bit for telemetry
   }
   else
   {
     nicla::leds.setColorRed(0);
-    fcu.status &= ~0x02; // Clear power failure warning bit
+    fcu.status &= ~0x02; // Clear power failure warning bit for telemetry
   }
 }
 
