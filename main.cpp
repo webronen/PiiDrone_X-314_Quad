@@ -145,7 +145,7 @@ void loop(void)
     landing_time_us = time_us + HZ_TO_US(1);
     memset(fcu.pid_setpoint, 0, sizeof(fcu.pid_setpoint));
 
-    // If thrust is greater than or equal to 10, decrease it by 10, else clear the active bit
+    // If thrust is greater than or equal to 10 units, decrease it by 10 units, else clear the active bit
     (fcu.thrust >= 10) ? (fcu.thrust -= 10) : (fcu.status &= ~0x01);
   }
 }
