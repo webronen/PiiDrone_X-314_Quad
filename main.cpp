@@ -68,7 +68,7 @@ void setup(void)
   nicla::enable3V3LDO();
 
   uint8_t pmic_status = nicla::_pmic.readByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL);
-  pmic_status = (pmic_status & ~0x3F) | 0x3F; // Set ILIM to 350mA and disable UVLO (Default 500mA and 3.0V UVLO threshold)
+  pmic_status = (pmic_status & ~0x3F) | 0x3F; // Set ILIM to 350mA and disable UVLO (Default ILIM 50mA and UVLO 3.0V)
   nicla::_pmic.writeByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL, pmic_status);
 
   sensortec.begin();
