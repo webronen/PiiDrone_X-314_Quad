@@ -113,9 +113,9 @@ void setup(void)
 
 void loop(void)
 {
-  // Capture current timer value and update global time variable
+  // Capture current timer value and store in time_us
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
-  time_us = NRF_TIMER0->CC[0];
+  const uint32_t time_us = NRF_TIMER0->CC[0];
 
   static uint32_t packet_time_us = time_us;
   static uint32_t landing_time_us = time_us;
@@ -129,7 +129,7 @@ void loop(void)
   }
 
   // Run periodic (scheduled) tasks
-  run_scheduler_tasks();
+  run_scheduler_tasks(time_us);
 
   /**
    * Automatic landing sequence
@@ -150,7 +150,7 @@ void loop(void)
   }
 }
 
-static inline void run_scheduler_tasks(void)
+static inline void run_scheduler_tasks(const uint32_t time_us)
 {
   for (uint8_t i = 0; i < SCHEDULER_TASK_COUNT; i++)
   {
@@ -172,6 +172,7 @@ static inline void run_scheduler_tasks(void)
 
 static inline void task_update_imu(void)
 {
+  // Update BHY2 sensor data
   sensortec.update();
 }
 
@@ -232,6 +233,7 @@ static inline void task_update_tof(void)
 
 static inline void task_send_rcu(void)
 {
+  // Prepare telemetry packet, copy FCU data to transmit packet
   memcpy(transmit_packet.data, &fcu, sizeof(Fcu));
 
   while (!NRF_RADIO->EVENTS_END)

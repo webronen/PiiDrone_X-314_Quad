@@ -166,9 +166,6 @@ typedef struct __attribute__((packed, aligned(4)))
 
 static_assert(sizeof(Task) == 16, "Task struct must be 16 bytes (4 words)");
 
-// Global variables
-static uint32_t time_us = 0;
-
 // Global instances
 static Fcu fcu = {0};
 static Esc esc = {0x8000, 0x8000, 0x8000, 0x8000};
@@ -178,7 +175,7 @@ static Pid pid_state[3] = {0};
 static const DataQuaternion hover_quaternion = {0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
 
 // Global scheduler function declaration
-static inline void run_scheduler_tasks(void);
+static inline void run_scheduler_tasks(const uint32_t time_us);
 
 // Task function declarations
 static inline void task_update_imu(void);
