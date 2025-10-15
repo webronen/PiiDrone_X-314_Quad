@@ -68,7 +68,7 @@ void setup(void)
   nicla::enable3V3LDO();
 
   uint8_t pmic_status = nicla::_pmic.readByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL);
-  pmic_status = (pmic_status & ~0x3F) | 0x3F;
+  pmic_status = (pmic_status & ~0x3F) | 0x3F; // Set ILIM to 350mA and disable UVLO (Default 500mA and 3.0V UVLO threshold)
   nicla::_pmic.writeByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL, pmic_status);
 
   sensortec.begin();
@@ -96,6 +96,7 @@ void setup(void)
   vl53l4cx.VL53L4CX_SetDistanceMode(VL53L4CX_DISTANCEMODE_MEDIUM);
   vl53l4cx.VL53L4CX_SetMeasurementTimingBudgetMicroSeconds(33000);
 
+  // Set ROI to 4x4 centered
   VL53L4CX_UserRoi_t roi = {
       .TopLeftX = 6,
       .TopLeftY = 6,
@@ -105,45 +106,44 @@ void setup(void)
   vl53l4cx.VL53L4CX_SetUserROI(&roi);
   vl53l4cx.VL53L4CX_StartMeasurement();
 
-  handle_load_request();
+  // Load PID gains from flash
+  memcpy(fcu.pid_gain, (const void *)NRF_UICR->CUSTOMER, sizeof(fcu.pid_gain));
 }
 
 void loop(void)
 {
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
-  const uint32_t global_time_us = NRF_TIMER0->CC[0];
+  time_us = NRF_TIMER0->CC[0];
 
-  static uint32_t packet_time_us = global_time_us;
-  static uint32_t landing_time_us = global_time_us;
+  static uint32_t packet_time_us = time_us;
+  static uint32_t landing_time_us = time_us;
 
   if (NRF_RADIO->EVENTS_CRCOK)
   {
     NRF_RADIO->EVENTS_CRCOK = 0;
-    packet_time_us = global_time_us + HZ_TO_US(0.1f);
+    packet_time_us = time_us + HZ_TO_US(0.1f);
     read_rcu();
   }
 
-  run_tasks(global_time_us);
+  run_scheduler_tasks();
 
   if ((fcu.status & 0x01) &&
-      global_time_us >= packet_time_us &&
-      global_time_us >= landing_time_us)
+      time_us >= packet_time_us &&
+      time_us >= landing_time_us)
   {
-    landing_time_us = global_time_us + HZ_TO_US(1);
-    memset(&fcu.setpoint, 0, sizeof(fcu.setpoint));
+    landing_time_us = time_us + HZ_TO_US(1);
+    memset(fcu.pid_setpoint, 0, sizeof(fcu.pid_setpoint));
 
-    if (fcu.thrust >= 10)
-      fcu.thrust -= 10;
-    else
-      fcu.status &= ~0x01;
+    // If thrust is greater than or equal to 10, decrease it by 10, else clear the active bit
+    (fcu.thrust >= 10) ? (fcu.thrust -= 10) : (fcu.status &= ~0x01);
   }
 }
 
-static inline void run_tasks(const uint32_t now_us)
+static inline void run_scheduler_tasks(void)
 {
   for (uint8_t i = 0; i < SCHEDULER_TASK_COUNT; i++)
   {
-    if (now_us >= tasks[i].previous_us)
+    if (time_us >= tasks[i].previous_us)
     {
 #ifdef DEBUG
       DEBUG_FUNC_TIME_START();
@@ -159,12 +159,12 @@ static inline void run_tasks(const uint32_t now_us)
   }
 }
 
-static inline void update_imu(void)
+static inline void task_update_imu(void)
 {
   sensortec.update();
 }
 
-static inline void update_fcu(void)
+static inline void task_update_fcu(void)
 {
   fcu.pressure = EMA_ALPHA * pressure._value + EMA_BETA * fcu.pressure;
   const float _temperature = temperature._value + TEMPERATURE_OFFSET;
@@ -176,23 +176,23 @@ static inline void update_fcu(void)
   DataQuaternion error;
   multiply_quaternion(error, hover_quaternion, conjugate);
 
-  update_pid(fcu.setpoint[0], error.x, fcu.pid[0][0], fcu.pid[0][1], fcu.pid[0][2],
+  update_pid(fcu.pid_setpoint[0], error.x, fcu.pid_gain[0][0], fcu.pid_gain[0][1], fcu.pid_gain[0][2],
              &pid_state[0].integral, &pid_state[0].prev, &pid_state[0].output);
 
-  update_pid(fcu.setpoint[1], error.y, fcu.pid[1][0], fcu.pid[1][1], fcu.pid[1][2],
+  update_pid(fcu.pid_setpoint[1], error.y, fcu.pid_gain[1][0], fcu.pid_gain[1][1], fcu.pid_gain[1][2],
              &pid_state[1].integral, &pid_state[1].prev, &pid_state[1].output);
 
-  update_pid(fcu.setpoint[2], error.z, fcu.pid[2][0], fcu.pid[2][1], fcu.pid[2][2],
+  update_pid(fcu.pid_setpoint[2], error.z, fcu.pid_gain[2][0], fcu.pid_gain[2][1], fcu.pid_gain[2][2],
              &pid_state[2].integral, &pid_state[2].prev, &pid_state[2].output);
 }
 
-static inline void update_esc(void)
+static inline void task_update_esc(void)
 {
   if (!(fcu.status & 0x01))
   {
     fcu.thrust = 0;
-    memset(&fcu.setpoint, 0, sizeof(fcu.setpoint));
-    memset(&pid_state, 0, sizeof(pid_state));
+    memset(fcu.pid_setpoint, 0, sizeof(fcu.pid_setpoint));
+    memset(pid_state, 0, sizeof(pid_state));
   }
 
   esc.m1 = 0x8000 | (uint16_t)constrain(fcu.thrust + pid_state[0].output - pid_state[1].output - pid_state[2].output, THRUST_MIN, THRUST_MAX);
@@ -203,7 +203,7 @@ static inline void update_esc(void)
   NRF_PWM0->TASKS_SEQSTART[0] = 1;
 }
 
-static inline void update_tof(void)
+static inline void task_update_tof(void)
 {
   uint8_t ready = 0;
   if (vl53l4cx.VL53L4CX_GetMeasurementDataReady(&ready) == VL53L4CX_ERROR_NONE && ready)
@@ -219,9 +219,9 @@ static inline void update_tof(void)
   }
 }
 
-static inline void send_rcu(void)
+static inline void task_send_rcu(void)
 {
-  memcpy(&transmit_packet.data, &fcu, sizeof(Fcu));
+  memcpy(transmit_packet.data, &fcu, sizeof(Fcu));
 
   while (!NRF_RADIO->EVENTS_END)
     __NOP();
@@ -265,7 +265,7 @@ static inline void normalize_quaternion(DataQuaternion &q)
   q.z *= inv;
 }
 
-static inline void handle_pof(void)
+static inline void task_handle_pof(void)
 {
   fcu.battery = nicla::getCurrentBatteryVoltage();
 
@@ -275,12 +275,12 @@ static inline void handle_pof(void)
     static bool led_state = false;
     led_state = !led_state;
     nicla::leds.setColorRed(led_state ? 255 : 0);
-    fcu.status |= 0x02;
+    fcu.status |= 0x02; // Set power failure warning bit
   }
   else
   {
     nicla::leds.setColorRed(0);
-    fcu.status &= ~0x02;
+    fcu.status &= ~0x02; // Clear power failure warning bit
   }
 }
 
@@ -303,19 +303,18 @@ static inline void update_pid(const float setpoint, const float value, const flo
 
 static inline void read_rcu(void)
 {
-  static void (*const handler_table[HANDLER_TABLE_SIZE])(void) = {
+  static void (*const request_table[REQUEST_HANDLER_COUNT])(void) = {
       handle_pid_request,
       handle_setpoint_request,
       handle_thrust_request,
-      handle_load_request,
       handle_save_request,
   };
 
   if (received_packet.node == NODE_ID &&
       received_packet.zone == ZONE_ID &&
-      received_packet.type < HANDLER_TABLE_SIZE)
+      received_packet.type < REQUEST_HANDLER_COUNT)
   {
-    handler_table[received_packet.type]();
+    request_table[received_packet.type]();
   }
 }
 
@@ -326,9 +325,9 @@ static inline void handle_pid_request(void)
 
   if (axis < 3 && gain < 3)
   {
-    float value = 0.0f;
-    memcpy(&value, (const void *)&received_packet.data[2], sizeof(float));
-    fcu.pid[axis][gain] = constrain(value, GAIN_MIN, GAIN_MAX);
+    float axis_gain = 0.0f;
+    memcpy(&axis_gain, (const void *)&received_packet.data[2], sizeof(axis_gain));
+    fcu.pid_gain[axis][gain] = constrain(axis_gain, GAIN_MIN, GAIN_MAX);
   }
 }
 
@@ -338,50 +337,49 @@ static inline void handle_setpoint_request(void)
 
   if (axis < 3)
   {
-    float value = 0.0f;
-    memcpy(&value, (const void *)&received_packet.data[1], sizeof(float));
-    fcu.setpoint[axis] = constrain(value, SETPOINT_MIN, SETPOINT_MAX);
+    float setpoint = 0.0f;
+    memcpy(&setpoint, (const void *)&received_packet.data[1], sizeof(setpoint));
+    fcu.pid_setpoint[axis] = constrain(setpoint, SETPOINT_MIN, SETPOINT_MAX);
   }
 }
 
 static inline void handle_thrust_request(void)
 {
-  uint16_t value = 0;
-  memcpy(&value, (const void *)&received_packet.data[0], sizeof(uint16_t));
-  fcu.thrust = constrain(value, THRUST_MIN, THRUST_MAX);
+  uint16_t thrust = 0;
+  memcpy(&thrust, (const void *)&received_packet.data[0], sizeof(thrust));
+  fcu.thrust = constrain(thrust, THRUST_MIN, THRUST_MAX);
 
-  if (value > THRUST_MIN)
-    fcu.status |= 0x01;
-  else
-    fcu.status &= ~0x01;
+  // If thrust is greater than THRUST_MIN, set the active bit, else clear it
+  (fcu.thrust > THRUST_MIN) ? (fcu.status |= 0x01) : (fcu.status &= ~0x01);
 }
 
 static inline void handle_save_request(void)
 {
+  // Enable erase mode
   NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Een;
   while (!NRF_NVMC->READY)
-    __NOP();
+    __NOP(); // Wait until erase mode is set
 
+  // Erase UICR
   NRF_NVMC->ERASEUICR = NVMC_ERASEUICR_ERASEUICR_Erase;
   while (!NRF_NVMC->READY)
-    __NOP();
+    __NOP(); // Wait until erase is complete
 
+  // Enable write mode
   NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Wen;
   while (!NRF_NVMC->READY)
-    __NOP();
+    __NOP(); // Wait until write mode is set
 
-  for (uint8_t i = 0; i < FLASH_BLOCK_WORDS; i++)
+  // Write PID gains to flash
+  const uint32_t *data = (const uint32_t *)fcu.pid_gain;
+  for (uint8_t i = 0; i < sizeof(fcu.pid_gain); i++)
   {
-    NRF_UICR->CUSTOMER[i] = ((const uint32_t *)&fcu)[i];
+    // Write each word to the UICR
+    NRF_UICR->CUSTOMER[i] = data[i];
     while (!NRF_NVMC->READY)
-      __NOP();
+      __NOP(); // Wait until write is complete, before writing the next word
   }
 
+  // Reset the system to apply changes
   NVIC_SystemReset();
-}
-
-static inline void handle_load_request(void)
-{
-  for (uint8_t i = 0; i < FLASH_BLOCK_WORDS; i++)
-    ((uint32_t *)&fcu)[i] = NRF_UICR->CUSTOMER[i];
 }
