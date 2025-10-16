@@ -7,12 +7,12 @@ void setup(void)
   while (!NRF_CLOCK->EVENTS_HFCLKSTARTED)
     __NOP();
 
-  // Configure Timer0 for microsecond (1us) timing (Max: 4294 seconds => 71 minutes => 1.19 hours)
+  // Configure Timer for microsecond (1us) timing (Max: 4294 seconds => 71 minutes => 1.19 hours)
   NRF_TIMER0->BITMODE = TIMER_BITMODE_BITMODE_32Bit;
   NRF_TIMER0->PRESCALER = 4; // 16MHz / 2^4 = 1MHz -> 1 tick = 1us
   NRF_TIMER0->TASKS_START = 1;
 
-  // Configure radio for 1Mbps bandwidth, 2402MHz channel frequency, transmit power +4dBm, fast ramp-up, static packet size 255 bytes
+  // Configure radio using Nordic's Proprietary 1Mbps protocol at 2.4GHz
   NRF_RADIO->SHORTS = (RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_START_Msk);
   NRF_RADIO->PACKETPTR = (uint32_t)&received_packet;
   NRF_RADIO->TXPOWER = RADIO_TXPOWER_TXPOWER_Pos4dBm;
@@ -49,7 +49,7 @@ void setup(void)
   NRF_P0->PIN_CNF[MOTOR4_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) |
                                  (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
 
-  // Configure PWM for motor control, 20kHz frequency, 0-800 duty cycle (0-100%)
+  // Configure PWM for ESC control (20kHz frequency, 0-800 duty cycle (0-100%))
   NRF_PWM0->COUNTERTOP = PWM_TOP;
   NRF_PWM0->PRESCALER = PWM_PRESCALER_PRESCALER_DIV_1;
   NRF_PWM0->DECODER = PWM_DECODER_LOAD_Individual;
@@ -94,7 +94,7 @@ void setup(void)
   humidity.begin(HUMIDITY_HZ, HUMIDITY_LATENCY);
   temperature.begin(TEMPERATURE_HZ, TEMPERATURE_LATENCY);
 
-  // Initialize external VL53L4CX Time-of-Flight distance sensor using I2C
+  // Configure external VL53L4CX Time-of-Flight distance sensor using I2C
   Wire.begin();
   Wire.setClock(400000);
 
@@ -124,11 +124,9 @@ void loop(void)
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
   const uint32_t loop_start_us = NRF_TIMER0->CC[0];
 
-  // Static variables to track last received packet time and landing rate time
   static uint32_t last_packet_us = loop_start_us;
   static uint32_t landing_rate_us = loop_start_us;
 
-  // Handle received RCU packets
   if (NRF_RADIO->EVENTS_CRCOK)
   {
     NRF_RADIO->EVENTS_CRCOK = 0;
@@ -136,16 +134,9 @@ void loop(void)
     rcu_read();
   }
 
-  // Run scheduled tasks
   task_run(loop_start_us);
 
-  /**
-   * Automatic landing sequence
-   *
-   * If FCU is active, and no new RCU packet has been received for 10 seconds, initiate landing sequence
-   * by gradually reducing thrust to zero at a rate of 10 units per second. If a new packet is received same
-   * time, landing sequence is aborted. When thrust reaches zero, FCU active bit is cleared.
-   */
+  // Automatic landing sequence: If no new RCU packet for 10s, reduce thrust to zero at 10 units/sec.
   if ((fcu.status & 0x01) && loop_start_us >= last_packet_us && loop_start_us >= landing_rate_us)
   {
     landing_rate_us = loop_start_us + HZ_TO_US(1);
@@ -176,7 +167,6 @@ static inline void task_run(const uint32_t loop_start_us)
 
 static inline void task_imu_update(void)
 {
-  // Update data on FIFO buffer
   sensortec.update();
 }
 
@@ -268,6 +258,7 @@ static inline void task_pof_update(void)
 {
   fcu.battery = nicla::getCurrentBatteryVoltage();
 
+  // Set or clear the power-fail status bit depending on POFWARN event
   NRF_POWER->EVENTS_POFWARN ? (fcu.status |= 0x02) : (fcu.status &= ~0x02);
   NRF_POWER->EVENTS_POFWARN = 0;
 }
@@ -292,6 +283,7 @@ static inline void pid_calculate(const float setpoint, const float value, const 
   const float derivative = -(value - *prev_value) * PID_LOOP_HZ;
   const float outputNoI = (kp * error) + (kd * derivative);
 
+  // Only integrate if output is within limits (anti-windup)
   *integral += error * PID_LOOP_PERIOD * ((outputNoI <= PID_MAX) && (outputNoI >= PID_MIN));
   const float iLimit = PID_MAX / (ki + __FLT_EPSILON__);
   *integral = constrain(*integral, -iLimit, iLimit);
