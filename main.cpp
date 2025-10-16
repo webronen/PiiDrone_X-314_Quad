@@ -336,18 +336,18 @@ static inline void handle_pid_update(void)
   const uint8_t axis = received_packet.data[0];
   const uint8_t gain = received_packet.data[1];
 
-  float axis_gain = 0.0f;
-  memcpy(&axis_gain, (const void *)&received_packet.data[2], sizeof(axis_gain));
-  fcu.pid_gain[axis % PID_DEPTH][gain % PID_DEPTH] = constrain(axis_gain, GAIN_MIN, GAIN_MAX);
+  float pid_gain = 0.0f;
+  memcpy(&pid_gain, (const void *)&received_packet.data[2], sizeof(pid_gain));
+  fcu.pid_gain[axis % PID_DEPTH][gain % PID_DEPTH] = constrain(pid_gain, GAIN_MIN, GAIN_MAX);
 }
 
 static inline void handle_setpoint_update(void)
 {
   const uint8_t axis = received_packet.data[0];
 
-  float setpoint = 0.0f;
-  memcpy(&setpoint, (const void *)&received_packet.data[1], sizeof(setpoint));
-  fcu.pid_setpoint[axis % PID_DEPTH] = constrain(setpoint, SETPOINT_MIN, SETPOINT_MAX);
+  float pid_setpoint = 0.0f;
+  memcpy(&pid_setpoint, (const void *)&received_packet.data[1], sizeof(pid_setpoint));
+  fcu.pid_setpoint[axis % PID_DEPTH] = constrain(pid_setpoint, SETPOINT_MIN, SETPOINT_MAX);
 }
 
 static inline void handle_thrust_update(void)
