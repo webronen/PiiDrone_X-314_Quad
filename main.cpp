@@ -80,8 +80,9 @@ void setup(void)
   gyroscope.begin(GYROSCOPE_HZ, GYROSCOPE_LATENCY);
   gyroscope.setRange(GYROSCOPE_RANGE);
 
-  magnetometer.begin(0, 0);
-  magnetometer.setRange(MAGNETOMETER_RANGE);
+  // TODO: Calibrate magnetometer, before using it.
+  // magnetometer.begin(MAGNETOMETER_HZ, MAGNETOMETER_LATENCY);
+  // magnetometer.setRange(MAGNETOMETER_RANGE);
 
   quaternion.begin(QUATERNION_HZ, QUATERNION_LATENCY);
 
