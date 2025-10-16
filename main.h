@@ -166,7 +166,7 @@ static volatile Rcu received_packet = {0};
 static Rcu transmit_packet = {NODE_ID, ZONE_ID, TYPE_TELEMETRY, {0}};
 static Pid pid_state[3] = {0};
 
-static inline void scheduler_run_tasks(const uint32_t time_us);
+static inline void scheduler_run_tasks(const uint32_t loop_time_us);
 
 static inline void task_imu_update(void);
 static inline void task_fcu_update(void);
