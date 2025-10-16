@@ -67,14 +67,14 @@ void setup(void)
   nicla::disableCharging();
   nicla::disableLDO();
   nicla::enable3V3LDO();
-
+  
   // Set ILIM to 350mA (Default 50mA) and disable UVLO (Default 3.0V)
   uint8_t pmic_status = nicla::_pmic.readByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL);
   pmic_status = (pmic_status & ~0x3F) | 0x3F;
   nicla::_pmic.writeByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL, pmic_status);
-
+  
   sensortec.begin();
-
+  
   accelerometer.begin(ACCELEROMETER_HZ, ACCELEROMETER_LATENCY);
   accelerometer.setRange(ACCELEROMETER_RANGE);
   gyroscope.begin(GYROSCOPE_HZ, GYROSCOPE_LATENCY);
@@ -260,19 +260,8 @@ static inline void task_pof_update(void)
 {
   fcu.battery = nicla::getCurrentBatteryVoltage();
 
-  if (NRF_POWER->EVENTS_POFWARN)
-  {
-    NRF_POWER->EVENTS_POFWARN = 0;
-    static bool led_state = false;
-    led_state = !led_state;
-    nicla::leds.setColorRed(led_state ? 255 : 0);
-    fcu.status |= 0x02;
-  }
-  else
-  {
-    nicla::leds.setColorRed(0);
-    fcu.status &= ~0x02;
-  }
+  NRF_POWER->EVENTS_POFWARN ? (fcu.status |= 0x02) : (fcu.status &= ~0x02);
+  NRF_POWER->EVENTS_POFWARN = 0;
 }
 
 static inline void rcu_read(void)
