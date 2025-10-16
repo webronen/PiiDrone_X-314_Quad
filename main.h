@@ -3,7 +3,7 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-// #define DEBUG
+#define DEBUG
 #define NODE_ID 1
 #define ZONE_ID 0
 
@@ -180,7 +180,6 @@ static Task tasks[SCHEDULER_TASK_COUNT] = {
     {HZ_TO_US(31), 0, "TOF", task_tof_update},
     {HZ_TO_US(3), 0, "TEL", task_tel_update},
     {HZ_TO_US(2), 0, "POF", task_pof_update}};
-    
 
 static inline void scheduler_run(const uint32_t loop_time_us);
 static inline void pid_update(const float setpoint, const float value, const float kp, const float ki,
