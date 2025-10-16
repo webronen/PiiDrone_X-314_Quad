@@ -74,10 +74,6 @@ VL53L4CX vl53l4cx(&Wire, NC);
 #define TYPE_TELEMETRY 4
 
 #define PID_DEPTH 3
-#define FCU_STATUS_ACTIVE (fcu.status & 0x01)
-#define FCU_STATUS_DISABLE (fcu.status &= ~0x01)
-#define FCU_STATUS_SET_POW (fcu.status |= 0x02)
-#define FCU_STATUS_CLEAR_POW (fcu.status &= ~0x02)
 
 #define ACCELEROMETER_HZ 400
 #define ACCELEROMETER_LATENCY 1
