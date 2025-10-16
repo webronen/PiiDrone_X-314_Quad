@@ -122,22 +122,22 @@ void loop(void)
 {
   // Capture current timer value in microseconds
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
-  const uint32_t loop_time_us = NRF_TIMER0->CC[0];
+  const uint32_t loop_start_us = NRF_TIMER0->CC[0];
 
   // Static variables to track last received packet time and landing rate time
-  static uint32_t last_packet_us = loop_time_us;
-  static uint32_t landing_rate_us = loop_time_us;
+  static uint32_t last_packet_us = loop_start_us;
+  static uint32_t landing_rate_us = loop_start_us;
 
   // Handle received RCU packets
   if (NRF_RADIO->EVENTS_CRCOK)
   {
     NRF_RADIO->EVENTS_CRCOK = 0;
-    last_packet_us = loop_time_us + HZ_TO_US(0.1f);
+    last_packet_us = loop_start_us + HZ_TO_US(0.1f);
     rcu_read();
   }
 
   // Run scheduled tasks
-  task_run(loop_time_us);
+  task_run(loop_start_us);
 
   /**
    * Automatic landing sequence
@@ -146,19 +146,19 @@ void loop(void)
    * by gradually reducing thrust to zero at a rate of 10 units per second. If a new packet is received same
    * time, landing sequence is aborted. When thrust reaches zero, FCU active bit is cleared.
    */
-  if ((fcu.status & 0x01) && loop_time_us >= last_packet_us && loop_time_us >= landing_rate_us)
+  if ((fcu.status & 0x01) && loop_start_us >= last_packet_us && loop_start_us >= landing_rate_us)
   {
-    landing_rate_us = loop_time_us + HZ_TO_US(1);
+    landing_rate_us = loop_start_us + HZ_TO_US(1);
     memset(fcu.pid_setpoint, 0, sizeof(fcu.pid_setpoint));
     (fcu.thrust >= 10) ? (fcu.thrust -= 10) : (fcu.status &= ~0x01);
   }
 }
 
-static inline void task_run(const uint32_t loop_time_us)
+static inline void task_run(const uint32_t loop_start_us)
 {
   for (uint8_t i = 0; i < SCHEDULER_TASK_COUNT; i++)
   {
-    if (loop_time_us >= tasks[i].previous_us)
+    if (loop_start_us >= tasks[i].previous_us)
     {
 #ifdef DEBUG
       DEBUG_FUNC_TIME_START();
