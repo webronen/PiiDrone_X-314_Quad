@@ -107,7 +107,7 @@ void setup(void)
   vl53l4cx.VL53L4CX_SetUserROI(&roi);
   vl53l4cx.VL53L4CX_StartMeasurement();
 
-  pid_load_from_flash();
+  pid_load();
 }
 
 void loop(void)
@@ -125,10 +125,10 @@ void loop(void)
   {
     NRF_RADIO->EVENTS_CRCOK = 0;
     packet_time_us = time_us + HZ_TO_US(0.1f);
-    rcu_read_type();
+    handle_rcu_packet();
   }
 
-  // Run scheduled tasks
+  // Run periodic (scheduled) tasks
   scheduler_run_tasks(time_us);
 
   /**
@@ -273,17 +273,17 @@ static inline void task_pof_update(void)
   }
 }
 
-static inline void rcu_read_type(void)
+static inline void handle_rcu_packet(void)
 {
-  static void (*const request_table[REQUEST_HANDLER_COUNT])(void) = {
-      handle_type_pid,
-      handle_type_setpoint,
-      handle_type_thrust,
-      handle_type_save,
+  static void (*const handle[PACKET_TYPE_COUNT])(void) = {
+      handle_pid_update,
+      handle_setpoint_update,
+      handle_thrust_update,
+      handle_flash_update,
   };
 
   if (received_packet.node == NODE_ID && received_packet.zone == ZONE_ID)
-    request_table[received_packet.type % REQUEST_HANDLER_COUNT]();
+    handle[received_packet.type % PACKET_TYPE_COUNT]();
 }
 
 static inline void pid_update(const float setpoint, const float value, const float kp, const float ki,
@@ -324,13 +324,13 @@ static inline void quaternion_normalize(DataQuaternion *q)
   q->z *= inv;
 }
 
-static inline void pid_load_from_flash(void)
+static inline void pid_load(void)
 {
   // TODO: Implement loading PID gains from flash memory
   return;
 }
 
-static inline void handle_type_pid(void)
+static inline void handle_pid_update(void)
 {
   const uint8_t axis = received_packet.data[0];
   const uint8_t gain = received_packet.data[1];
@@ -340,7 +340,7 @@ static inline void handle_type_pid(void)
   fcu.pid_gain[axis % PID_DEPTH][gain % PID_DEPTH] = constrain(axis_gain, GAIN_MIN, GAIN_MAX);
 }
 
-static inline void handle_type_setpoint(void)
+static inline void handle_setpoint_update(void)
 {
   const uint8_t axis = received_packet.data[0];
 
@@ -349,7 +349,7 @@ static inline void handle_type_setpoint(void)
   fcu.pid_setpoint[axis % PID_DEPTH] = constrain(setpoint, SETPOINT_MIN, SETPOINT_MAX);
 }
 
-static inline void handle_type_thrust(void)
+static inline void handle_thrust_update(void)
 {
   uint16_t thrust = 0;
   memcpy(&thrust, (const void *)&received_packet.data[0], sizeof(thrust));
@@ -357,7 +357,7 @@ static inline void handle_type_thrust(void)
   (fcu.thrust > THRUST_MIN) ? (fcu.status |= 0x01) : (fcu.status &= ~0x01);
 }
 
-static inline void handle_type_save(void)
+static inline void handle_flash_update(void)
 {
   // TODO: Implement saving PID gains to flash memory
   return;

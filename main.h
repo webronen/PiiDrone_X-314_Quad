@@ -65,12 +65,12 @@ VL53L4CX vl53l4cx(&Wire, NC);
 #define DISTANCE_OFFSET -20
 
 #define SCHEDULER_TASK_COUNT 6
-#define REQUEST_HANDLER_COUNT 4
+#define PACKET_TYPE_COUNT 4
 
 #define TYPE_PID 0
 #define TYPE_SETPOINT 1
 #define TYPE_THRUST 2
-#define TYPE_SAVE 3
+#define TYPE_FLASH 3
 #define TYPE_TELEMETRY 4
 
 #define PID_DEPTH 3
@@ -183,16 +183,16 @@ static Task tasks[SCHEDULER_TASK_COUNT] = {
     {HZ_TO_US(3), 0, "TEL", task_tel_update},
     {HZ_TO_US(2), 0, "POF", task_pof_update}};
 
-static inline void rcu_read_type(void);
 static inline void pid_update(const float setpoint, const float value, const float kp, const float ki,
                               const float kd, float *integral, float *prev_value, float *output);
 static inline void quaternion_multiply(DataQuaternion *result, const DataQuaternion *q1, const DataQuaternion *q2);
 static inline void quaternion_normalize(DataQuaternion *q);
-static inline void pid_load_from_flash(void);
+static inline void pid_load(void);
 
-static inline void handle_type_pid(void);
-static inline void handle_type_setpoint(void);
-static inline void handle_type_thrust(void);
-static inline void handle_type_save(void);
+static inline void handle_rcu_packet(void);
+static inline void handle_pid_update(void);
+static inline void handle_setpoint_update(void);
+static inline void handle_thrust_update(void);
+static inline void handle_flash_update(void);
 
 #endif // MAIN_H
