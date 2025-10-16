@@ -107,12 +107,12 @@ void setup(void)
   vl53l4cx.VL53L4CX_SetUserROI(&roi);
   vl53l4cx.VL53L4CX_StartMeasurement();
 
-  pid_load();
+  flash_read();
 }
 
 void loop(void)
 {
-  // Capture current timer value and store in loop_time_us
+  // Capture current timer value
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
   const uint32_t loop_time_us = NRF_TIMER0->CC[0];
 
@@ -125,11 +125,11 @@ void loop(void)
   {
     NRF_RADIO->EVENTS_CRCOK = 0;
     last_packet_us = loop_time_us + HZ_TO_US(0.1f);
-    handle_rcu_packet();
+    rcu_read();
   }
 
   // Run periodic (scheduled) tasks
-  task_run(loop_time_us);
+  scheduler_run(loop_time_us);
 
   /**
    * Automatic landing sequence
@@ -146,7 +146,7 @@ void loop(void)
   }
 }
 
-static inline void task_run(const uint32_t loop_time_us)
+static inline void scheduler_run(const uint32_t loop_time_us)
 {
   for (uint8_t i = 0; i < SCHEDULER_TASK_COUNT; i++)
   {
@@ -168,7 +168,7 @@ static inline void task_run(const uint32_t loop_time_us)
 
 static inline void task_imu_update(void)
 {
-  // Update BHY2 sensor data
+  // Update data on FIFO buffer
   sensortec.update();
 }
 
@@ -273,13 +273,13 @@ static inline void task_pof_update(void)
   }
 }
 
-static inline void handle_rcu_packet(void)
+static inline void rcu_read(void)
 {
   static void (*const handle[PACKET_TYPE_COUNT])(void) = {
       handle_pid_update,
       handle_setpoint_update,
       handle_thrust_update,
-      handle_flash_update,
+      handle_flash_write,
   };
 
   if (received_packet.node == NODE_ID && received_packet.zone == ZONE_ID)
@@ -324,7 +324,7 @@ static inline void quaternion_normalize(DataQuaternion *q)
   q->z *= inv;
 }
 
-static inline void pid_load(void)
+static inline void flash_read(void)
 {
   // TODO: Implement loading PID gains from flash memory
   return;
@@ -357,7 +357,7 @@ static inline void handle_thrust_update(void)
   (fcu.thrust > THRUST_MIN) ? FCU_STATUS_ACTIVE : FCU_STATUS_DISABLE;
 }
 
-static inline void handle_flash_update(void)
+static inline void handle_flash_write(void)
 {
   // TODO: Implement saving PID gains to flash memory
   return;

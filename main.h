@@ -170,7 +170,6 @@ static volatile Rcu received_packet = {0};
 static Rcu transmit_packet = {NODE_ID, ZONE_ID, TYPE_TELEMETRY, {0}};
 static Pid pid_state[3] = {0};
 
-static inline void task_run(const uint32_t loop_time_us);
 static inline void task_imu_update(void);
 static inline void task_fcu_update(void);
 static inline void task_esc_update(void);
@@ -185,17 +184,19 @@ static Task tasks[SCHEDULER_TASK_COUNT] = {
     {HZ_TO_US(31), 0, "TOF", task_tof_update},
     {HZ_TO_US(3), 0, "TEL", task_tel_update},
     {HZ_TO_US(2), 0, "POF", task_pof_update}};
+    
 
+static inline void scheduler_run(const uint32_t loop_time_us);
 static inline void pid_update(const float setpoint, const float value, const float kp, const float ki,
                               const float kd, float *integral, float *prev_value, float *output);
 static inline void quaternion_multiply(DataQuaternion *result, const DataQuaternion *q1, const DataQuaternion *q2);
 static inline void quaternion_normalize(DataQuaternion *q);
-static inline void pid_load(void);
+static inline void flash_read(void);
+static inline void rcu_read(void);
 
-static inline void handle_rcu_packet(void);
 static inline void handle_pid_update(void);
 static inline void handle_setpoint_update(void);
 static inline void handle_thrust_update(void);
-static inline void handle_flash_update(void);
+static inline void handle_flash_write(void);
 
 #endif // MAIN_H
