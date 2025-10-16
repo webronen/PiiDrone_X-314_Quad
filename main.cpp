@@ -125,7 +125,7 @@ void loop(void)
   {
     NRF_RADIO->EVENTS_CRCOK = 0;
     packet_time_us = time_us + HZ_TO_US(0.1f);
-    rcu_read();
+    rcu_read_type();
   }
 
   // Run scheduled tasks
@@ -273,21 +273,17 @@ static inline void task_pof_update(void)
   }
 }
 
-static inline void rcu_read(void)
+static inline void rcu_read_type(void)
 {
   static void (*const request_table[REQUEST_HANDLER_COUNT])(void) = {
-      handle_pid_request,
-      handle_setpoint_request,
-      handle_thrust_request,
-      handle_save_request,
+      handle_type_pid,
+      handle_type_setpoint,
+      handle_type_thrust,
+      handle_type_save,
   };
 
-  if (received_packet.node == NODE_ID &&
-      received_packet.zone == ZONE_ID &&
-      received_packet.type < REQUEST_HANDLER_COUNT)
-  {
-    request_table[received_packet.type]();
-  }
+  if (received_packet.node == NODE_ID && received_packet.zone == ZONE_ID)
+    request_table[received_packet.type % REQUEST_HANDLER_COUNT]();
 }
 
 static inline void pid_update(const float setpoint, const float value, const float kp, const float ki,
@@ -334,7 +330,7 @@ static inline void pid_load_from_flash(void)
   return;
 }
 
-static inline void handle_pid_request(void)
+static inline void handle_type_pid(void)
 {
   const uint8_t axis = received_packet.data[0];
   const uint8_t gain = received_packet.data[1];
@@ -344,7 +340,7 @@ static inline void handle_pid_request(void)
   fcu.pid_gain[axis % PID_DEPTH][gain % PID_DEPTH] = constrain(axis_gain, GAIN_MIN, GAIN_MAX);
 }
 
-static inline void handle_setpoint_request(void)
+static inline void handle_type_setpoint(void)
 {
   const uint8_t axis = received_packet.data[0];
 
@@ -353,7 +349,7 @@ static inline void handle_setpoint_request(void)
   fcu.pid_setpoint[axis % PID_DEPTH] = constrain(setpoint, SETPOINT_MIN, SETPOINT_MAX);
 }
 
-static inline void handle_thrust_request(void)
+static inline void handle_type_thrust(void)
 {
   uint16_t thrust = 0;
   memcpy(&thrust, (const void *)&received_packet.data[0], sizeof(thrust));
@@ -361,7 +357,7 @@ static inline void handle_thrust_request(void)
   (fcu.thrust > THRUST_MIN) ? (fcu.status |= 0x01) : (fcu.status &= ~0x01);
 }
 
-static inline void handle_save_request(void)
+static inline void handle_type_save(void)
 {
   // TODO: Implement saving PID gains to flash memory
   return;
