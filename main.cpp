@@ -194,13 +194,13 @@ static inline void task_fcu_update(void)
   quaternion_multiply(&error, &hover_quaternion, &conjugate);
 
   pid_calculate(fcu.pid_setpoint[0], error.x, fcu.pid_gain[0][0], fcu.pid_gain[0][1], fcu.pid_gain[0][2],
-             &pid_state[0].integral, &pid_state[0].prev, &pid_state[0].output);
+                &pid_state[0].integral, &pid_state[0].prev, &pid_state[0].output);
 
   pid_calculate(fcu.pid_setpoint[1], error.y, fcu.pid_gain[1][0], fcu.pid_gain[1][1], fcu.pid_gain[1][2],
-             &pid_state[1].integral, &pid_state[1].prev, &pid_state[1].output);
+                &pid_state[1].integral, &pid_state[1].prev, &pid_state[1].output);
 
   pid_calculate(fcu.pid_setpoint[2], error.z, fcu.pid_gain[2][0], fcu.pid_gain[2][1], fcu.pid_gain[2][2],
-             &pid_state[2].integral, &pid_state[2].prev, &pid_state[2].output);
+                &pid_state[2].integral, &pid_state[2].prev, &pid_state[2].output);
 }
 
 static inline void task_esc_update(void)
@@ -286,7 +286,7 @@ static inline void rcu_read(void)
 }
 
 static inline void pid_calculate(const float setpoint, const float value, const float kp, const float ki,
-                              const float kd, float *integral, float *prev_value, float *output)
+                                 const float kd, float *integral, float *prev_value, float *output)
 {
   const float error = setpoint - value;
   const float derivative = -(value - *prev_value) * PID_LOOP_HZ;
