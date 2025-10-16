@@ -4,8 +4,7 @@ void setup(void)
 {
   // Start 64MHz clock, needed for radio
   NRF_CLOCK->TASKS_HFCLKSTART = 1;
-  while (!NRF_CLOCK->EVENTS_HFCLKSTARTED)
-    __NOP();
+  while (!NRF_CLOCK->EVENTS_HFCLKSTARTED);
 
   // Configure Timer for microsecond (1us) timing (Max: 4294 seconds => 71 minutes => 1.19 hours)
   NRF_TIMER0->BITMODE = TIMER_BITMODE_BITMODE_32Bit;
@@ -39,7 +38,7 @@ void setup(void)
 
   NRF_RADIO->TASKS_RXEN = 1;
 
-  // Configure motor control pins
+  // Configure ESC control pins as outputs
   NRF_P0->PIN_CNF[MOTOR1_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) |
                                  (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
   NRF_P0->PIN_CNF[MOTOR2_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) |
@@ -96,7 +95,7 @@ void setup(void)
 
   // Configure external VL53L4CX Time-of-Flight distance sensor using I2C
   Wire.begin();
-  Wire.setClock(400000);
+  Wire.setClock(VL53L4CX_I2C_SPEED);
 
   vl53l4cx.VL53L4CX_SetDeviceAddress(VL53L4CX_DEFAULT_DEVICE_ADDRESS);
   vl53l4cx.VL53L4CX_WaitDeviceBooted();
@@ -105,12 +104,7 @@ void setup(void)
   vl53l4cx.VL53L4CX_SetMeasurementTimingBudgetMicroSeconds(33000);
 
   // Set ROI to 4x4 centered
-  VL53L4CX_UserRoi_t roi = {
-      .TopLeftX = 6,
-      .TopLeftY = 6,
-      .BotRightX = 9,
-      .BotRightY = 9};
-
+  VL53L4CX_UserRoi_t roi = {6, 6, 9, 9};
   vl53l4cx.VL53L4CX_SetUserROI(&roi);
   vl53l4cx.VL53L4CX_StartMeasurement();
 
@@ -230,24 +224,20 @@ static inline void task_tof_update(void)
 static inline void task_tel_update(void)
 {
   static Rcu transmit_packet = {NODE_ID, ZONE_ID, TYPE_TELEMETRY, {0}};
-
   memcpy(transmit_packet.data, &fcu, sizeof(Fcu));
 
-  while (!NRF_RADIO->EVENTS_END)
-    __NOP();
+  while (!NRF_RADIO->EVENTS_END);
 
   NRF_RADIO->EVENTS_END = 0;
   NRF_RADIO->TASKS_DISABLE = 1;
 
-  while (NRF_RADIO->STATE)
-    __NOP();
+  while (NRF_RADIO->STATE);
 
   NRF_RADIO->PACKETPTR = (uint32_t)&transmit_packet;
   NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk;
   NRF_RADIO->TASKS_TXEN = 1;
 
-  while (NRF_RADIO->STATE)
-    __NOP();
+  while (NRF_RADIO->STATE);
 
   NRF_RADIO->PACKETPTR = (uint32_t)&received_packet;
   NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_START_Msk;

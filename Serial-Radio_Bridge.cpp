@@ -21,8 +21,7 @@ static inline void send_radio_packet(void);
 void setup(void)
 {
   NRF_CLOCK->TASKS_HFCLKSTART = 1;
-  while (!NRF_CLOCK->EVENTS_HFCLKSTARTED)
-    __NOP();
+  while (!NRF_CLOCK->EVENTS_HFCLKSTARTED);
 
   NRF_RADIO->SHORTS = (RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_START_Msk);
   NRF_RADIO->PACKETPTR = (uint32_t)&received_packet;
@@ -51,8 +50,7 @@ void setup(void)
   NRF_RADIO->TASKS_RXEN = 1;
 
   Serial.begin(MBPS_TO_BPS(1));
-  while (!Serial)
-    __NOP();
+  while (!Serial);
 }
 
 void loop(void)
@@ -74,21 +72,18 @@ void loop(void)
 
 static inline void send_radio_packet(void)
 {
-  while (!NRF_RADIO->EVENTS_END)
-    __NOP();
+  while (!NRF_RADIO->EVENTS_END);
 
   NRF_RADIO->EVENTS_END = 0;
   NRF_RADIO->TASKS_DISABLE = 1;
 
-  while (NRF_RADIO->STATE)
-    __NOP();
+  while (NRF_RADIO->STATE);
 
   NRF_RADIO->PACKETPTR = (uint32_t)&transmit_packet;
   NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk;
   NRF_RADIO->TASKS_TXEN = 1;
 
-  while (NRF_RADIO->STATE)
-    __NOP();
+  while (NRF_RADIO->STATE);
 
   NRF_RADIO->PACKETPTR = (uint32_t)&received_packet;
   NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_START_Msk;

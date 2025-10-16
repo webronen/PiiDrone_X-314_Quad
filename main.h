@@ -36,6 +36,7 @@ VL53L4CX vl53l4cx(&Wire, NC);
 #define MOTOR4_PIN 29
 
 #define HZ_TO_US(Hz) ((uint32_t)(1000000.0f / (Hz)))
+#define VL53L4CX_I2C_SPEED 400000 // 400kHz
 
 #define PWM_BASE_CLOCK 16000000UL
 #define PWM_FREQUENCY 20000UL
@@ -56,7 +57,6 @@ VL53L4CX vl53l4cx(&Wire, NC);
 #define THRUST_MIN 0
 
 #define TELEMETRY_DATA_BYTES 252
-#define FLASH_BLOCK_WORDS 32
 
 #define EMA_ALPHA 0.3f
 #define EMA_BETA (1.0f - EMA_ALPHA)
