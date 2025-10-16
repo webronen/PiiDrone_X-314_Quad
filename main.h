@@ -3,7 +3,7 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-#define DEBUG
+// #define DEBUG
 #define NODE_ID 1
 #define ZONE_ID 0
 
@@ -83,8 +83,8 @@ VL53L4CX vl53l4cx(&Wire, NC);
 #define GYROSCOPE_LATENCY 1
 #define GYROSCOPE_RANGE 1000
 
-#define MAGNETOMETER_HZ 25
-#define MAGNETOMETER_LATENCY 40
+#define MAGNETOMETER_HZ 0
+#define MAGNETOMETER_LATENCY 0
 #define MAGNETOMETER_RANGE 2500
 
 #define PRESSURE_HZ 1
@@ -163,7 +163,6 @@ static_assert(sizeof(Task) == 16, "Task struct must be 16 bytes (4 words)");
 static Fcu fcu = {0};
 static Esc esc = {0x8000, 0x8000, 0x8000, 0x8000};
 static volatile Rcu received_packet = {0};
-static Rcu transmit_packet = {NODE_ID, ZONE_ID, TYPE_TELEMETRY, {0}};
 static Pid pid_state[3] = {0};
 
 static inline void task_imu_update(void);
@@ -181,9 +180,9 @@ static Task tasks[SCHEDULER_TASK_COUNT] = {
     {HZ_TO_US(3), 0, "TEL", task_tel_update},
     {HZ_TO_US(2), 0, "POF", task_pof_update}};
 
-static inline void scheduler_run(const uint32_t loop_time_us);
-static inline void pid_update(const float setpoint, const float value, const float kp, const float ki,
-                              const float kd, float *integral, float *prev_value, float *output);
+static inline void task_run(const uint32_t loop_time_us);
+static inline void pid_calculate(const float setpoint, const float value, const float kp, const float ki,
+                                 const float kd, float *integral, float *prev_value, float *output);
 static inline void quaternion_multiply(DataQuaternion *result, const DataQuaternion *q1, const DataQuaternion *q2);
 static inline void quaternion_normalize(DataQuaternion *q);
 static inline void flash_read(void);

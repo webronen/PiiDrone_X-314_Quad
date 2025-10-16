@@ -2,23 +2,17 @@
 
 void setup(void)
 {
+  // Start 64MHz clock, needed for radio
   NRF_CLOCK->TASKS_HFCLKSTART = 1;
   while (!NRF_CLOCK->EVENTS_HFCLKSTARTED)
     __NOP();
 
+  // Configure Timer0 for microsecond (1us) timing (Max: 4294 seconds => 71 minutes => 1.19 hours)
   NRF_TIMER0->BITMODE = TIMER_BITMODE_BITMODE_32Bit;
-  NRF_TIMER0->PRESCALER = 4;
+  NRF_TIMER0->PRESCALER = 4; // 16MHz / 2^4 = 1MHz -> 1 tick = 1us
   NRF_TIMER0->TASKS_START = 1;
 
-  NRF_P0->PIN_CNF[MOTOR1_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) |
-                                 (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
-  NRF_P0->PIN_CNF[MOTOR2_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) |
-                                 (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
-  NRF_P0->PIN_CNF[MOTOR3_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) |
-                                 (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
-  NRF_P0->PIN_CNF[MOTOR4_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) |
-                                 (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
-
+  // Configure radio for 1Mbps bandwidth, 2402MHz channel frequency, transmit power +4dBm, fast ramp-up, static packet size 255 bytes
   NRF_RADIO->SHORTS = (RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_START_Msk);
   NRF_RADIO->PACKETPTR = (uint32_t)&received_packet;
   NRF_RADIO->TXPOWER = RADIO_TXPOWER_TXPOWER_Pos4dBm;
@@ -45,6 +39,17 @@ void setup(void)
 
   NRF_RADIO->TASKS_RXEN = 1;
 
+  // Configure motor control pins
+  NRF_P0->PIN_CNF[MOTOR1_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) |
+                                 (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
+  NRF_P0->PIN_CNF[MOTOR2_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) |
+                                 (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
+  NRF_P0->PIN_CNF[MOTOR3_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) |
+                                 (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
+  NRF_P0->PIN_CNF[MOTOR4_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) |
+                                 (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
+
+  // Configure PWM for motor control, 20kHz frequency, 0-800 duty cycle (0-100%)
   NRF_PWM0->COUNTERTOP = PWM_TOP;
   NRF_PWM0->PRESCALER = PWM_PRESCALER_PRESCALER_DIV_1;
   NRF_PWM0->DECODER = PWM_DECODER_LOAD_Individual;
@@ -59,30 +64,29 @@ void setup(void)
   NRF_PWM0->TASKS_SEQSTART[0] = 1;
 
   // Set power failure threshold to 2.7V and enable power failure detection for battery monitoring and early warning
-  NRF_POWER->POFCON = (POWER_POFCON_THRESHOLD_V27 << POWER_POFCON_THRESHOLD_Pos) |
-                      POWER_POFCON_POF_Enabled;
+  NRF_POWER->POFCON = (POWER_POFCON_THRESHOLD_V27 << POWER_POFCON_THRESHOLD_Pos) | POWER_POFCON_POF_Enabled;
 
   nicla::begin(false);
   nicla::setBatteryNTCEnabled(false);
   nicla::disableCharging();
   nicla::disableLDO();
   nicla::enable3V3LDO();
-  
+
   // Set ILIM to 350mA (Default 50mA) and disable UVLO (Default 3.0V)
   uint8_t pmic_status = nicla::_pmic.readByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL);
   pmic_status = (pmic_status & ~0x3F) | 0x3F;
   nicla::_pmic.writeByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL, pmic_status);
-  
+
   sensortec.begin();
-  
+
   accelerometer.begin(ACCELEROMETER_HZ, ACCELEROMETER_LATENCY);
   accelerometer.setRange(ACCELEROMETER_RANGE);
   gyroscope.begin(GYROSCOPE_HZ, GYROSCOPE_LATENCY);
   gyroscope.setRange(GYROSCOPE_RANGE);
 
   // TODO: Calibrate magnetometer, before using it.
-  // magnetometer.begin(MAGNETOMETER_HZ, MAGNETOMETER_LATENCY);
-  // magnetometer.setRange(MAGNETOMETER_RANGE);
+  magnetometer.begin(MAGNETOMETER_HZ, MAGNETOMETER_LATENCY);
+  magnetometer.setRange(MAGNETOMETER_RANGE);
 
   quaternion.begin(QUATERNION_HZ, QUATERNION_LATENCY);
 
@@ -90,6 +94,7 @@ void setup(void)
   humidity.begin(HUMIDITY_HZ, HUMIDITY_LATENCY);
   temperature.begin(TEMPERATURE_HZ, TEMPERATURE_LATENCY);
 
+  // Initialize external VL53L4CX Time-of-Flight distance sensor using I2C
   Wire.begin();
   Wire.setClock(400000);
 
@@ -109,12 +114,13 @@ void setup(void)
   vl53l4cx.VL53L4CX_SetUserROI(&roi);
   vl53l4cx.VL53L4CX_StartMeasurement();
 
+  // Read configuration from flash memory
   flash_read();
 }
 
 void loop(void)
 {
-  // Capture current timer value
+  // Capture current timer value in microseconds
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
   const uint32_t loop_time_us = NRF_TIMER0->CC[0];
 
@@ -130,8 +136,8 @@ void loop(void)
     rcu_read();
   }
 
-  // Run periodic (scheduled) tasks
-  scheduler_run(loop_time_us);
+  // Run scheduled tasks
+  task_run(loop_time_us);
 
   /**
    * Automatic landing sequence
@@ -148,7 +154,7 @@ void loop(void)
   }
 }
 
-static inline void scheduler_run(const uint32_t loop_time_us)
+static inline void task_run(const uint32_t loop_time_us)
 {
   for (uint8_t i = 0; i < SCHEDULER_TASK_COUNT; i++)
   {
@@ -177,24 +183,23 @@ static inline void task_imu_update(void)
 static inline void task_fcu_update(void)
 {
   fcu.pressure = EMA_ALPHA * pressure._value + EMA_BETA * fcu.pressure;
-  const float _temperature = temperature._value + TEMPERATURE_OFFSET;
-  fcu.temperature = EMA_ALPHA * _temperature + EMA_BETA * fcu.temperature;
+  fcu.temperature = EMA_ALPHA * (temperature._value + TEMPERATURE_OFFSET) + EMA_BETA * fcu.temperature;
   fcu.humidity = EMA_ALPHA * humidity._value + EMA_BETA * fcu.humidity;
 
   static const DataQuaternion hover_quaternion = {0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
   const DataQuaternion conjugate = {-quaternion._data.x, -quaternion._data.y,
                                     -quaternion._data.z, quaternion._data.w};
 
-  DataQuaternion error;
+  static DataQuaternion error;
   quaternion_multiply(&error, &hover_quaternion, &conjugate);
 
-  pid_update(fcu.pid_setpoint[0], error.x, fcu.pid_gain[0][0], fcu.pid_gain[0][1], fcu.pid_gain[0][2],
+  pid_calculate(fcu.pid_setpoint[0], error.x, fcu.pid_gain[0][0], fcu.pid_gain[0][1], fcu.pid_gain[0][2],
              &pid_state[0].integral, &pid_state[0].prev, &pid_state[0].output);
 
-  pid_update(fcu.pid_setpoint[1], error.y, fcu.pid_gain[1][0], fcu.pid_gain[1][1], fcu.pid_gain[1][2],
+  pid_calculate(fcu.pid_setpoint[1], error.y, fcu.pid_gain[1][0], fcu.pid_gain[1][1], fcu.pid_gain[1][2],
              &pid_state[1].integral, &pid_state[1].prev, &pid_state[1].output);
 
-  pid_update(fcu.pid_setpoint[2], error.z, fcu.pid_gain[2][0], fcu.pid_gain[2][1], fcu.pid_gain[2][2],
+  pid_calculate(fcu.pid_setpoint[2], error.z, fcu.pid_gain[2][0], fcu.pid_gain[2][1], fcu.pid_gain[2][2],
              &pid_state[2].integral, &pid_state[2].prev, &pid_state[2].output);
 }
 
@@ -217,10 +222,11 @@ static inline void task_esc_update(void)
 
 static inline void task_tof_update(void)
 {
-  static uint8_t ready = 0;
+  static uint8_t ready;
+  static VL53L4CX_MultiRangingData_t data;
+
   if (vl53l4cx.VL53L4CX_GetMeasurementDataReady(&ready) == VL53L4CX_ERROR_NONE && ready)
   {
-    static VL53L4CX_MultiRangingData_t data;
     if (vl53l4cx.VL53L4CX_GetMultiRangingData(&data) == VL53L4CX_ERROR_NONE &&
         data.NumberOfObjectsFound > 0 &&
         data.RangeData[0].RangeStatus == 0)
@@ -233,6 +239,8 @@ static inline void task_tof_update(void)
 
 static inline void task_tel_update(void)
 {
+  static Rcu transmit_packet = {NODE_ID, ZONE_ID, TYPE_TELEMETRY, {0}};
+
   memcpy(transmit_packet.data, &fcu, sizeof(Fcu));
 
   while (!NRF_RADIO->EVENTS_END)
@@ -277,7 +285,7 @@ static inline void rcu_read(void)
     handle[received_packet.type % PACKET_TYPE_COUNT]();
 }
 
-static inline void pid_update(const float setpoint, const float value, const float kp, const float ki,
+static inline void pid_calculate(const float setpoint, const float value, const float kp, const float ki,
                               const float kd, float *integral, float *prev_value, float *output)
 {
   const float error = setpoint - value;
@@ -326,8 +334,9 @@ static inline void handle_pid_update(void)
   const uint8_t axis = received_packet.data[0];
   const uint8_t gain = received_packet.data[1];
 
-  float pid_gain = 0.0f;
+  float pid_gain;
   memcpy(&pid_gain, (const void *)&received_packet.data[2], sizeof(pid_gain));
+
   fcu.pid_gain[axis % PID_DEPTH][gain % PID_DEPTH] = constrain(pid_gain, GAIN_MIN, GAIN_MAX);
 }
 
@@ -335,15 +344,17 @@ static inline void handle_setpoint_update(void)
 {
   const uint8_t axis = received_packet.data[0];
 
-  float pid_setpoint = 0.0f;
+  float pid_setpoint;
   memcpy(&pid_setpoint, (const void *)&received_packet.data[1], sizeof(pid_setpoint));
+
   fcu.pid_setpoint[axis % PID_DEPTH] = constrain(pid_setpoint, SETPOINT_MIN, SETPOINT_MAX);
 }
 
 static inline void handle_thrust_update(void)
 {
-  uint16_t thrust = 0;
+  uint16_t thrust;
   memcpy(&thrust, (const void *)&received_packet.data[0], sizeof(thrust));
+
   fcu.thrust = constrain(thrust, THRUST_MIN, THRUST_MAX);
   (fcu.thrust > THRUST_MIN) ? (fcu.status |= 0x01) : (fcu.status &= ~0x01);
 }
