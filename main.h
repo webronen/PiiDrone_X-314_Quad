@@ -74,6 +74,10 @@ VL53L4CX vl53l4cx(&Wire, NC);
 #define TYPE_TELEMETRY 4
 
 #define PID_DEPTH 3
+#define FCU_STATUS_ACTIVE (fcu.status & 0x01)
+#define FCU_STATUS_DISABLE (fcu.status &= ~0x01)
+#define FCU_STATUS_SET_POW (fcu.status |= 0x02)
+#define FCU_STATUS_CLEAR_POW (fcu.status &= ~0x02)
 
 #define ACCELEROMETER_HZ 400
 #define ACCELEROMETER_LATENCY 1
@@ -166,8 +170,7 @@ static volatile Rcu received_packet = {0};
 static Rcu transmit_packet = {NODE_ID, ZONE_ID, TYPE_TELEMETRY, {0}};
 static Pid pid_state[3] = {0};
 
-static inline void scheduler_run_tasks(const uint32_t loop_time_us);
-
+static inline void task_run(const uint32_t loop_time_us);
 static inline void task_imu_update(void);
 static inline void task_fcu_update(void);
 static inline void task_esc_update(void);

@@ -129,7 +129,7 @@ void loop(void)
   }
 
   // Run periodic (scheduled) tasks
-  scheduler_run_tasks(loop_time_us);
+  task_run(loop_time_us);
 
   /**
    * Automatic landing sequence
@@ -138,15 +138,15 @@ void loop(void)
    * by gradually reducing thrust to zero at a rate of 10 units per second. If a new packet is received same
    * time, landing sequence is aborted. When thrust reaches zero, FCU active bit is cleared.
    */
-  if ((fcu.status & 0x01) && loop_time_us >= last_packet_us && loop_time_us >= landing_rate_us)
+  if (FCU_STATUS_ACTIVE && loop_time_us >= last_packet_us && loop_time_us >= landing_rate_us)
   {
     landing_rate_us = loop_time_us + HZ_TO_US(1);
     memset(fcu.pid_setpoint, 0, sizeof(fcu.pid_setpoint));
-    (fcu.thrust >= 10) ? (fcu.thrust -= 10) : (fcu.status &= ~0x01);
+    (fcu.thrust >= 10) ? (fcu.thrust -= 10) : FCU_STATUS_DISABLE;
   }
 }
 
-static inline void scheduler_run_tasks(const uint32_t loop_time_us)
+static inline void task_run(const uint32_t loop_time_us)
 {
   for (uint8_t i = 0; i < SCHEDULER_TASK_COUNT; i++)
   {
@@ -198,7 +198,7 @@ static inline void task_fcu_update(void)
 
 static inline void task_esc_update(void)
 {
-  if (!(fcu.status & 0x01))
+  if (!FCU_STATUS_ACTIVE)
   {
     fcu.thrust = 0;
     memset(fcu.pid_setpoint, 0, sizeof(fcu.pid_setpoint));
@@ -264,12 +264,12 @@ static inline void task_pof_update(void)
     static bool led_state = false;
     led_state = !led_state;
     nicla::leds.setColorRed(led_state ? 255 : 0);
-    fcu.status |= 0x02;
+    FCU_STATUS_SET_POW;
   }
   else
   {
     nicla::leds.setColorRed(0);
-    fcu.status &= ~0x02;
+    FCU_STATUS_CLEAR_POW;
   }
 }
 
@@ -354,7 +354,7 @@ static inline void handle_thrust_update(void)
   uint16_t thrust = 0;
   memcpy(&thrust, (const void *)&received_packet.data[0], sizeof(thrust));
   fcu.thrust = constrain(thrust, THRUST_MIN, THRUST_MAX);
-  (fcu.thrust > THRUST_MIN) ? (fcu.status |= 0x01) : (fcu.status &= ~0x01);
+  (fcu.thrust > THRUST_MIN) ? FCU_STATUS_ACTIVE : FCU_STATUS_DISABLE;
 }
 
 static inline void handle_flash_update(void)
