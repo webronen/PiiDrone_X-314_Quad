@@ -71,7 +71,7 @@ void setup(void)
   nicla::disableLDO();
   nicla::enable3V3LDO();
 
-  // Set ILIM to 350mA (Default 50mA) and disable UVLO (Default 3.0V)
+  // Set ILIM to 350mA (Default 50mA) and disable UVLO (Default 3.0V) because we use power failure comparator
   uint8_t pmic_status = nicla::_pmic.readByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL);
   pmic_status = (pmic_status & ~0x3F) | 0x3F;
   nicla::_pmic.writeByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL, pmic_status);
@@ -111,6 +111,25 @@ void setup(void)
   // Load saved FCU settings from flash
   flash_read();
 }
+
+/**
+ * Event Polling Approach:
+ *
+ * This code uses event polling in the main control loop to handle hardware events
+ * such as radio packet reception and power-fail warnings. Instead of relying on
+ * interrupt service routines (ISRs), all event flags are checked and processed
+ * sequentially within the main loop.
+ *
+ * Benefits over ISR-based design:
+ * - Simpler code flow: All logic is centralized in the main loop, making it easier to follow and debug.
+ * - No concurrency issues: Avoids race conditions and shared data problems between ISRs and main code.
+ * - Predictable timing: Control over the order and timing of all actions, which is important for real-time systems.
+ * - Easier maintenance: No need to manage interrupt priorities or context switches.
+ * - Full control: The main loop can prioritize tasks and events as needed, and all state changes are explicit.
+ *
+ * This approach is well-suited for high-frequency control loops (such as drones),
+ * where the loop runs fast enough to respond to events promptly without missing critical updates.
+ */
 
 void loop(void)
 {
@@ -301,6 +320,7 @@ static inline void pid_calculate(const float setpoint, const float value, const 
 
 static inline void quaternion_multiply(DataQuaternion *r, const DataQuaternion *q1, const DataQuaternion *q2)
 {
+  // Hamilton product of two quaternions (r = q1 * q2)
   r->w = q1->w * q2->w - q1->x * q2->x - q1->y * q2->y - q1->z * q2->z;
   r->x = q1->w * q2->x + q1->x * q2->w + q1->y * q2->z - q1->z * q2->y;
   r->y = q1->w * q2->y - q1->x * q2->z + q1->y * q2->w + q1->z * q2->x;
@@ -311,6 +331,7 @@ static inline void quaternion_multiply(DataQuaternion *r, const DataQuaternion *
 
 static inline void quaternion_normalize(DataQuaternion *q)
 {
+  // Normalize quaternion to unit length and avoid division by zero using epsilon
   const float mag = q->w * q->w + q->x * q->x + q->y * q->y + q->z * q->z;
   const float inv = 1.0f / __builtin_sqrtf(mag + __FLT_EPSILON__);
 
