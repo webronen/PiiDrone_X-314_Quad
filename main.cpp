@@ -2,16 +2,17 @@
 
 void setup(void)
 {
-  // Start 64MHz clock, needed for radio
+  // Start High Frequency Clock (32MHz) from external crystal, needed for Radio
   NRF_CLOCK->TASKS_HFCLKSTART = 1;
-  while (!NRF_CLOCK->EVENTS_HFCLKSTARTED);
+  while (!NRF_CLOCK->EVENTS_HFCLKSTARTED)
+    ;
 
-  // Configure Timer for microsecond (1us) timing (Max: 4294 seconds => 71 minutes => 1.19 hours)
+  // Configure timer for timekeeping (1us resolution)
   NRF_TIMER0->BITMODE = TIMER_BITMODE_BITMODE_32Bit;
-  NRF_TIMER0->PRESCALER = 4; // 16MHz / 2^4 = 1MHz -> 1 tick = 1us
+  NRF_TIMER0->PRESCALER = 4;
   NRF_TIMER0->TASKS_START = 1;
 
-  // Configure radio using Nordic's Proprietary 1Mbps protocol at 2.4GHz
+  // Configure Radio for receiving RCU packets using Nordic's Proprietary 1Mbps protocol at 2.4GHz
   NRF_RADIO->SHORTS = (RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_START_Msk);
   NRF_RADIO->PACKETPTR = (uint32_t)&received_packet;
   NRF_RADIO->TXPOWER = RADIO_TXPOWER_TXPOWER_Pos4dBm;
@@ -38,7 +39,7 @@ void setup(void)
 
   NRF_RADIO->TASKS_RXEN = 1;
 
-  // Configure ESC control pins as outputs
+  // Configure PWM for ESC control (20kHz frequency, 0-800 duty cycle (0-100%))
   NRF_P0->PIN_CNF[MOTOR1_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) |
                                  (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
   NRF_P0->PIN_CNF[MOTOR2_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) |
@@ -48,7 +49,6 @@ void setup(void)
   NRF_P0->PIN_CNF[MOTOR4_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) |
                                  (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
 
-  // Configure PWM for ESC control (20kHz frequency, 0-800 duty cycle (0-100%))
   NRF_PWM0->COUNTERTOP = PWM_TOP;
   NRF_PWM0->PRESCALER = PWM_PRESCALER_PRESCALER_DIV_1;
   NRF_PWM0->DECODER = PWM_DECODER_LOAD_Individual;
@@ -62,7 +62,7 @@ void setup(void)
   NRF_PWM0->ENABLE = PWM_ENABLE_ENABLE_Enabled;
   NRF_PWM0->TASKS_SEQSTART[0] = 1;
 
-  // Set power failure threshold to 2.7V and enable power failure detection for battery monitoring and early warning
+  // Configure Power Failure Comparator to 2.7V threshold
   NRF_POWER->POFCON = (POWER_POFCON_THRESHOLD_V27 << POWER_POFCON_THRESHOLD_Pos) | POWER_POFCON_POF_Enabled;
 
   nicla::begin(false);
@@ -108,19 +108,24 @@ void setup(void)
   vl53l4cx.VL53L4CX_SetUserROI(&roi);
   vl53l4cx.VL53L4CX_StartMeasurement();
 
-  // Read configuration from flash memory
+  // Load saved FCU settings from flash
   flash_read();
 }
 
 void loop(void)
 {
-  // Capture current timer value in microseconds
+  // Capture current timer value
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
   const uint32_t loop_start_us = NRF_TIMER0->CC[0];
 
+  // Static variables to manage RCU packet timeout and landing sequence
   static uint32_t last_packet_us = loop_start_us;
-  static uint32_t landing_rate_us = loop_start_us;
+  static uint32_t last_landing_us = loop_start_us;
 
+  const bool packet_timeout = (int32_t)(loop_start_us - last_packet_us) >= 0;
+  const bool landing_timeout = (int32_t)(loop_start_us - last_landing_us) >= 0;
+
+  // Check for received RCU packet
   if (NRF_RADIO->EVENTS_CRCOK)
   {
     NRF_RADIO->EVENTS_CRCOK = 0;
@@ -128,14 +133,21 @@ void loop(void)
     rcu_read();
   }
 
+  // Run scheduled tasks
   task_run(loop_start_us);
 
-  // Automatic landing sequence: If no new RCU packet for 10s, reduce thrust to zero at 10 units/sec.
-  if ((fcu.status & 0x01) && loop_start_us >= last_packet_us && loop_start_us >= landing_rate_us)
+  /**
+   * Automatic landing sequence:
+   * - If no new RCU packet is received for 10 seconds, begin landing.
+   * - During landing, reduce thrust by 10 units per second until thrust is ≤ 10.
+   * - When thrust reaches 10 or less, clear the active status bit and stop landing.
+   * - If a new RCU packet arrives at any time, abort landing and resume normal flight control.
+   */
+  if (FCU_IS_ACTIVE(fcu.status) && packet_timeout && landing_timeout)
   {
-    landing_rate_us = loop_start_us + HZ_TO_US(1);
+    last_landing_us += HZ_TO_US(1);
     memset(fcu.pid_setpoint, 0, sizeof(fcu.pid_setpoint));
-    (fcu.thrust >= 10) ? (fcu.thrust -= 10) : (fcu.status &= ~0x01);
+    (fcu.thrust >= 10) ? (fcu.thrust -= 10) : FCU_CLEAR_ACTIVE(fcu.status);
   }
 }
 
@@ -143,7 +155,7 @@ static inline void task_run(const uint32_t loop_start_us)
 {
   for (uint8_t i = 0; i < SCHEDULER_TASK_COUNT; i++)
   {
-    if (loop_start_us >= tasks[i].previous_us)
+    if ((int32_t)(loop_start_us - tasks[i].previous_us) >= 0)
     {
 #ifdef DEBUG
       DEBUG_FUNC_TIME_START();
@@ -174,7 +186,7 @@ static inline void task_fcu_update(void)
   const DataQuaternion conjugate = {-quaternion._data.x, -quaternion._data.y,
                                     -quaternion._data.z, quaternion._data.w};
 
-  static DataQuaternion error;
+  DataQuaternion error;
   quaternion_multiply(&error, &hover_quaternion, &conjugate);
 
   pid_calculate(fcu.pid_setpoint[0], error.x, fcu.pid_gain[0][0], fcu.pid_gain[0][1], fcu.pid_gain[0][2],
@@ -189,7 +201,7 @@ static inline void task_fcu_update(void)
 
 static inline void task_esc_update(void)
 {
-  if (!(fcu.status & 0x01))
+  if (!FCU_IS_ACTIVE(fcu.status))
   {
     fcu.thrust = 0;
     memset(fcu.pid_setpoint, 0, sizeof(fcu.pid_setpoint));
@@ -226,18 +238,21 @@ static inline void task_tel_update(void)
   static Rcu transmit_packet = {NODE_ID, ZONE_ID, TYPE_TELEMETRY, {0}};
   memcpy(transmit_packet.data, &fcu, sizeof(Fcu));
 
-  while (!NRF_RADIO->EVENTS_END);
+  while (!NRF_RADIO->EVENTS_END)
+    ;
 
   NRF_RADIO->EVENTS_END = 0;
   NRF_RADIO->TASKS_DISABLE = 1;
 
-  while (NRF_RADIO->STATE);
+  while (NRF_RADIO->STATE)
+    ;
 
   NRF_RADIO->PACKETPTR = (uint32_t)&transmit_packet;
   NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk;
   NRF_RADIO->TASKS_TXEN = 1;
 
-  while (NRF_RADIO->STATE);
+  while (NRF_RADIO->STATE)
+    ;
 
   NRF_RADIO->PACKETPTR = (uint32_t)&received_packet;
   NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_START_Msk;
@@ -246,10 +261,9 @@ static inline void task_tel_update(void)
 
 static inline void task_pof_update(void)
 {
+  // Update battery voltage and power-fail status
   fcu.battery = nicla::getCurrentBatteryVoltage();
-
-  // Set or clear the power-fail status bit depending on POFWARN event
-  NRF_POWER->EVENTS_POFWARN ? (fcu.status |= 0x02) : (fcu.status &= ~0x02);
+  NRF_POWER->EVENTS_POFWARN ? FCU_SET_POFWARN(fcu.status) : FCU_CLEAR_POFWARN(fcu.status);
   NRF_POWER->EVENTS_POFWARN = 0;
 }
 
@@ -259,7 +273,7 @@ static inline void rcu_read(void)
       handle_pid_update,
       handle_setpoint_update,
       handle_thrust_update,
-      handle_flash_write,
+      handle_flash_update,
   };
 
   if (received_packet.node == NODE_ID && received_packet.zone == ZONE_ID)
@@ -305,12 +319,6 @@ static inline void quaternion_normalize(DataQuaternion *q)
   q->z *= inv;
 }
 
-static inline void flash_read(void)
-{
-  // TODO: Implement loading PID gains from flash memory
-  return;
-}
-
 static inline void handle_pid_update(void)
 {
   const uint8_t axis = received_packet.data[0];
@@ -338,11 +346,17 @@ static inline void handle_thrust_update(void)
   memcpy(&thrust, (const void *)&received_packet.data[0], sizeof(thrust));
 
   fcu.thrust = constrain(thrust, THRUST_MIN, THRUST_MAX);
-  (fcu.thrust > THRUST_MIN) ? (fcu.status |= 0x01) : (fcu.status &= ~0x01);
+  (fcu.thrust > THRUST_MIN) ? FCU_SET_ACTIVE(fcu.status) : FCU_CLEAR_ACTIVE(fcu.status);
 }
 
-static inline void handle_flash_write(void)
+static inline void flash_read(void)
 {
-  // TODO: Implement saving PID gains to flash memory
+  // TODO: Read PID gains from UICR
+  return;
+}
+
+static inline void handle_flash_update(void)
+{
+  // TODO: Write PID gains to UICR
   return;
 }

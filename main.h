@@ -74,6 +74,20 @@ VL53L4CX vl53l4cx(&Wire, NC);
 #define TYPE_TELEMETRY 4
 
 #define PID_DEPTH 3
+#define PID_FILE_ID 0
+#define PID_FILE_KEY 0
+#define PID_FILE_WORDS (PID_DEPTH * 3)
+
+#define FCU_STATUS_ACTIVE (1U << 0)
+#define FCU_STATUS_POFWARN (1U << 1)
+
+#define FCU_IS_ACTIVE(status) (status & FCU_STATUS_ACTIVE)
+#define FCU_SET_ACTIVE(status) (status |= FCU_STATUS_ACTIVE)
+#define FCU_CLEAR_ACTIVE(status) (status &= ~FCU_STATUS_ACTIVE)
+
+#define FCU_IS_POFWARN(status) (status & FCU_STATUS_POFWARN)
+#define FCU_SET_POFWARN(status) (status |= FCU_STATUS_POFWARN)
+#define FCU_CLEAR_POFWARN(status) (status &= ~FCU_STATUS_POFWARN)
 
 #define ACCELEROMETER_HZ 400
 #define ACCELEROMETER_LATENCY 1
@@ -152,10 +166,10 @@ static_assert(sizeof(Pid) == 12, "Pid struct must be 12 bytes (3 words)");
 
 typedef struct __attribute__((packed, aligned(4)))
 {
-  const uint32_t interval_us;
-  uint32_t previous_us;
   const char *name;
   void (*task)(void);
+  const uint32_t interval_us;
+  uint32_t previous_us;
 } Task;
 
 static_assert(sizeof(Task) == 16, "Task struct must be 16 bytes (4 words)");
@@ -173,12 +187,12 @@ static inline void task_tel_update(void);
 static inline void task_pof_update(void);
 
 static Task tasks[SCHEDULER_TASK_COUNT] = {
-    {HZ_TO_US(401), 0, "IMU", task_imu_update},
-    {HZ_TO_US(211), 0, "FCU", task_fcu_update},
-    {HZ_TO_US(101), 0, "ESC", task_esc_update},
-    {HZ_TO_US(31), 0, "TOF", task_tof_update},
-    {HZ_TO_US(3), 0, "TEL", task_tel_update},
-    {HZ_TO_US(2), 0, "POF", task_pof_update}};
+    {"IMU", task_imu_update, HZ_TO_US(401), 0},
+    {"FCU", task_fcu_update, HZ_TO_US(211), 0},
+    {"ESC", task_esc_update, HZ_TO_US(101), 0},
+    {"TOF", task_tof_update, HZ_TO_US(31), 0},
+    {"TEL", task_tel_update, HZ_TO_US(3), 0},
+    {"POF", task_pof_update, HZ_TO_US(2), 0}};
 
 static inline void task_run(const uint32_t loop_time_us);
 static inline void pid_calculate(const float setpoint, const float value, const float kp, const float ki,
@@ -191,6 +205,6 @@ static inline void rcu_read(void);
 static inline void handle_pid_update(void);
 static inline void handle_setpoint_update(void);
 static inline void handle_thrust_update(void);
-static inline void handle_flash_write(void);
+static inline void handle_flash_update(void);
 
 #endif // MAIN_H
