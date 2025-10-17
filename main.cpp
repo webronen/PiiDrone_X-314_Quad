@@ -143,7 +143,7 @@ void loop(void)
    * - When thrust reaches 10 or less, clear the active status bit and stop landing.
    * - If a new RCU packet arrives at any time, abort landing and resume normal flight control.
    */
-  if (FCU_IS_ACTIVE(fcu.status) && packet_timeout && landing_timeout)
+  if ((FCU_IS_ACTIVE(fcu.status) && (packet_timeout || FCU_IS_POFWARN(fcu.status)) && landing_timeout))
   {
     last_landing_us += HZ_TO_US(1);
     memset(fcu.pid_setpoint, 0, sizeof(fcu.pid_setpoint));
