@@ -138,10 +138,10 @@ void loop(void)
 
   /**
    * Automatic landing sequence:
-   * - If no new RCU packet is received for 10 seconds, begin landing.
+   * - If no new RCU packet is received for 10 seconds, or a power-fail warning is active, begin landing.
    * - During landing, reduce thrust by 10 units per second until thrust is ≤ 10.
    * - When thrust reaches 10 or less, clear the active status bit and stop landing.
-   * - If a new RCU packet arrives at any time, abort landing and resume normal flight control.
+   * - If a new RCU packet arrives at any time, or power-fail warning clears, abort landing and resume normal flight control.
    */
   if ((FCU_IS_ACTIVE(fcu.status) && (packet_timeout || FCU_IS_POFWARN(fcu.status)) && landing_timeout))
   {
