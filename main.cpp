@@ -342,11 +342,15 @@ static inline void handle_setpoint_update(void)
 
 static inline void handle_thrust_update(void)
 {
-  uint16_t thrust;
-  memcpy(&thrust, (const void *)&received_packet.data[0], sizeof(thrust));
+  // Only update thrust if no power-fail warning is active
+  if (!FCU_IS_POFWARN(fcu.status))
+  {
+    uint16_t thrust;
+    memcpy(&thrust, (const void *)&received_packet.data[0], sizeof(thrust));
 
-  fcu.thrust = constrain(thrust, THRUST_MIN, THRUST_MAX);
-  (fcu.thrust > THRUST_MIN) ? FCU_SET_ACTIVE(fcu.status) : FCU_CLEAR_ACTIVE(fcu.status);
+    fcu.thrust = constrain(thrust, THRUST_MIN, THRUST_MAX);
+    (fcu.thrust > THRUST_MIN) ? FCU_SET_ACTIVE(fcu.status) : FCU_CLEAR_ACTIVE(fcu.status);
+  }
 }
 
 static inline void flash_read(void)
