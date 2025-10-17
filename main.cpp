@@ -1,3 +1,22 @@
+/**
+ * Event Polling Approach:
+ *
+ * This code uses event polling in the main control loop to handle hardware events
+ * such as radio packet reception and power-fail warnings. Instead of relying on
+ * interrupt service routines (ISRs), all event flags are checked and processed
+ * sequentially within the main loop.
+ *
+ * Benefits over ISR-based design:
+ * - Simpler code flow: All logic is centralized in the main loop, making it easier to follow and debug.
+ * - No concurrency issues: Avoids race conditions and shared data problems between ISRs and main code.
+ * - Predictable timing: Control over the order and timing of all actions, which is important for real-time systems.
+ * - Easier maintenance: No need to manage interrupt priorities or context switches.
+ * - Full control: The main loop can prioritize tasks and events as needed, and all state changes are explicit.
+ *
+ * This approach is well-suited for high-frequency control loops (such as drones),
+ * where the loop runs fast enough to respond to events promptly without missing critical updates.
+ */
+
 #include "main.h"
 
 void setup(void)
@@ -111,25 +130,6 @@ void setup(void)
   // Load saved FCU settings from flash
   flash_read();
 }
-
-/**
- * Event Polling Approach:
- *
- * This code uses event polling in the main control loop to handle hardware events
- * such as radio packet reception and power-fail warnings. Instead of relying on
- * interrupt service routines (ISRs), all event flags are checked and processed
- * sequentially within the main loop.
- *
- * Benefits over ISR-based design:
- * - Simpler code flow: All logic is centralized in the main loop, making it easier to follow and debug.
- * - No concurrency issues: Avoids race conditions and shared data problems between ISRs and main code.
- * - Predictable timing: Control over the order and timing of all actions, which is important for real-time systems.
- * - Easier maintenance: No need to manage interrupt priorities or context switches.
- * - Full control: The main loop can prioritize tasks and events as needed, and all state changes are explicit.
- *
- * This approach is well-suited for high-frequency control loops (such as drones),
- * where the loop runs fast enough to respond to events promptly without missing critical updates.
- */
 
 void loop(void)
 {
