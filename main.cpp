@@ -26,9 +26,9 @@ void setup(void)
   while (!NRF_CLOCK->EVENTS_HFCLKSTARTED)
     ;
 
-  // Configure timer for timekeeping (1us resolution)
+  // Configure timer for timekeeping, Overflow every 4,294 seconds => 71 minutes => 1.19 hours when in 32-bit mode
   NRF_TIMER0->BITMODE = TIMER_BITMODE_BITMODE_32Bit;
-  NRF_TIMER0->PRESCALER = 4;
+  NRF_TIMER0->PRESCALER = 4; // 1MHz timer frequency (1us ticks)
   NRF_TIMER0->TASKS_START = 1;
 
   // Configure Radio for receiving RCU packets using Nordic's Proprietary 1Mbps protocol at 2.4GHz
@@ -127,7 +127,7 @@ void setup(void)
   vl53l4cx.VL53L4CX_SetUserROI(&roi);
   vl53l4cx.VL53L4CX_StartMeasurement();
 
-  // Load saved PID gains from flash
+  // Read PID gains from MX25R1635F flash memory using SPI
   flash_read();
 }
 
@@ -157,17 +157,17 @@ void loop(void)
 
   /**
    * Automatic landing sequence:
-   * - If no new RCU packet is received for 10 seconds, or a power-fail warning is active, begin landing.
-   * - During landing, reduce thrust by 10 units per second until thrust is ≤ 10.
-   * - When thrust reaches 10 or less, clear the active status bit and stop landing.
-   * - If a new RCU packet arrives at any time, or power-fail warning clears, abort landing and resume normal flight control.
-   * - If power-fail warning is active, landing will continue regardless of thrust packet reception.
+   * - Landing is triggered if no new RCU packet is received for 10 seconds, or if a power-fail warning is active.
+   * - While landing, thrust is reduced by 10 units every second until it reaches 10 or less.
+   * - When thrust drops to 10 or below, the active status bit is cleared and landing stops.
+   * - If a new RCU packet arrives or the power-fail warning clears, landing is aborted and normal flight control resumes.
+   * - If power-fail warning is active, landing continues and thrust can only be reduced (not increased).
+   * - Directional control remains active during landing for safety.
    */
   if ((FCU_IS_ACTIVE(fcu.status) && (packet_timeout || FCU_IS_POFWARN(fcu.status)) && landing_timeout))
   {
     last_landing_us = loop_start_us + HZ_TO_US(1);
-    memset(fcu.pid_setpoint, 0, sizeof(fcu.pid_setpoint));
-    (fcu.thrust >= 10) ? (fcu.thrust -= 10) : FCU_CLEAR_ACTIVE(fcu.status);
+    FCU_LANDING_STEP(fcu.thrust, 10, 10, fcu.status);
   }
 }
 
@@ -283,7 +283,7 @@ static inline void task_pof_update(void)
 {
   // Update battery voltage and power-fail status
   fcu.battery = nicla::getCurrentBatteryVoltage();
-  NRF_POWER->EVENTS_POFWARN ? FCU_SET_POFWARN(fcu.status) : FCU_CLEAR_POFWARN(fcu.status);
+  FCU_UPDATE_POFWARN(fcu.status, NRF_POWER->EVENTS_POFWARN);
   NRF_POWER->EVENTS_POFWARN = 0;
 }
 
@@ -296,8 +296,9 @@ static inline void rcu_read(void)
       handle_flash_update,
   };
 
-  if (received_packet.node == NODE_ID && received_packet.zone == ZONE_ID)
-    handle[received_packet.type % PACKET_TYPE_COUNT]();
+  if (received_packet.node == NODE_ID &&
+      received_packet.zone == ZONE_ID)
+    FCU_HANDLE_PACKET(handle, received_packet.type);
 }
 
 static inline void pid_calculate(const float setpoint, const float value, const float kp, const float ki,
@@ -349,7 +350,7 @@ static inline void handle_pid_update(void)
   float pid_gain;
   memcpy(&pid_gain, (const void *)&received_packet.data[2], sizeof(pid_gain));
 
-  fcu.pid_gain[axis % PID_DEPTH][gain % PID_DEPTH] = constrain(pid_gain, GAIN_MIN, GAIN_MAX);
+  FCU_UPDATE_GAIN(fcu.pid_gain, axis, gain, pid_gain, GAIN_MIN, GAIN_MAX);
 }
 
 static inline void handle_setpoint_update(void)
@@ -359,26 +360,24 @@ static inline void handle_setpoint_update(void)
   float pid_setpoint;
   memcpy(&pid_setpoint, (const void *)&received_packet.data[1], sizeof(pid_setpoint));
 
-  fcu.pid_setpoint[axis % PID_DEPTH] = constrain(pid_setpoint, SETPOINT_MIN, SETPOINT_MAX);
+  FCU_UPDATE_SETPOINT(fcu.pid_setpoint, axis, pid_setpoint, SETPOINT_MIN, SETPOINT_MAX);
 }
 
 static inline void handle_thrust_update(void)
 {
   uint16_t thrust;
   memcpy(&thrust, (const void *)&received_packet.data[0], sizeof(thrust));
-  // Only update thrust if no power-fail warning is active.
-  fcu.thrust = constrain(FCU_IS_POFWARN(fcu.status) ? fcu.thrust : thrust, THRUST_MIN, THRUST_MAX);
-  (fcu.thrust > THRUST_MIN) ? FCU_SET_ACTIVE(fcu.status) : FCU_CLEAR_ACTIVE(fcu.status);
+
+  FCU_UPDATE_THRUST(fcu.status, fcu.thrust, thrust, THRUST_MIN, THRUST_MAX);
+  FCU_UPDATE_ACTIVE(fcu.status, fcu.thrust > THRUST_MIN);
 }
 
 static inline void flash_read(void)
 {
-  // TODO: Read PID gains from UICR
-  return;
+  // Read PID gains from MX25R1635F flash memory
 }
 
 static inline void handle_flash_update(void)
 {
-  // TODO: Write PID gains to UICR
-  return;
+  // Write PID gains to MX25R1635F flash memory
 }

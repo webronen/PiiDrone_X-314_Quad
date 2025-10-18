@@ -8,6 +8,7 @@
 #define ZONE_ID 0
 
 #include <nrf.h>
+#include <nrf_spi.h>
 #include <Nicla_System.h>
 
 #include <sensors/SensorXYZ.h>
@@ -84,10 +85,27 @@ VL53L4CX vl53l4cx(&Wire, NC);
 #define FCU_IS_ACTIVE(status) (status & FCU_STATUS_ACTIVE)
 #define FCU_SET_ACTIVE(status) (status |= FCU_STATUS_ACTIVE)
 #define FCU_CLEAR_ACTIVE(status) (status &= ~FCU_STATUS_ACTIVE)
+#define FCU_UPDATE_ACTIVE(status, cond) ((cond) ? FCU_SET_ACTIVE(status) : FCU_CLEAR_ACTIVE(status))
 
 #define FCU_IS_POFWARN(status) (status & FCU_STATUS_POFWARN)
 #define FCU_SET_POFWARN(status) (status |= FCU_STATUS_POFWARN)
 #define FCU_CLEAR_POFWARN(status) (status &= ~FCU_STATUS_POFWARN)
+#define FCU_UPDATE_POFWARN(status, cond) ((cond) ? FCU_SET_POFWARN(status) : FCU_CLEAR_POFWARN(status))
+
+#define FCU_LANDING_STEP(thrust_var, threshold, step, status) \
+  ((thrust_var) >= (threshold) ? ((thrust_var) -= (step)) : FCU_CLEAR_ACTIVE(status))
+
+#define FCU_HANDLE_PACKET(handle_array, type) \
+  (handle_array[(type) % PACKET_TYPE_COUNT]())
+
+#define FCU_UPDATE_GAIN(gain_array, axis, gain_idx, value, min, max) \
+  (gain_array[(axis) % PID_DEPTH][(gain_idx) % PID_DEPTH] = constrain((value), (min), (max)))
+
+#define FCU_UPDATE_SETPOINT(setpoint_array, axis, value, min, max) \
+  (setpoint_array[(axis) % PID_DEPTH] = constrain((value), (min), (max)))
+
+#define FCU_UPDATE_THRUST(status, thrust_var, new_thrust, min, max) \
+  (thrust_var = constrain(FCU_IS_POFWARN(status) ? ((new_thrust < thrust_var) ? new_thrust : thrust_var) : new_thrust, (min), (max)))
 
 #define ACCELEROMETER_HZ 400
 #define ACCELEROMETER_LATENCY 1
