@@ -1,20 +1,23 @@
 /**
- * Event Polling Approach:
+ * FCU-Centered Non-blocking Event Polling Approach:
  *
- * This code uses event polling in the main control loop to handle hardware events
- * such as radio packet reception and power-fail warnings. Instead of relying on
- * interrupt service routines (ISRs), all event flags are checked and processed
- * sequentially within the main loop.
+ * This firmware uses a non-blocking, polling-based architecture where all flight control unit (FCU) state updates,
+ * event handling, and safety checks are performed centrally in the main control loop. Instead of relying on
+ * interrupt service routines (ISRs), all hardware event flags—such as radio packet reception, power-fail warnings,
+ * and sensor updates—are checked and processed sequentially within the loop, without blocking the execution flow.
  *
- * Benefits over ISR-based design:
- * - Simpler code flow: All logic is centralized in the main loop, making it easier to follow and debug.
- * - No concurrency issues: Avoids race conditions and shared data problems between ISRs and main code.
- * - Predictable timing: Control over the order and timing of all actions, which is important for real-time systems.
- * - Easier maintenance: No need to manage interrupt priorities or context switches.
- * - Full control: The main loop can prioritize tasks and events as needed, and all state changes are explicit.
+ * Benefits:
+ * - Centralized State Management: All critical state (thrust, setpoints, PID gains, status flags) is updated in one place,
+ *   making system behavior predictable and easy to reason about.
+ * - Non-blocking: The main loop never waits for events, ensuring all tasks and checks run at high frequency.
+ * - Simpler Code Flow: Logic is not fragmented across ISRs and callbacks, reducing complexity and risk of subtle bugs.
+ * - No Concurrency Issues: All state changes happen in the main loop, avoiding race conditions and data sharing problems.
+ * - Deterministic Timing: The order and timing of all actions are controlled, which is important for real-time flight control.
+ * - Easier Debugging and Maintenance: The main loop acts as the “center” of the system, making it straightforward to trace and modify behavior.
+ * - Full Control: The main loop can prioritize tasks and events as needed, and all state changes are explicit.
  *
- * This approach is well-suited for high-frequency control loops (such as drones),
- * where the loop runs fast enough to respond to events promptly without missing critical updates.
+ * This approach is well-suited for high-frequency control loops (such as drones), where the loop runs fast enough
+ * to respond to events promptly without missing critical updates, while keeping the codebase robust and maintainable.
  */
 
 #include "main.h"
