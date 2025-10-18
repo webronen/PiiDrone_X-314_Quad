@@ -3,12 +3,10 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-// #define DEBUG
 #define NODE_ID 1
 #define ZONE_ID 0
 
 #include <nrf.h>
-#include <nrf_spi.h>
 #include <Nicla_System.h>
 
 #include <sensors/SensorXYZ.h>
@@ -130,17 +128,6 @@ VL53L4CX vl53l4cx(&Wire, NC);
 
 #define QUATERNION_HZ 400
 #define QUATERNION_LATENCY 1
-
-#ifdef DEBUG
-#define DEBUG_FUNC_TIME_START()     \
-  NRF_TIMER0->TASKS_CAPTURE[1] = 1; \
-  uint32_t __start_us = NRF_TIMER0->CC[1];
-
-#define DEBUG_FUNC_TIME_END(msg)         \
-  NRF_TIMER0->TASKS_CAPTURE[2] = 1;      \
-  uint32_t __end_us = NRF_TIMER0->CC[2]; \
-  printf("%s: %lu us\n", msg, (__end_us - __start_us));
-#endif
 
 typedef struct __attribute__((packed, aligned(1)))
 {

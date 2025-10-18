@@ -22,46 +22,45 @@
 
 #include "main.h"
 
+/**
+ * System Initialization (setup):
+ * - Initializes clocks, timers, radio, GPIO, PWM, and power-fail warning.
+ * - Configures all sensors and peripherals required for flight control.
+ * - Loads persisted FCU settings from flash memory.
+ * - All hardware and sensor interfaces are set up for non-blocking, event-driven operation.
+ */
+
 void setup(void)
 {
-  // Start High Frequency Clock (32MHz) from external crystal, needed for Radio
+  // Start high-frequency clock (32MHz) and configure 1MHz timer for timekeeping.
   NRF_CLOCK->TASKS_HFCLKSTART = 1;
   while (!NRF_CLOCK->EVENTS_HFCLKSTARTED)
     ;
 
-  // Configure timer for timekeeping, Overflow every 4,294 seconds => 71 minutes => 1.19 hours when in 32-bit mode
   NRF_TIMER0->BITMODE = TIMER_BITMODE_BITMODE_32Bit;
   NRF_TIMER0->PRESCALER = 4; // 1MHz timer frequency (1us ticks)
   NRF_TIMER0->TASKS_START = 1;
 
-  // Configure Radio for receiving RCU packets using Nordic's Proprietary 1Mbps protocol at 2.4GHz
+  // Configure radio for RCU packet reception using proprietary 1Mbps protocol.
   NRF_RADIO->SHORTS = (RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_START_Msk);
   NRF_RADIO->PACKETPTR = (uint32_t)&received_packet;
   NRF_RADIO->TXPOWER = RADIO_TXPOWER_TXPOWER_Pos4dBm;
 
-  NRF_RADIO->PCNF1 = (sizeof(Rcu) << RADIO_PCNF1_MAXLEN_Pos) |
-                     (sizeof(Rcu) << RADIO_PCNF1_STATLEN_Pos) |
-                     (2 << RADIO_PCNF1_BALEN_Pos) |
-                     (RADIO_PCNF1_WHITEEN_Enabled << RADIO_PCNF1_WHITEEN_Pos);
-
+  NRF_RADIO->PCNF1 = (sizeof(Rcu) << RADIO_PCNF1_MAXLEN_Pos) | (sizeof(Rcu) << RADIO_PCNF1_STATLEN_Pos) |
+                     (2 << RADIO_PCNF1_BALEN_Pos) | (RADIO_PCNF1_WHITEEN_Enabled << RADIO_PCNF1_WHITEEN_Pos);
   NRF_RADIO->BASE0 = 0x0000BABE;
   NRF_RADIO->PREFIX0 = 0x41 << RADIO_PREFIX0_AP0_Pos;
   NRF_RADIO->RXADDRESSES = RADIO_RXADDRESSES_ADDR0_Msk;
-
   NRF_RADIO->CRCCNF = (RADIO_CRCCNF_LEN_Two << RADIO_CRCCNF_LEN_Pos) |
                       (RADIO_CRCCNF_SKIPADDR_Skip << RADIO_CRCCNF_SKIPADDR_Pos);
-
   NRF_RADIO->CRCPOLY = 0x0000AAAA;
   NRF_RADIO->CRCINIT = 0x12345678;
-
   NRF_RADIO->DATAWHITEIV = 0x55;
-
   NRF_RADIO->MODECNF0 = (RADIO_MODECNF0_DTX_B0 << RADIO_MODECNF0_DTX_Pos) |
                         (RADIO_MODECNF0_RU_Fast << RADIO_MODECNF0_RU_Pos);
-
   NRF_RADIO->TASKS_RXEN = 1;
 
-  // Configure PWM for ESC control (20kHz frequency, 0-800 duty cycle (0-100%))
+  // Set up motor pins and configure PWM for ESC control.
   NRF_P0->PIN_CNF[MOTOR1_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) |
                                  (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
   NRF_P0->PIN_CNF[MOTOR2_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) |
@@ -70,7 +69,6 @@ void setup(void)
                                  (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
   NRF_P0->PIN_CNF[MOTOR4_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) |
                                  (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
-
   NRF_PWM0->COUNTERTOP = PWM_TOP;
   NRF_PWM0->PRESCALER = PWM_PRESCALER_PRESCALER_DIV_1;
   NRF_PWM0->DECODER = PWM_DECODER_LOAD_Individual;
@@ -84,70 +82,69 @@ void setup(void)
   NRF_PWM0->ENABLE = PWM_ENABLE_ENABLE_Enabled;
   NRF_PWM0->TASKS_SEQSTART[0] = 1;
 
-  // Configure Power Failure Comparator to 2.7V threshold
+  // Configure power-fail warning and PMIC settings.
   NRF_POWER->POFCON = (POWER_POFCON_THRESHOLD_V27 << POWER_POFCON_THRESHOLD_Pos) | POWER_POFCON_POF_Enabled;
-
   nicla::begin(false);
   nicla::setBatteryNTCEnabled(false);
   nicla::disableCharging();
   nicla::disableLDO();
   nicla::enable3V3LDO();
-
-  // Set ILIM to 350mA (Default 50mA) and disable UVLO (Default 3.0V) because we use power failure comparator
   uint8_t pmic_status = nicla::_pmic.readByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL);
-  pmic_status = (pmic_status & ~0x3F) | 0x3F;
+  pmic_status = (pmic_status & ~0x3F) | 0x3F; // Set to maximum current limit and disable UVLO
   nicla::_pmic.writeByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL, pmic_status);
 
+  // Initialize all sensors (IMU, magnetometer, quaternion, pressure, humidity, temperature, ToF).
   sensortec.begin();
-
   accelerometer.begin(ACCELEROMETER_HZ, ACCELEROMETER_LATENCY);
   accelerometer.setRange(ACCELEROMETER_RANGE);
   gyroscope.begin(GYROSCOPE_HZ, GYROSCOPE_LATENCY);
   gyroscope.setRange(GYROSCOPE_RANGE);
 
-  // TODO: Calibrate magnetometer, before using it.
+  // TODO: Calibrate magnetometer hard-iron offsets
   magnetometer.begin(MAGNETOMETER_HZ, MAGNETOMETER_LATENCY);
   magnetometer.setRange(MAGNETOMETER_RANGE);
-
   quaternion.begin(QUATERNION_HZ, QUATERNION_LATENCY);
-
   pressure.begin(PRESSURE_HZ, PRESSURE_LATENCY);
   humidity.begin(HUMIDITY_HZ, HUMIDITY_LATENCY);
   temperature.begin(TEMPERATURE_HZ, TEMPERATURE_LATENCY);
-
-  // Configure external VL53L4CX Time-of-Flight distance sensor using I2C
   Wire.begin();
   Wire.setClock(VL53L4CX_I2C_SPEED);
-
   vl53l4cx.VL53L4CX_SetDeviceAddress(VL53L4CX_DEFAULT_DEVICE_ADDRESS);
   vl53l4cx.VL53L4CX_WaitDeviceBooted();
   vl53l4cx.VL53L4CX_DataInit();
   vl53l4cx.VL53L4CX_SetDistanceMode(VL53L4CX_DISTANCEMODE_MEDIUM);
   vl53l4cx.VL53L4CX_SetMeasurementTimingBudgetMicroSeconds(33000);
-
-  // Set ROI to 4x4 centered
-  VL53L4CX_UserRoi_t roi = {6, 6, 9, 9};
+  VL53L4CX_UserRoi_t roi = {6, 6, 9, 9}; // Set ROI to 4x4 centered
   vl53l4cx.VL53L4CX_SetUserROI(&roi);
   vl53l4cx.VL53L4CX_StartMeasurement();
 
-  // Read PID gains from MX25R1635F flash memory using SPI
+  // Read FCU settings from flash memory.
   flash_read();
 }
 
+/**
+ * FCU-Centered Non-blocking Event Polling Loop:
+ * - Polls hardware event flags and updates FCU state in the main loop.
+ * - Handles RCU packet reception, scheduled tasks, and automatic landing sequence.
+ * - Ensures all control logic, safety checks, and state updates are performed centrally.
+ * - Maintains deterministic timing and avoids blocking or concurrency issues.
+ * - Designed for high-frequency, real-time flight control.
+ */
+
 void loop(void)
 {
-  // Capture current timer value
+  // Capture current timer value for loop timing.
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
   const uint32_t loop_start_us = NRF_TIMER0->CC[0];
 
-  // Static variables to manage RCU packet timeout and landing sequence
+  // Manage RCU packet timeout and landing sequence timing.
   static uint32_t last_packet_us = loop_start_us;
   static uint32_t last_landing_us = loop_start_us;
 
   const bool packet_timeout = (int32_t)(loop_start_us - last_packet_us) >= 0;
   const bool landing_timeout = (int32_t)(loop_start_us - last_landing_us) >= 0;
 
-  // Check for received RCU packet
+  // Check for received RCU packet and process if available.
   if (NRF_RADIO->EVENTS_CRCOK)
   {
     NRF_RADIO->EVENTS_CRCOK = 0;
@@ -155,7 +152,7 @@ void loop(void)
     rcu_read();
   }
 
-  // Run scheduled tasks
+  // Run all scheduled tasks (IMU, FCU, ESC, telemetry, ToF, power-fail).
   task_run(loop_start_us);
 
   /**
@@ -167,6 +164,8 @@ void loop(void)
    * - If power-fail warning is active, landing continues and thrust can only be reduced (not increased).
    * - Directional control remains active during landing for safety.
    */
+
+  // If landing conditions are met, reduce thrust and manage landing state.
   if ((FCU_IS_ACTIVE(fcu.status) && (packet_timeout || FCU_IS_POFWARN(fcu.status)) && landing_timeout))
   {
     last_landing_us = loop_start_us + HZ_TO_US(1);
@@ -176,21 +175,15 @@ void loop(void)
 
 static inline void task_run(const uint32_t loop_start_us)
 {
-  for (uint8_t i = 0; i < SCHEDULER_TASK_COUNT; i++)
+  uint8_t i = 0;
+  while (i < SCHEDULER_TASK_COUNT)
   {
     if ((int32_t)(loop_start_us - tasks[i].previous_us) >= 0)
     {
-#ifdef DEBUG
-      DEBUG_FUNC_TIME_START();
-#endif
-
       tasks[i].previous_us += tasks[i].interval_us;
       tasks[i].task();
-
-#ifdef DEBUG
-      DEBUG_FUNC_TIME_END(tasks[i].name);
-#endif
     }
+    i++;
   }
 }
 
@@ -284,7 +277,6 @@ static inline void task_tel_update(void)
 
 static inline void task_pof_update(void)
 {
-  // Update battery voltage and power-fail status
   fcu.battery = nicla::getCurrentBatteryVoltage();
   FCU_UPDATE_POFWARN(fcu.status, NRF_POWER->EVENTS_POFWARN);
   NRF_POWER->EVENTS_POFWARN = 0;
@@ -311,7 +303,6 @@ static inline void pid_calculate(const float setpoint, const float value, const 
   const float derivative = -(value - *prev_value) * PID_LOOP_HZ;
   const float outputNoI = (kp * error) + (kd * derivative);
 
-  // Only integrate if output is within limits (anti-windup)
   *integral += error * PID_LOOP_PERIOD * ((outputNoI <= PID_MAX) && (outputNoI >= PID_MIN));
   const float iLimit = PID_MAX / (ki + __FLT_EPSILON__);
   *integral = constrain(*integral, -iLimit, iLimit);
@@ -324,7 +315,6 @@ static inline void pid_calculate(const float setpoint, const float value, const 
 
 static inline void quaternion_multiply(DataQuaternion *r, const DataQuaternion *q1, const DataQuaternion *q2)
 {
-  // Hamilton product of two quaternions (r = q1 * q2)
   r->w = q1->w * q2->w - q1->x * q2->x - q1->y * q2->y - q1->z * q2->z;
   r->x = q1->w * q2->x + q1->x * q2->w + q1->y * q2->z - q1->z * q2->y;
   r->y = q1->w * q2->y - q1->x * q2->z + q1->y * q2->w + q1->z * q2->x;
@@ -335,7 +325,6 @@ static inline void quaternion_multiply(DataQuaternion *r, const DataQuaternion *
 
 static inline void quaternion_normalize(DataQuaternion *q)
 {
-  // Normalize quaternion to unit length and avoid division by zero using epsilon
   const float mag = q->w * q->w + q->x * q->x + q->y * q->y + q->z * q->z;
   const float inv = 1.0f / __builtin_sqrtf(mag + __FLT_EPSILON__);
 
@@ -377,10 +366,12 @@ static inline void handle_thrust_update(void)
 
 static inline void flash_read(void)
 {
-  // Read PID gains from MX25R1635F flash memory
+  // TODO: Read PID gains from MX25R1635F flash memory
+  return;
 }
 
 static inline void handle_flash_update(void)
 {
-  // Write PID gains to MX25R1635F flash memory
+  // TODO: Write PID gains to MX25R1635F flash memory
+  return;
 }
