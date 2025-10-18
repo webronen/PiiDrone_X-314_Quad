@@ -92,20 +92,20 @@ VL53L4CX vl53l4cx(&Wire, NC);
 #define FCU_CLEAR_POFWARN(status) (status &= ~FCU_STATUS_POFWARN)
 #define FCU_UPDATE_POFWARN(status, cond) ((cond) ? FCU_SET_POFWARN(status) : FCU_CLEAR_POFWARN(status))
 
-#define FCU_LANDING_STEP(thrust_var, threshold, step, status) \
-  ((thrust_var) >= (threshold) ? ((thrust_var) -= (step)) : FCU_CLEAR_ACTIVE(status))
+#define FCU_LANDING_STEP(thrust, threshold, step, status) \
+  ((thrust) >= (threshold) ? ((thrust) -= (step)) : FCU_CLEAR_ACTIVE(status))
 
-#define FCU_HANDLE_PACKET(handle_array, type) \
-  (handle_array[(type) % PACKET_TYPE_COUNT]())
+#define FCU_HANDLE_PACKET(handler_array, packet_type) \
+  (handler_array[(packet_type) % PACKET_TYPE_COUNT]())
 
-#define FCU_UPDATE_GAIN(gain_array, axis, gain_idx, value, min, max) \
-  (gain_array[(axis) % PID_DEPTH][(gain_idx) % PID_DEPTH] = constrain((value), (min), (max)))
+#define FCU_UPDATE_GAIN(gain_array, axis, gain, value, min, max) \
+  (gain_array[(axis) % PID_DEPTH][(gain) % PID_DEPTH] = constrain((value), (min), (max)))
 
 #define FCU_UPDATE_SETPOINT(setpoint_array, axis, value, min, max) \
   (setpoint_array[(axis) % PID_DEPTH] = constrain((value), (min), (max)))
 
-#define FCU_UPDATE_THRUST(status, thrust_var, new_thrust, min, max) \
-  (thrust_var = constrain(FCU_IS_POFWARN(status) ? ((new_thrust < thrust_var) ? new_thrust : thrust_var) : new_thrust, (min), (max)))
+#define FCU_UPDATE_THRUST(status, thrust, value, min, max) \
+  (thrust = constrain(FCU_IS_POFWARN(status) ? ((value) < (thrust) ? (value) : (thrust)) : (value), (min), (max)))
 
 #define ACCELEROMETER_HZ 400
 #define ACCELEROMETER_LATENCY 1
