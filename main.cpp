@@ -445,7 +445,7 @@ static inline void flash_read(void)
   NRF_SPIM0->ENABLE = SPIM_ENABLE_ENABLE_Disabled;
 }
 
-void flash_read_id(void)
+static inline void flash_read_id(void)
 {
   static uint8_t tx_buf[1] = {FLASH_RDID_CMD};
   static uint8_t rx_buf[4] = {0};
@@ -466,7 +466,7 @@ void flash_read_id(void)
   FLASH_CS_HIGH();
 }
 
-uint8_t flash_read_status(void)
+static inline uint8_t flash_read_status(void)
 {
   static uint8_t tx_buf[1] = {FLASH_RDSR_CMD};
   static uint8_t rx_buf[2] = {0};
@@ -490,7 +490,7 @@ uint8_t flash_read_status(void)
   return status;
 }
 
-bool flash_write_enable(void)
+static inline bool flash_write_enable(void)
 {
   static uint8_t tx_buf[1] = {FLASH_WREN_CMD};
 
@@ -513,7 +513,7 @@ bool flash_write_enable(void)
   return (status & 0x02) != 0;
 }
 
-bool flash_wait_ready(void)
+static inline bool flash_wait_ready(void)
 {
   uint32_t timeout = 1000000;
   while ((flash_read_status() & 0x01) && timeout--)
@@ -550,7 +550,7 @@ bool flash_erase(const uint32_t addr)
   return flash_wait_ready();
 }
 
-bool flash_write(void)
+static inline bool flash_write(void)
 {
   if (!flash_write_enable())
     return false;
