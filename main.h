@@ -224,7 +224,7 @@ static Task tasks[SCHEDULER_TASK_COUNT] = {
     {"TEL", task_tel_update, HZ_TO_US(3), 0},
     {"POF", task_pof_update, HZ_TO_US(2), 0}};
 
-// Packet handler function prototypes
+// Handler function prototypes
 static inline void handle_pid_update(void);
 static inline void handle_setpoint_update(void);
 static inline void handle_thrust_update(void);
@@ -244,11 +244,11 @@ static inline void quaternion_multiply(DataQuaternion *result, const DataQuatern
 static inline void quaternion_normalize(DataQuaternion *q);
 static inline void flash_read(void);
 
-void flash_read_id(void);
-uint8_t flash_read_status(void);
-bool flash_write_enable(void);
-bool flash_wait_ready(void);
-bool flash_erase(const uint32_t addr);
-bool flash_write(void);
+static inline void flash_read_id(void);
+static inline uint8_t flash_read_status(void);
+static inline bool flash_write_enable(void);
+static inline bool flash_wait_ready(void);
+static inline bool flash_erase(const uint32_t addr);
+static inline bool flash_write(void);
 
 #endif // MAIN_H
