@@ -242,6 +242,7 @@ static inline void quaternion_multiply(DataQuaternion *result, const DataQuatern
 static inline void quaternion_normalize(DataQuaternion *q);
 static inline void flash_read(void);
 
+static inline void flash_spim_init(void);
 static inline void flash_read_id(void);
 static inline uint8_t flash_read_status(void);
 static inline bool flash_write_enable(void);

@@ -351,19 +351,8 @@ static inline void handle_thrust_update(void)
   FCU_UPDATE_ACTIVE(fcu.status, fcu.thrust > THRUST_MIN);
 }
 
-static inline void handle_flash_update(void)
+static inline void flash_spim_init(void)
 {
-  /**
-   * Prepare SPI transaction to write flash memory starting from FLASH_FCU_ADDR
-   * 1 . Send WRITE ENABLE command
-   * 2 . Send PAGE PROGRAM command followed by 3-byte (24-bit) address
-   * 3 . Erase relevant flash sector before writing
-   * 4 . Wait for write to complete by polling WIP bit in status register
-   * 5 . Reset system to apply new settings
-   *
-   * Note: Writing to flash memory is slow and blocking. This function should be used sparingly,
-   * ideally only when settings need to be persisted after significant changes.
-   */
   NRF_SPIM0->ENABLE = SPIM_ENABLE_ENABLE_Disabled;
   NRF_P0->PIN_CNF[FLASH_CS_PIN] = (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos) |
                                   (GPIO_PIN_CNF_DRIVE_S0S1 << GPIO_PIN_CNF_DRIVE_Pos) |
@@ -378,7 +367,23 @@ static inline void handle_flash_update(void)
                       (SPIM_CONFIG_CPHA_Leading << SPIM_CONFIG_CPHA_Pos) |
                       (SPIM_CONFIG_CPOL_ActiveHigh << SPIM_CONFIG_CPOL_Pos);
   NRF_SPIM0->ENABLE = SPIM_ENABLE_ENABLE_Enabled;
+}
 
+static inline void handle_flash_update(void)
+{
+  /**
+   * Prepare SPI transaction to write flash memory starting from FLASH_FCU_ADDR
+   * 1. Send WRITE ENABLE command
+   * 2. Send PAGE PROGRAM command followed by 3-byte (24-bit) address
+   * 3. Erase relevant flash sector before writing
+   * 4. Wait for write to complete by polling WIP bit in status register
+   * 5. Reset system to clear state and reload settings from flash on next boot
+   *
+   * Note: Writing to flash memory is slow and blocking. This function should be used sparingly,
+   * ideally only when settings need to be persisted after significant changes.
+   */
+
+  flash_spim_init();
   memcpy(&flash.pid_gain, &fcu.pid_gain, sizeof(fcu.pid_gain));
   flash_erase(FLASH_FCU_ADDR);
   flash_write();
@@ -391,30 +396,17 @@ static inline void flash_read(void)
 {
   /**
    * Prepare SPI transaction to read flash memory starting from FLASH_FCU_ADDR
-   * 1 . Send READ command followed by 3-byte (24-bit) address
-   * 2 . Read back data into rx_buf
-   * 3 . Copy rx_buf into flash structure
-   * 4 . Copy PID gains into FCU structure from flash structure
-   * 5 . Copy other relevant data as needed
+   * 1. Send READ command followed by 3-byte (24-bit) address
+   * 2. Read back data into rx_buf
+   * 3. Copy rx_buf into flash structure
+   * 4. Copy PID gains into FCU structure from flash structure
+   * 5. Copy other relevant data as needed
    *
    * Note: The first 5 bytes of rx_buf are command and address bytes
    * we need to skip them to get to the actual data.
    */
 
-  NRF_SPIM0->ENABLE = SPIM_ENABLE_ENABLE_Disabled;
-  NRF_P0->PIN_CNF[FLASH_CS_PIN] = (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos) |
-                                  (GPIO_PIN_CNF_DRIVE_S0S1 << GPIO_PIN_CNF_DRIVE_Pos) |
-                                  (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos) |
-                                  (GPIO_PIN_CNF_PULL_Disabled << GPIO_PIN_CNF_PULL_Pos);
-  NRF_P0->OUTSET = (1UL << FLASH_CS_PIN);
-  NRF_SPIM0->PSEL.SCK = FLASH_SCK_PIN;
-  NRF_SPIM0->PSEL.MOSI = FLASH_MOSI_PIN;
-  NRF_SPIM0->PSEL.MISO = FLASH_MISO_PIN;
-  NRF_SPIM0->FREQUENCY = SPIM_FREQUENCY_FREQUENCY_M8;
-  NRF_SPIM0->CONFIG = (SPIM_CONFIG_ORDER_MsbFirst << SPIM_CONFIG_ORDER_Pos) |
-                      (SPIM_CONFIG_CPHA_Leading << SPIM_CONFIG_CPHA_Pos) |
-                      (SPIM_CONFIG_CPOL_ActiveHigh << SPIM_CONFIG_CPOL_Pos);
-  NRF_SPIM0->ENABLE = SPIM_ENABLE_ENABLE_Enabled;
+  flash_spim_init();
 
   static uint8_t tx_buf[5] = {
       (uint8_t)FLASH_READ_CMD,
