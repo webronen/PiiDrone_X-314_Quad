@@ -7,8 +7,10 @@
 #define ZONE_ID 0
 
 #include <nrf.h>
+#include <nrf_delay.h>
 #include <Nicla_System.h>
 
+#include <common.h>
 #include <sensors/SensorXYZ.h>
 SensorXYZ accelerometer(BHY2_SENSOR_ID_ACC);
 SensorXYZ gyroscope(BHY2_SENSOR_ID_GYRO);
@@ -37,8 +39,8 @@ VL53L4CX vl53l4cx(&Wire, NC);
 #define HZ_TO_US(Hz) ((uint32_t)(1000000.0f / (Hz)))
 #define VL53L4CX_I2C_SPEED 400000 // 400kHz
 
-#define PWM_BASE_CLOCK 16000000UL
-#define PWM_FREQUENCY 20000UL
+#define PWM_BASE_CLOCK 16000000UL // 16 MHz
+#define PWM_FREQUENCY 20000UL     // 20 kHz
 #define PWM_TOP (PWM_BASE_CLOCK / PWM_FREQUENCY)
 
 #define PID_LOOP_HZ 211.0f
@@ -73,9 +75,8 @@ VL53L4CX vl53l4cx(&Wire, NC);
 #define TYPE_TELEMETRY 4
 
 #define PID_DEPTH 3
-#define PID_FILE_ID 0
-#define PID_FILE_KEY 0
 #define PID_FILE_WORDS (PID_DEPTH * 3)
+#define PID_FILE_BYTES (PID_FILE_WORDS * 4)
 
 #define FCU_STATUS_ACTIVE (1U << 0)
 #define FCU_STATUS_POFWARN (1U << 1)
@@ -93,9 +94,6 @@ VL53L4CX vl53l4cx(&Wire, NC);
 #define FCU_LANDING_STEP(thrust, threshold, step, status) \
   ((thrust) >= (threshold) ? ((thrust) -= (step)) : FCU_CLEAR_ACTIVE(status))
 
-#define FCU_HANDLE_PACKET(handler_array, packet_type) \
-  (handler_array[(packet_type) % PACKET_TYPE_COUNT]())
-
 #define FCU_UPDATE_GAIN(gain_array, axis, gain, value, min, max) \
   (gain_array[(axis) % PID_DEPTH][(gain) % PID_DEPTH] = constrain((value), (min), (max)))
 
@@ -104,6 +102,21 @@ VL53L4CX vl53l4cx(&Wire, NC);
 
 #define FCU_UPDATE_THRUST(status, thrust, value, min, max) \
   (thrust = constrain(FCU_IS_POFWARN(status) ? ((value) < (thrust) ? (value) : (thrust)) : (value), (min), (max)))
+
+#define FLASH_SCK_PIN 3
+#define FLASH_MOSI_PIN 4
+#define FLASH_MISO_PIN 5
+#define FLASH_CS_PIN 26
+#define FLASH_WREN_CMD 0x06
+#define FLASH_WRDI_CMD 0x04
+#define FLASH_READ_CMD 0x0B
+#define FLASH_WRITE_CMD 0x02
+#define FLASH_RDSR_CMD 0x05
+#define FLASH_SE_CMD 0x20
+#define FLASH_RDID_CMD 0x9F
+#define FLASH_FCU_ADDR 0x000000
+#define FLASH_CS_LOW() (NRF_P0->OUTCLR = (1UL << FLASH_CS_PIN))
+#define FLASH_CS_HIGH() (NRF_P0->OUTSET = (1UL << FLASH_CS_PIN))
 
 #define ACCELEROMETER_HZ 400
 #define ACCELEROMETER_LATENCY 1
@@ -129,7 +142,7 @@ VL53L4CX vl53l4cx(&Wire, NC);
 #define QUATERNION_HZ 400
 #define QUATERNION_LATENCY 1
 
-typedef struct __attribute__((packed, aligned(1)))
+typedef struct __attribute__((packed, aligned(4)))
 {
   float pid_gain[PID_DEPTH][PID_DEPTH];
   float pid_setpoint[PID_DEPTH];
@@ -145,7 +158,7 @@ typedef struct __attribute__((packed, aligned(1)))
 
 static_assert(sizeof(Fcu) == TELEMETRY_DATA_BYTES, "Fcu struct must be 252 bytes (63 words)");
 
-typedef struct __attribute__((packed, aligned(4)))
+typedef struct __attribute__((packed, aligned(2)))
 {
   uint16_t m1, m2, m3, m4;
 } Esc;
@@ -179,11 +192,22 @@ typedef struct __attribute__((packed, aligned(4)))
 
 static_assert(sizeof(Task) == 16, "Task struct must be 16 bytes (4 words)");
 
+typedef struct __attribute__((packed, aligned(4)))
+{
+  float pid_gain[PID_DEPTH][PID_DEPTH];
+  uint32_t reserved[53];
+} Flash;
+
+static_assert(sizeof(Flash) == 248, "Flash struct must be 248 bytes (62 words)");
+
+// Global utility instances
 static Fcu fcu = {0};
 static Esc esc = {0x8000, 0x8000, 0x8000, 0x8000};
 static volatile Rcu received_packet = {0};
 static Pid pid_state[3] = {0};
+static Flash flash = {0};
 
+// Task function prototypes
 static inline void task_imu_update(void);
 static inline void task_fcu_update(void);
 static inline void task_esc_update(void);
@@ -191,6 +215,7 @@ static inline void task_tof_update(void);
 static inline void task_tel_update(void);
 static inline void task_pof_update(void);
 
+// Scheduler task array
 static Task tasks[SCHEDULER_TASK_COUNT] = {
     {"IMU", task_imu_update, HZ_TO_US(401), 0},
     {"FCU", task_fcu_update, HZ_TO_US(211), 0},
@@ -199,17 +224,31 @@ static Task tasks[SCHEDULER_TASK_COUNT] = {
     {"TEL", task_tel_update, HZ_TO_US(3), 0},
     {"POF", task_pof_update, HZ_TO_US(2), 0}};
 
-static inline void task_run(const uint32_t loop_time_us);
+// Packet handler function prototypes
+static inline void handle_pid_update(void);
+static inline void handle_setpoint_update(void);
+static inline void handle_thrust_update(void);
+static inline void handle_flash_update(void);
+
+static void (*const handle_type[PACKET_TYPE_COUNT])(void) = {
+    handle_pid_update,
+    handle_setpoint_update,
+    handle_thrust_update,
+    handle_flash_update,
+};
+
+// Utility function prototypes
 static inline void pid_calculate(const float setpoint, const float value, const float kp, const float ki,
                                  const float kd, float *integral, float *prev_value, float *output);
 static inline void quaternion_multiply(DataQuaternion *result, const DataQuaternion *q1, const DataQuaternion *q2);
 static inline void quaternion_normalize(DataQuaternion *q);
 static inline void flash_read(void);
-static inline void rcu_read(void);
 
-static inline void handle_pid_update(void);
-static inline void handle_setpoint_update(void);
-static inline void handle_thrust_update(void);
-static inline void handle_flash_update(void);
+void flash_read_id(void);
+uint8_t flash_read_status(void);
+bool flash_write_enable(void);
+bool flash_wait_ready(void);
+bool flash_erase(const uint32_t addr);
+bool flash_write(void);
 
 #endif // MAIN_H
