@@ -57,8 +57,6 @@ VL53L4CX vl53l4cx(&Wire, NC);
 #define THRUST_MAX 800
 #define THRUST_MIN 0
 
-#define TELEMETRY_DATA_BYTES 252
-
 #define EMA_ALPHA 0.3f
 #define EMA_BETA (1.0f - EMA_ALPHA)
 
@@ -156,7 +154,7 @@ typedef struct __attribute__((packed, aligned(4)))
   uint8_t reserved[183];
 } Fcu;
 
-static_assert(sizeof(Fcu) == TELEMETRY_DATA_BYTES, "Fcu struct must be 252 bytes (63 words)");
+static_assert(sizeof(Fcu) == 252, "Fcu struct must be 252 bytes (63 words)");
 
 typedef struct __attribute__((packed, aligned(2)))
 {
@@ -170,10 +168,10 @@ typedef struct __attribute__((packed, aligned(1)))
   uint8_t node;
   uint8_t zone;
   uint8_t type;
-  uint8_t data[TELEMETRY_DATA_BYTES];
+  uint8_t data[252];
 } Rcu;
 
-static_assert(sizeof(Rcu) == 255, "Rcu struct must be 255 bytes");
+static_assert(sizeof(Rcu) == 255, "Rcu struct must be 255 bytes (63.75 words)");
 
 typedef struct __attribute__((packed, aligned(4)))
 {
