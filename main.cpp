@@ -225,6 +225,7 @@ static inline void task_esc_update(void)
     memset(pid_state, 0, sizeof(pid_state));
   }
 
+  // M1: Front-Right (CCW), M2: Front-Left (CW), M3: Rear-Right (CW), M4: Rear-Left (CCW)
   esc.m1 = 0x8000 | (uint16_t)constrain(fcu.thrust + pid_state[0].output - pid_state[1].output - pid_state[2].output, THRUST_MIN, THRUST_MAX);
   esc.m2 = 0x8000 | (uint16_t)constrain(fcu.thrust - pid_state[0].output - pid_state[1].output + pid_state[2].output, THRUST_MIN, THRUST_MAX);
   esc.m3 = 0x8000 | (uint16_t)constrain(fcu.thrust + pid_state[0].output + pid_state[1].output + pid_state[2].output, THRUST_MIN, THRUST_MAX);
@@ -351,7 +352,7 @@ static inline void handle_thrust_update(void)
   FCU_UPDATE_ACTIVE(fcu.status, fcu.thrust > THRUST_MIN);
 }
 
-static inline void flash_spim_init(void)
+static void flash_spim_init(void)
 {
   NRF_SPIM0->ENABLE = SPIM_ENABLE_ENABLE_Disabled;
   NRF_P0->PIN_CNF[FLASH_CS_PIN] = (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos) |
@@ -437,28 +438,7 @@ static inline void flash_read(void)
   NRF_SPIM0->ENABLE = SPIM_ENABLE_ENABLE_Disabled;
 }
 
-static inline void flash_read_id(void)
-{
-  static uint8_t tx_buf[1] = {FLASH_RDID_CMD};
-  static uint8_t rx_buf[4] = {0};
-
-  FLASH_CS_LOW();
-  nrf_delay_us(1);
-
-  NRF_SPIM0->TXD.PTR = (uint32_t)tx_buf;
-  NRF_SPIM0->TXD.MAXCNT = sizeof(tx_buf);
-  NRF_SPIM0->RXD.PTR = (uint32_t)rx_buf;
-  NRF_SPIM0->RXD.MAXCNT = sizeof(rx_buf);
-  NRF_SPIM0->TASKS_START = 1;
-
-  while (!NRF_SPIM0->EVENTS_END)
-    ;
-
-  NRF_SPIM0->EVENTS_END = 0;
-  FLASH_CS_HIGH();
-}
-
-static inline uint8_t flash_read_status(void)
+static uint8_t flash_read_status(void)
 {
   static uint8_t tx_buf[1] = {FLASH_RDSR_CMD};
   static uint8_t rx_buf[2] = {0};
@@ -482,7 +462,7 @@ static inline uint8_t flash_read_status(void)
   return status;
 }
 
-static inline bool flash_write_enable(void)
+static bool flash_write_enable(void)
 {
   static uint8_t tx_buf[1] = {FLASH_WREN_CMD};
 
@@ -505,7 +485,7 @@ static inline bool flash_write_enable(void)
   return (status & 0x02) != 0;
 }
 
-static inline bool flash_wait_ready(void)
+static bool flash_wait_ready(void)
 {
   uint32_t timeout = 1000000;
   while ((flash_read_status() & 0x01) && timeout--)
@@ -513,7 +493,7 @@ static inline bool flash_wait_ready(void)
   return timeout > 0;
 }
 
-bool flash_erase(const uint32_t addr)
+static inline bool flash_erase(const uint32_t addr)
 {
   if (!flash_write_enable())
     return false;
