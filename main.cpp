@@ -69,7 +69,7 @@ void setup(void)
                                  (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
   NRF_P0->PIN_CNF[MOTOR4_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) |
                                  (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
-  NRF_PWM0->COUNTERTOP = PWM_TOP;
+  NRF_PWM0->COUNTERTOP = MOTOR_MAX; // Set PWM period to match MOTOR_MAX for ESCs (0-800 range, 20kHz)
   NRF_PWM0->PRESCALER = PWM_PRESCALER_PRESCALER_DIV_1;
   NRF_PWM0->DECODER = PWM_DECODER_LOAD_Individual;
   NRF_PWM0->SEQ[0].PTR = (uint32_t)&esc;
@@ -218,6 +218,7 @@ static inline void task_fcu_update(void)
 
 static inline void task_esc_update(void)
 {
+  // If FCU is not active, reset thrust and setpoints/PID states for safety
   if (!FCU_IS_ACTIVE(fcu.status))
   {
     fcu.thrust = 0;
@@ -225,12 +226,33 @@ static inline void task_esc_update(void)
     memset(pid_state, 0, sizeof(pid_state));
   }
 
-  // M1: Front-Right (CCW), M2: Front-Left (CW), M3: Rear-Right (CW), M4: Rear-Left (CCW)
-  esc.m1 = 0x8000 | (uint16_t)constrain(fcu.thrust + pid_state[0].output - pid_state[1].output - pid_state[2].output, THRUST_MIN, THRUST_MAX);
-  esc.m2 = 0x8000 | (uint16_t)constrain(fcu.thrust - pid_state[0].output - pid_state[1].output + pid_state[2].output, THRUST_MIN, THRUST_MAX);
-  esc.m3 = 0x8000 | (uint16_t)constrain(fcu.thrust + pid_state[0].output + pid_state[1].output + pid_state[2].output, THRUST_MIN, THRUST_MAX);
-  esc.m4 = 0x8000 | (uint16_t)constrain(fcu.thrust - pid_state[0].output + pid_state[1].output - pid_state[2].output, THRUST_MIN, THRUST_MAX);
+  // Motor mixing: combine thrust and PID outputs for each motor (X quad configuration)
+  float m1 = fcu.thrust + pid_state[0].output - pid_state[1].output - pid_state[2].output; // M1: Front-right (CCW)
+  float m2 = fcu.thrust - pid_state[0].output - pid_state[1].output + pid_state[2].output; // M2: Front-left (CW)
+  float m3 = fcu.thrust + pid_state[0].output + pid_state[1].output + pid_state[2].output; // M3: Rear-right (CCW)
+  float m4 = fcu.thrust - pid_state[0].output + pid_state[1].output - pid_state[2].output; // M4: Rear-left (CW)
 
+  // Find min/max motor output to check for saturation
+  const float min_motor = __builtin_fminf(__builtin_fminf(m1, m2), __builtin_fminf(m3, m4));
+  const float max_motor = __builtin_fmaxf(__builtin_fmaxf(m1, m2), __builtin_fmaxf(m3, m4));
+
+  // Dynamically offset motor outputs to prevent saturation
+  float offset = (max_motor > MOTOR_MAX) ? (max_motor - MOTOR_MAX) : (min_motor < MOTOR_MIN) ? (min_motor - MOTOR_MIN)
+                                                                                             : 0.0f;
+
+  // Apply offset to all motors
+  m1 -= offset;
+  m2 -= offset;
+  m3 -= offset;
+  m4 -= offset;
+
+  // Update ESC PWM values with constrained motor outputs and apply inverted signal flag (0x8000)
+  esc.m1 = 0x8000 | (uint16_t)constrain(m1, MOTOR_MIN, MOTOR_MAX);
+  esc.m2 = 0x8000 | (uint16_t)constrain(m2, MOTOR_MIN, MOTOR_MAX);
+  esc.m3 = 0x8000 | (uint16_t)constrain(m3, MOTOR_MIN, MOTOR_MAX);
+  esc.m4 = 0x8000 | (uint16_t)constrain(m4, MOTOR_MIN, MOTOR_MAX);
+
+  // Start PWM sequence to update motor outputs
   NRF_PWM0->TASKS_SEQSTART[0] = 1;
 }
 
@@ -287,18 +309,22 @@ static inline void task_pof_update(void)
 static inline void pid_calculate(const float setpoint, const float value, const float kp, const float ki,
                                  const float kd, float *integral, float *prev_value, float *output)
 {
-  const float error = setpoint - value;
-  const float derivative = -(value - *prev_value) * PID_LOOP_HZ;
-  const float outputNoI = (kp * error) + (kd * derivative);
+  // PID calculations
+  const float error = setpoint - value;                          // Current control error (setpoint minus measurement)
+  const float derivative = -(value - *prev_value) * PID_LOOP_HZ; // Derivative of measurement (negative sign = derivative on measurement)
+  const float P = kp * error;                                    // Proportional term
 
-  *integral += error * PID_LOOP_PERIOD * ((outputNoI <= PID_MAX) && (outputNoI >= PID_MIN));
-  const float iLimit = PID_MAX / (ki + __FLT_EPSILON__);
-  *integral = constrain(*integral, -iLimit, iLimit);
-
-  *output = outputNoI + (ki * (*integral));
-  *output = constrain(*output, PID_MIN, PID_MAX);
-
-  *prev_value = value;
+  // Throttle-based auto scaling for I-term (branchless)
+  float i_scaling = fcu.thrust / (float)MOTOR_MAX;        // Normalize thrust to 0...1
+  i_scaling = constrain(i_scaling, 0.2f, 1.0f);           // Clamp scaling factor to [0.2, 1.0] to preserve some integration at low throttle
+  *integral += error * PID_LOOP_PERIOD * i_scaling;       // Update integral term, scaled by thrust level
+  const float i_limit = I_TERM_MAX * i_scaling;           // Integral limit scaled by thrust level
+  *integral = constrain(*integral, -i_limit, i_limit);    // Clamp integral to prevent windup
+  const float I = ki * (*integral);                       // Integral term
+  const float D = kd * derivative;                        // Derivative term
+  const float pid_sum = P + I + D;                        // Combined PID output
+  *output = constrain(pid_sum, PID_OUT_MIN, PID_OUT_MAX); // Clamp final output to actuator range
+  *prev_value = value;                                    // Save current measurement for next derivative calculation
 }
 
 static inline void quaternion_multiply(DataQuaternion *r, const DataQuaternion *q1, const DataQuaternion *q2)
@@ -348,8 +374,8 @@ static inline void handle_thrust_update(void)
   uint16_t thrust;
   memcpy(&thrust, (const void *)&received_packet.data[0], sizeof(thrust));
 
-  FCU_UPDATE_THRUST(fcu.status, fcu.thrust, thrust, THRUST_MIN, THRUST_MAX);
-  FCU_UPDATE_ACTIVE(fcu.status, fcu.thrust > THRUST_MIN);
+  FCU_UPDATE_THRUST(fcu.status, fcu.thrust, thrust, MOTOR_MIN, MOTOR_MAX);
+  FCU_UPDATE_ACTIVE(fcu.status, fcu.thrust > MOTOR_MIN);
 }
 
 static void flash_spim_init(void)
