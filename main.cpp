@@ -226,17 +226,17 @@ static inline void task_esc_update(void)
     memset(pid_state, 0, sizeof(pid_state));
   }
 
-  // Motor mixing: combine thrust and PID outputs for each motor (X quad configuration)
+  // Calculate raw motor outputs based on thrust and PID outputs
   const float m1 = fcu.thrust + pid_state[0].output - pid_state[1].output - pid_state[2].output; // M1: Front-right (CCW)
   const float m2 = fcu.thrust - pid_state[0].output - pid_state[1].output + pid_state[2].output; // M2: Front-left (CW)
   const float m3 = fcu.thrust + pid_state[0].output + pid_state[1].output + pid_state[2].output; // M3: Rear-right (CCW)
   const float m4 = fcu.thrust - pid_state[0].output + pid_state[1].output - pid_state[2].output; // M4: Rear-left (CW)
 
-  // Find min/max motor output to check for saturation
+  // Find minimum and maximum motor outputs
   const float min_motor = __builtin_fminf(__builtin_fminf(m1, m2), __builtin_fminf(m3, m4));
   const float max_motor = __builtin_fmaxf(__builtin_fmaxf(m1, m2), __builtin_fmaxf(m3, m4));
 
-  // Dynamically offset motor outputs to prevent saturation using symmetric adjustment
+  // Dynamically handles both upper and lower saturation by calculating an offset
   const float offset = __builtin_fmax(max_motor - MOTOR_MAX, 0.0f) + // positive if max is too high
                        __builtin_fmin(min_motor - MOTOR_MIN, 0.0f);  // negative if min is too low
 
