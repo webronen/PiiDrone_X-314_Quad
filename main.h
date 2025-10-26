@@ -31,16 +31,17 @@ SensorQuaternion quaternion(BHY2_SENSOR_ID_RV);
 #include <vl53l4cx_class.h>
 VL53L4CX vl53l4cx(&Wire, NC);
 
-#define MOTOR1_PIN 11
-#define MOTOR2_PIN 28
-#define MOTOR3_PIN 27
-#define MOTOR4_PIN 29
+#define MOTOR1_PIN 11 // M1: Front-left (CCW)
+#define MOTOR2_PIN 28 // M2: Front-right (CW)
+#define MOTOR3_PIN 27 // M3: Rear-left (CW)
+#define MOTOR4_PIN 29 // M4: Rear-right (CCW)
 
 #define HZ_TO_US(Hz) ((uint32_t)(1000000.0f / (Hz)))
 #define VL53L4CX_I2C_SPEED 400000 // 400kHz
 
 #define MOTOR_MIN 0
 #define MOTOR_MAX 800
+#define MOTOR_MAX_INV (1.0f / MOTOR_MAX)
 
 #define I_TERM_MIN -200.0f
 #define I_TERM_MAX 200.0f

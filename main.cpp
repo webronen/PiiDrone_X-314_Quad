@@ -75,10 +75,10 @@ void setup(void)
   NRF_PWM0->SEQ[0].PTR = (uint32_t)&esc;
   NRF_PWM0->SEQ[0].CNT = (sizeof(Esc) / sizeof(uint16_t));
   NRF_PWM0->SEQ[0].REFRESH = PWM_SEQ_REFRESH_CNT_Continuous;
-  NRF_PWM0->PSEL.OUT[0] = MOTOR1_PIN;
-  NRF_PWM0->PSEL.OUT[1] = MOTOR2_PIN;
-  NRF_PWM0->PSEL.OUT[2] = MOTOR3_PIN;
-  NRF_PWM0->PSEL.OUT[3] = MOTOR4_PIN;
+  NRF_PWM0->PSEL.OUT[0] = MOTOR1_PIN; // M1: Front-left (CCW)
+  NRF_PWM0->PSEL.OUT[1] = MOTOR2_PIN; // M2: Front-right (CW)
+  NRF_PWM0->PSEL.OUT[2] = MOTOR3_PIN; // M3: Rear-left (CW)
+  NRF_PWM0->PSEL.OUT[3] = MOTOR4_PIN; // M4: Rear-right (CCW)
   NRF_PWM0->ENABLE = PWM_ENABLE_ENABLE_Enabled;
   NRF_PWM0->TASKS_SEQSTART[0] = 1;
 
@@ -240,7 +240,7 @@ static inline void task_esc_update(void)
   const float offset = __builtin_fmax(motor_max - MOTOR_MAX, 0.0f) + // positive if max is too high
                        __builtin_fmin(motor_min - MOTOR_MIN, 0.0f);  // negative if min is too low
 
-  // Apply offset and constrain motor outputs to valid range, then set ESC values and enable inverted PWM mask (0x8000)
+  // Apply offset and constrain motor outputs to valid range, then set ESC values and add inverted PWM mask (0x8000)
   esc.m1 = 0x8000 | (uint16_t)constrain(m1 - offset, MOTOR_MIN, MOTOR_MAX);
   esc.m2 = 0x8000 | (uint16_t)constrain(m2 - offset, MOTOR_MIN, MOTOR_MAX);
   esc.m3 = 0x8000 | (uint16_t)constrain(m3 - offset, MOTOR_MIN, MOTOR_MAX);
@@ -309,7 +309,7 @@ static inline void pid_calculate(const float setpoint, const float value, const 
   const float P = kp * error;                                    // Proportional term
 
   // Throttle-based auto scaling for I-term (branchless)
-  float i_scaling = fcu.thrust / (float)MOTOR_MAX;        // Normalize thrust to 0...1
+  float i_scaling = fcu.thrust * (float)MOTOR_MAX_INV;    // Normalize thrust to 0...1
   i_scaling = constrain(i_scaling, 0.2f, 1.0f);           // Clamp scaling factor to [0.2, 1.0] to preserve some integration at low throttle
   *integral += error * PID_LOOP_PERIOD * i_scaling;       // Update integral term, scaled by thrust level
   const float i_limit = I_TERM_MAX * i_scaling;           // Integral limit scaled by thrust level
