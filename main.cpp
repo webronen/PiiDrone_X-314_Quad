@@ -233,12 +233,12 @@ static inline void task_esc_update(void)
   const float m4 = fcu.thrust - pid_state[0].output + pid_state[1].output - pid_state[2].output; // M4: Rear-left (CW)
 
   // Find minimum and maximum motor outputs
-  const float min_motor = __builtin_fminf(__builtin_fminf(m1, m2), __builtin_fminf(m3, m4));
-  const float max_motor = __builtin_fmaxf(__builtin_fmaxf(m1, m2), __builtin_fmaxf(m3, m4));
+  const float motor_min = __builtin_fminf(__builtin_fminf(m1, m2), __builtin_fminf(m3, m4));
+  const float motor_max = __builtin_fmaxf(__builtin_fmaxf(m1, m2), __builtin_fmaxf(m3, m4));
 
   // Dynamically handles both upper and lower saturation by calculating an offset
-  const float offset = __builtin_fmax(max_motor - MOTOR_MAX, 0.0f) + // positive if max is too high
-                       __builtin_fmin(min_motor - MOTOR_MIN, 0.0f);  // negative if min is too low
+  const float offset = __builtin_fmax(motor_max - MOTOR_MAX, 0.0f) + // positive if max is too high
+                       __builtin_fmin(motor_min - MOTOR_MIN, 0.0f);  // negative if min is too low
 
   // Apply offset and constrain motor outputs to valid range, then set ESC values and enable inverted PWM mask (0x8000)
   esc.m1 = 0x8000 | (uint16_t)constrain(m1 - offset, MOTOR_MIN, MOTOR_MAX);
