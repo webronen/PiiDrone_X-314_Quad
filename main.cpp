@@ -227,30 +227,24 @@ static inline void task_esc_update(void)
   }
 
   // Motor mixing: combine thrust and PID outputs for each motor (X quad configuration)
-  float m1 = fcu.thrust + pid_state[0].output - pid_state[1].output - pid_state[2].output; // M1: Front-right (CCW)
-  float m2 = fcu.thrust - pid_state[0].output - pid_state[1].output + pid_state[2].output; // M2: Front-left (CW)
-  float m3 = fcu.thrust + pid_state[0].output + pid_state[1].output + pid_state[2].output; // M3: Rear-right (CCW)
-  float m4 = fcu.thrust - pid_state[0].output + pid_state[1].output - pid_state[2].output; // M4: Rear-left (CW)
+  const float m1 = fcu.thrust + pid_state[0].output - pid_state[1].output - pid_state[2].output; // M1: Front-right (CCW)
+  const float m2 = fcu.thrust - pid_state[0].output - pid_state[1].output + pid_state[2].output; // M2: Front-left (CW)
+  const float m3 = fcu.thrust + pid_state[0].output + pid_state[1].output + pid_state[2].output; // M3: Rear-right (CCW)
+  const float m4 = fcu.thrust - pid_state[0].output + pid_state[1].output - pid_state[2].output; // M4: Rear-left (CW)
 
   // Find min/max motor output to check for saturation
   const float min_motor = __builtin_fminf(__builtin_fminf(m1, m2), __builtin_fminf(m3, m4));
   const float max_motor = __builtin_fmaxf(__builtin_fmaxf(m1, m2), __builtin_fmaxf(m3, m4));
 
-  // Dynamically offset motor outputs to prevent saturation
-  float offset = (max_motor > MOTOR_MAX) ? (max_motor - MOTOR_MAX) : (min_motor < MOTOR_MIN) ? (min_motor - MOTOR_MIN)
-                                                                                             : 0.0f;
+  // Dynamically offset motor outputs to prevent saturation using symmetric adjustment
+  const float offset = __builtin_fmax(max_motor - MOTOR_MAX, 0.0f) + // positive if max is too high
+                       __builtin_fmin(min_motor - MOTOR_MIN, 0.0f);  // negative if min is too low
 
-  // Apply offset to all motors
-  m1 -= offset;
-  m2 -= offset;
-  m3 -= offset;
-  m4 -= offset;
-
-  // Update ESC PWM values with constrained motor outputs and apply inverted signal flag (0x8000)
-  esc.m1 = 0x8000 | (uint16_t)constrain(m1, MOTOR_MIN, MOTOR_MAX);
-  esc.m2 = 0x8000 | (uint16_t)constrain(m2, MOTOR_MIN, MOTOR_MAX);
-  esc.m3 = 0x8000 | (uint16_t)constrain(m3, MOTOR_MIN, MOTOR_MAX);
-  esc.m4 = 0x8000 | (uint16_t)constrain(m4, MOTOR_MIN, MOTOR_MAX);
+  // Apply offset and constrain motor outputs to valid range, then set ESC values and enable inverted PWM mask (0x8000)
+  esc.m1 = 0x8000 | (uint16_t)constrain(m1 - offset, MOTOR_MIN, MOTOR_MAX);
+  esc.m2 = 0x8000 | (uint16_t)constrain(m2 - offset, MOTOR_MIN, MOTOR_MAX);
+  esc.m3 = 0x8000 | (uint16_t)constrain(m3 - offset, MOTOR_MIN, MOTOR_MAX);
+  esc.m4 = 0x8000 | (uint16_t)constrain(m4 - offset, MOTOR_MIN, MOTOR_MAX);
 
   // Start PWM sequence to update motor outputs
   NRF_PWM0->TASKS_SEQSTART[0] = 1;
