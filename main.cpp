@@ -227,10 +227,10 @@ static inline void task_esc_update(void)
   }
 
   // Calculate raw motor outputs based on thrust and PID outputs
-  const float m1 = fcu.thrust + pid_state[0].output - pid_state[1].output - pid_state[2].output; // M1: Front-right (CCW)
-  const float m2 = fcu.thrust - pid_state[0].output - pid_state[1].output + pid_state[2].output; // M2: Front-left (CW)
-  const float m3 = fcu.thrust + pid_state[0].output + pid_state[1].output + pid_state[2].output; // M3: Rear-right (CCW)
-  const float m4 = fcu.thrust - pid_state[0].output + pid_state[1].output - pid_state[2].output; // M4: Rear-left (CW)
+  const float m1 = fcu.thrust - pid_state[0].output + pid_state[1].output - pid_state[2].output; // M1: Front-right (CCW)
+  const float m2 = fcu.thrust + pid_state[0].output + pid_state[1].output + pid_state[2].output; // M2: Front-left (CW)
+  const float m3 = fcu.thrust - pid_state[0].output - pid_state[1].output + pid_state[2].output; // M3: Rear-right (CCW)
+  const float m4 = fcu.thrust + pid_state[0].output - pid_state[1].output - pid_state[2].output; // M4: Rear-left (CW)
 
   // Find minimum and maximum motor outputs
   const float motor_min = __builtin_fminf(__builtin_fminf(m1, m2), __builtin_fminf(m3, m4));
