@@ -234,7 +234,7 @@ static inline void task_esc_update(void)
 
   // Determine only the maximum upper motor output and calculate offset if exceeding MOTOR_MAX.
   const float motor_max = __builtin_fmaxf(__builtin_fmaxf(m1, m2), __builtin_fmaxf(m3, m4));
-  const float offset = __builtin_fmax(motor_max - MOTOR_MAX, 0.0f);
+  const float offset = __builtin_fmaxf(motor_max - MOTOR_MAX, 0.0f);
 
   // Apply offset if needed and constrain motor outputs to valid range
   esc.m1 = 0x8000 | (uint16_t)constrain(m1 - offset, MOTOR_MIN, MOTOR_MAX);
