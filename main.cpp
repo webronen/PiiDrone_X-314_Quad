@@ -218,7 +218,7 @@ static inline void task_fcu_update(void)
 
 static inline void task_esc_update(void)
 {
-  // If FCU is not active, reset thrust and PID states
+  // If FCU is not active, reset thrust and PID setpoints and states
   if (!FCU_IS_ACTIVE(fcu.status))
   {
     fcu.thrust = 0;
