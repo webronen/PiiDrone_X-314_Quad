@@ -225,14 +225,14 @@ static inline void task_esc_update(void)
     memset(fcu.pid_setpoint, 0, sizeof(fcu.pid_setpoint));
     memset(pid_state, 0, sizeof(pid_state));
   }
-  
+
   // Calculate raw motor outputs based on thrust and PID outputs
   const float m1 = fcu.thrust - pid_state[0].output + pid_state[1].output - pid_state[2].output; // M1: Front-right (CCW)
   const float m2 = fcu.thrust + pid_state[0].output + pid_state[1].output + pid_state[2].output; // M2: Front-left (CW)
   const float m3 = fcu.thrust - pid_state[0].output - pid_state[1].output + pid_state[2].output; // M3: Rear-right (CCW)
   const float m4 = fcu.thrust + pid_state[0].output - pid_state[1].output - pid_state[2].output; // M4: Rear-left (CW)
-  
-  // Determine only the maximum motor output to apply offset if needed
+
+  // Determine only the maximum upper motor output and calculate offset if exceeding MOTOR_MAX.
   const float motor_max = __builtin_fmaxf(__builtin_fmaxf(m1, m2), __builtin_fmaxf(m3, m4));
   const float offset = __builtin_fmax(motor_max - MOTOR_MAX, 0.0f);
 
@@ -299,22 +299,23 @@ static inline void task_pof_update(void)
 static inline void pid_calculate(const float setpoint, const float value, const float kp, const float ki,
                                  const float kd, float *integral, float *prev_value, float *output)
 {
-  // PID calculations
-  const float error = setpoint - value;                          // Current control error (setpoint minus measurement)
-  const float derivative = -(value - *prev_value) * PID_LOOP_HZ; // Derivative of measurement (negative sign = derivative on measurement)
-  const float P = kp * error;                                    // Proportional term
+  const float error = setpoint - value;
+  const float P = kp * error;
 
-  // Throttle-based auto scaling for I-term (branchless)
-  float i_scaling = fcu.thrust * (float)MOTOR_MAX_INV;    // Normalize thrust to 0...1
-  i_scaling = constrain(i_scaling, 0.2f, 1.0f);           // Clamp scaling factor to [0.2, 1.0] to preserve some integration at low throttle
-  *integral += error * PID_LOOP_PERIOD * i_scaling;       // Update integral term, scaled by thrust level
-  const float i_limit = I_TERM_MAX * i_scaling;           // Integral limit scaled by thrust level
-  *integral = constrain(*integral, -i_limit, i_limit);    // Clamp integral to prevent windup
-  const float I = ki * (*integral);                       // Integral term
-  const float D = kd * derivative;                        // Derivative term
-  const float pid_sum = P + I + D;                        // Combined PID output
-  *output = constrain(pid_sum, PID_OUT_MIN, PID_OUT_MAX); // Clamp final output to actuator range
-  *prev_value = value;                                    // Save current measurement for next derivative calculation
+  const float D = kd * (*prev_value - value) * -PID_LOOP_HZ;
+
+  const float i_scaling = constrain(fcu.thrust * MOTOR_MAX_INV, 0.2f, 1.0f);
+
+  const float integral_delta = error * PID_LOOP_PERIOD * i_scaling;
+  const float new_integral = *integral + integral_delta;
+  const float i_limit = I_TERM_MAX * i_scaling;
+  *integral = constrain(new_integral, -i_limit, i_limit);
+
+  const float I = ki * (*integral);
+  const float pid_sum = P + I + D;
+
+  *output = constrain(pid_sum, PID_OUT_MIN, PID_OUT_MAX);
+  *prev_value = value;
 }
 
 static inline void quaternion_multiply(DataQuaternion *r, const DataQuaternion *q1, const DataQuaternion *q2)
