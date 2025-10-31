@@ -52,7 +52,7 @@ VL53L4CX vl53l4cx(&Wire, NC);
 #define PID_LOOP_HZ 211.0f
 #define PID_LOOP_PERIOD (1.0f / PID_LOOP_HZ)
 
-#define GAIN_MAX 100.0f
+#define GAIN_MAX 1000.0f
 #define GAIN_MIN 0.0f
 
 #define SETPOINT_MAX 1.0f
