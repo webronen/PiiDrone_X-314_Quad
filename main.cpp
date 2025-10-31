@@ -218,29 +218,25 @@ static inline void task_fcu_update(void)
 
 static inline void task_esc_update(void)
 {
-  // If FCU is not active, reset thrust and setpoints/PID states for safety
+  // If FCU is not active, reset thrust and PID states
   if (!FCU_IS_ACTIVE(fcu.status))
   {
     fcu.thrust = 0;
     memset(fcu.pid_setpoint, 0, sizeof(fcu.pid_setpoint));
     memset(pid_state, 0, sizeof(pid_state));
   }
-
+  
   // Calculate raw motor outputs based on thrust and PID outputs
   const float m1 = fcu.thrust - pid_state[0].output + pid_state[1].output - pid_state[2].output; // M1: Front-right (CCW)
   const float m2 = fcu.thrust + pid_state[0].output + pid_state[1].output + pid_state[2].output; // M2: Front-left (CW)
   const float m3 = fcu.thrust - pid_state[0].output - pid_state[1].output + pid_state[2].output; // M3: Rear-right (CCW)
   const float m4 = fcu.thrust + pid_state[0].output - pid_state[1].output - pid_state[2].output; // M4: Rear-left (CW)
-
-  // Find minimum and maximum motor outputs
-  const float motor_min = __builtin_fminf(__builtin_fminf(m1, m2), __builtin_fminf(m3, m4));
+  
+  // Determine only the maximum motor output to apply offset if needed
   const float motor_max = __builtin_fmaxf(__builtin_fmaxf(m1, m2), __builtin_fmaxf(m3, m4));
+  const float offset = __builtin_fmax(motor_max - MOTOR_MAX, 0.0f);
 
-  // Dynamically handles both upper and lower saturation by calculating an offset
-  const float offset = __builtin_fmax(motor_max - MOTOR_MAX, 0.0f) + // positive if max is too high
-                       __builtin_fmin(motor_min - MOTOR_MIN, 0.0f);  // negative if min is too low
-
-  // Apply offset and constrain motor outputs to valid range, then set ESC values and add inverted PWM mask (0x8000)
+  // Apply offset if needed and constrain motor outputs to valid range
   esc.m1 = 0x8000 | (uint16_t)constrain(m1 - offset, MOTOR_MIN, MOTOR_MAX);
   esc.m2 = 0x8000 | (uint16_t)constrain(m2 - offset, MOTOR_MIN, MOTOR_MAX);
   esc.m3 = 0x8000 | (uint16_t)constrain(m3 - offset, MOTOR_MIN, MOTOR_MAX);
