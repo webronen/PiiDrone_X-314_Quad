@@ -303,8 +303,8 @@ static inline void pid_calculate(const float sp, const float pv, const float Kp,
   *I = *I + P * PID_PERIOD;
   *I = constrain(*I, I_MIN, I_MAX);
   const float D = -(pv - *_pv) * PID_FREQUENCY;
-  const float output_unconstrained = Kp * P + Ki * (*I) + Kd * D;
-  *out = constrain(output_unconstrained, PID_MIN, PID_MAX);
+  *out = Kp * P + Ki * (*I) + Kd * D;
+  *out = constrain(*out, PID_MIN, PID_MAX);
   *_pv = pv;
 }
 
