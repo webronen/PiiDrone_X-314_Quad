@@ -63,9 +63,8 @@ VL53L4CX vl53l4cx(&Wire, NC);
 // Safe thrust limit to avoid motor saturation
 #define MAX_SAFE_THRUST 200.0f
 
-
-#define SETPOINT_MAX 1.0f
 #define SETPOINT_MIN -1.0f
+#define SETPOINT_MAX 1.0f
 
 #define EMA_ALPHA 0.3f
 #define EMA_BETA (1.0f - EMA_ALPHA)
