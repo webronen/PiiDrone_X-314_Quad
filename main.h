@@ -51,7 +51,7 @@ VL53L4CX vl53l4cx(&Wire, NC);
 #define PID_FREQUENCY 211.0f
 #define PID_PERIOD (1.0f / PID_FREQUENCY)
 
-#define GAIN_MAX 1000.0f
+#define GAIN_MAX 100.0f
 #define GAIN_MIN 0.0f
 
 #define SETPOINT_MAX 1.0f
