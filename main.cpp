@@ -296,23 +296,16 @@ static inline void task_pof_update(void)
   NRF_POWER->EVENTS_POFWARN = 0;
 }
 
-static inline void pid_calculate(const float setpoint, const float value, const float kp, const float ki,
-                                 const float kd, float *integral, float *prev_value, float *output)
+static inline void pid_calculate(const float sp, const float pv, const float Kp, const float Ki,
+                                 const float Kd, float *I, float *_pv, float *out)
 {
-  const float error = setpoint - value;
-  const float P = kp * error;
-
-  const float derivative = -(value - *prev_value) * PID_LOOP_HZ;
-  const float D = kd * derivative;
-  
-  *integral += error * PID_LOOP_PERIOD;
-  *integral = constrain(*integral, I_TERM_MIN, I_TERM_MAX);
-
-  const float I = ki * (*integral);
-  const float pid_sum = P + I + D;
-
-  *output = constrain(pid_sum, PID_OUT_MIN, PID_OUT_MAX);
-  *prev_value = value;
+  const float P = sp - pv;
+  *I = *I + P * PID_PERIOD;
+  *I = constrain(*I, I_MIN, I_MAX);
+  const float D = -(pv - *_pv) * PID_FREQUENCY;
+  const float output_unconstrained = Kp * P + Ki * (*I) + Kd * D;
+  *out = constrain(output_unconstrained, PID_MIN, PID_MAX);
+  *_pv = pv;
 }
 
 static inline void quaternion_multiply(DataQuaternion *r, const DataQuaternion *q1, const DataQuaternion *q2)

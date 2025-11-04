@@ -41,16 +41,15 @@ VL53L4CX vl53l4cx(&Wire, NC);
 
 #define MOTOR_MIN 0
 #define MOTOR_MAX 800
-#define MOTOR_MAX_INV (1.0f / MOTOR_MAX)
 
-#define I_TERM_MIN -200.0f
-#define I_TERM_MAX 200.0f
+#define I_MIN -200.0f
+#define I_MAX 200.0f
 
-#define PID_OUT_MIN -400.0f
-#define PID_OUT_MAX 400.0f
+#define PID_MIN -400.0f
+#define PID_MAX 400.0f
 
-#define PID_LOOP_HZ 211.0f
-#define PID_LOOP_PERIOD (1.0f / PID_LOOP_HZ)
+#define PID_FREQUENCY 211.0f
+#define PID_PERIOD (1.0f / PID_FREQUENCY)
 
 #define GAIN_MAX 1000.0f
 #define GAIN_MIN 0.0f
@@ -237,8 +236,8 @@ static void (*const handle_type[PACKET_TYPE_COUNT])(void) = {
 };
 
 // Utility function prototypes
-static inline void pid_calculate(const float setpoint, const float value, const float kp, const float ki,
-                                 const float kd, float *integral, float *prev_value, float *output);
+static inline void pid_calculate(const float sp, const float pv, const float Kp, const float Ki,
+                                 const float Kd, float *I, float *_pv, float *out);
 static inline void quaternion_multiply(DataQuaternion *result, const DataQuaternion *q1, const DataQuaternion *q2);
 static inline void quaternion_normalize(DataQuaternion *q);
 static inline void flash_read(void);
