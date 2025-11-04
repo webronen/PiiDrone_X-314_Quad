@@ -302,14 +302,11 @@ static inline void pid_calculate(const float setpoint, const float value, const 
   const float error = setpoint - value;
   const float P = kp * error;
 
-  const float D = kd * (*prev_value - value) * -PID_LOOP_HZ;
-
-  const float i_scaling = constrain(fcu.thrust * MOTOR_MAX_INV, 0.2f, 1.0f);
-
-  const float integral_delta = error * PID_LOOP_PERIOD * i_scaling;
-  const float new_integral = *integral + integral_delta;
-  const float i_limit = I_TERM_MAX * i_scaling;
-  *integral = constrain(new_integral, -i_limit, i_limit);
+  const float derivative = -(value - *prev_value) * PID_LOOP_HZ;
+  const float D = kd * derivative;
+  
+  *integral += error * PID_LOOP_PERIOD;
+  *integral = constrain(*integral, I_TERM_MIN, I_TERM_MAX);
 
   const float I = ki * (*integral);
   const float pid_sum = P + I + D;
