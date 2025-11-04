@@ -39,20 +39,30 @@ VL53L4CX vl53l4cx(&Wire, NC);
 #define HZ_TO_US(Hz) ((uint32_t)(1000000.0f / (Hz)))
 #define VL53L4CX_I2C_SPEED 400000 // 400kHz
 
+// Motor output range
 #define MOTOR_MIN 0
 #define MOTOR_MAX 800
+#define MOTOR_MAX_INV (1.0f / MOTOR_MAX)
 
-#define I_MIN -200.0f
-#define I_MAX 200.0f
+// PID loop timing
+#define PID_LOOP_HZ 211.0f
+#define PID_LOOP_PERIOD (1.0f / PID_LOOP_HZ)
 
-#define PID_MIN -400.0f
-#define PID_MAX 400.0f
+// PID output limits
+#define PID_OUT_MIN -200.0f
+#define PID_OUT_MAX 200.0f
 
-#define PID_FREQUENCY 211.0f
-#define PID_PERIOD (1.0f / PID_FREQUENCY)
+// Integral term limits (anti-windup)
+#define I_TERM_MIN -100.0f
+#define I_TERM_MAX 100.0f
 
-#define GAIN_MAX 100.0f
+// Gain tuning range
 #define GAIN_MIN 0.0f
+#define GAIN_MAX 100.0f
+
+// Safe thrust limit to avoid motor saturation
+#define MAX_SAFE_THRUST 200.0f
+
 
 #define SETPOINT_MAX 1.0f
 #define SETPOINT_MIN -1.0f

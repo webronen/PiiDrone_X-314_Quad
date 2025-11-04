@@ -301,11 +301,11 @@ static inline void pid_calculate(const float sp, const float pv, const float Kp,
 {
   // Textbook PID controller implementation with anti-windup, derivative on measurement, and output constraining.
   const float P = sp - pv;
-  *I = *I + P * PID_PERIOD;
-  *I = constrain(*I, I_MIN, I_MAX); // Anti-windup
-  const float D = -(pv - *_pv) * PID_FREQUENCY; // Derivative on measurement
+  *I = *I + P * PID_LOOP_PERIOD;
+  *I = constrain(*I, I_TERM_MIN, I_TERM_MAX); // Anti-windup
+  const float D = -(pv - *_pv) * PID_LOOP_HZ; // Derivative on measurement
   *out = Kp * P + Ki * (*I) + Kd * D;
-  *out = constrain(*out, PID_MIN, PID_MAX); // Constrain output
+  *out = constrain(*out, PID_OUT_MIN, PID_OUT_MAX); // Constrain output
   *_pv = pv;
 }
 
@@ -356,7 +356,7 @@ static inline void handle_thrust_update(void)
   uint16_t thrust;
   memcpy(&thrust, (const void *)&received_packet.data[0], sizeof(thrust));
 
-  FCU_UPDATE_THRUST(fcu.status, fcu.thrust, thrust, MOTOR_MIN, MOTOR_MAX);
+  FCU_UPDATE_THRUST(fcu.status, fcu.thrust, thrust, MOTOR_MIN, MAX_SAFE_THRUST);
   FCU_UPDATE_ACTIVE(fcu.status, fcu.thrust > MOTOR_MIN);
 }
 
