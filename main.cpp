@@ -207,13 +207,13 @@ static inline void task_fcu_update(void)
   quaternion_multiply(&error, &hover_quaternion, &conjugate);
 
   pid_calculate(fcu.pid_setpoint[0], error.x, fcu.pid_gain[0][0], fcu.pid_gain[0][1], fcu.pid_gain[0][2],
-                &pid_state[0].integral, &pid_state[0].prev, &pid_state[0].output);
+                &pid_state[0].I, &pid_state[0].pv, &pid_state[0].out);
 
   pid_calculate(fcu.pid_setpoint[1], error.y, fcu.pid_gain[1][0], fcu.pid_gain[1][1], fcu.pid_gain[1][2],
-                &pid_state[1].integral, &pid_state[1].prev, &pid_state[1].output);
+                &pid_state[1].I, &pid_state[1].pv, &pid_state[1].out);
 
   pid_calculate(fcu.pid_setpoint[2], error.z, fcu.pid_gain[2][0], fcu.pid_gain[2][1], fcu.pid_gain[2][2],
-                &pid_state[2].integral, &pid_state[2].prev, &pid_state[2].output);
+                &pid_state[2].I, &pid_state[2].pv, &pid_state[2].out);
 }
 
 static inline void task_esc_update(void)
@@ -227,10 +227,10 @@ static inline void task_esc_update(void)
   }
 
   // Calculate raw motor outputs based on thrust and PID outputs
-  const float m1 = fcu.thrust - pid_state[0].output + pid_state[1].output - pid_state[2].output; // M1: Front-right (CCW)
-  const float m2 = fcu.thrust + pid_state[0].output + pid_state[1].output + pid_state[2].output; // M2: Front-left (CW)
-  const float m3 = fcu.thrust - pid_state[0].output - pid_state[1].output + pid_state[2].output; // M3: Rear-right (CCW)
-  const float m4 = fcu.thrust + pid_state[0].output - pid_state[1].output - pid_state[2].output; // M4: Rear-left (CW)
+  const float m1 = fcu.thrust - pid_state[0].out + pid_state[1].out - pid_state[2].out; // M1: Front-right (CCW)
+  const float m2 = fcu.thrust + pid_state[0].out + pid_state[1].out + pid_state[2].out; // M2: Front-left (CW)
+  const float m3 = fcu.thrust - pid_state[0].out - pid_state[1].out + pid_state[2].out; // M3: Rear-right (CCW)
+  const float m4 = fcu.thrust + pid_state[0].out - pid_state[1].out - pid_state[2].out; // M4: Rear-left (CW)
 
   // Determine only the maximum upper motor output and calculate offset if exceeding MOTOR_MAX.
   const float motor_max = __builtin_fmaxf(__builtin_fmaxf(m1, m2), __builtin_fmaxf(m3, m4));
@@ -299,12 +299,13 @@ static inline void task_pof_update(void)
 static inline void pid_calculate(const float sp, const float pv, const float Kp, const float Ki,
                                  const float Kd, float *I, float *_pv, float *out)
 {
+  // Textbook PID controller implementation with anti-windup, derivative on measurement, and output constraining.
   const float P = sp - pv;
   *I = *I + P * PID_PERIOD;
-  *I = constrain(*I, I_MIN, I_MAX);
-  const float D = -(pv - *_pv) * PID_FREQUENCY;
+  *I = constrain(*I, I_MIN, I_MAX); // Anti-windup
+  const float D = -(pv - *_pv) * PID_FREQUENCY; // Derivative on measurement
   *out = Kp * P + Ki * (*I) + Kd * D;
-  *out = constrain(*out, PID_MIN, PID_MAX);
+  *out = constrain(*out, PID_MIN, PID_MAX); // Constrain output
   *_pv = pv;
 }
 

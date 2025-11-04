@@ -175,7 +175,7 @@ static_assert(sizeof(Rcu) == 255, "Rcu struct must be 255 bytes (63.75 words)");
 
 typedef struct __attribute__((packed, aligned(4)))
 {
-  float integral, output, prev;
+  float I, pv, out;
 } Pid;
 
 static_assert(sizeof(Pid) == 12, "Pid struct must be 12 bytes (3 words)");
