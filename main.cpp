@@ -227,10 +227,10 @@ static inline void task_esc_update(void)
   }
 
   // Calculate raw motor outputs based on thrust and PID outputs
-  const float m1 = fcu.thrust - pid_state[0].out + pid_state[1].out - pid_state[2].out; // M1: Front-right (CCW)
-  const float m2 = fcu.thrust + pid_state[0].out + pid_state[1].out + pid_state[2].out; // M2: Front-left (CW)
-  const float m3 = fcu.thrust - pid_state[0].out - pid_state[1].out + pid_state[2].out; // M3: Rear-right (CCW)
-  const float m4 = fcu.thrust + pid_state[0].out - pid_state[1].out - pid_state[2].out; // M4: Rear-left (CW)
+  const float m1 = fcu.thrust + pid_state[0].out - pid_state[1].out - pid_state[2].out; // M1: Front-right (CCW)
+  const float m2 = fcu.thrust - pid_state[0].out - pid_state[1].out + pid_state[2].out; // M2: Front-left (CW)
+  const float m3 = fcu.thrust + pid_state[0].out + pid_state[1].out + pid_state[2].out; // M3: Rear-right (CCW)
+  const float m4 = fcu.thrust - pid_state[0].out + pid_state[1].out - pid_state[2].out; // M4: Rear-left (CW)
 
   // Determine only the maximum upper motor output and calculate offset if exceeding MOTOR_MAX.
   const float motor_max = __builtin_fmaxf(__builtin_fmaxf(m1, m2), __builtin_fmaxf(m3, m4));
