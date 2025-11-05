@@ -195,6 +195,7 @@ static inline void task_imu_update(void)
 
 static inline void task_fcu_update(void)
 {
+  // Update FCU sensor readings with EMA filtering.
   fcu.pressure = EMA_ALPHA * pressure._value + EMA_BETA * fcu.pressure;
   fcu.temperature = EMA_ALPHA * (temperature._value + TEMPERATURE_OFFSET) + EMA_BETA * fcu.temperature;
   fcu.humidity = EMA_ALPHA * humidity._value + EMA_BETA * fcu.humidity;
@@ -218,7 +219,28 @@ static inline void task_fcu_update(void)
 
 static inline void task_esc_update(void)
 {
-  // If FCU is not active, reset thrust and PID setpoints and states
+  /**
+   * Control motor outputs based on FCU thrust and PID controller outputs.
+   * - If FCU is not active, reset thrust and PID setpoints/outputs to zero.
+   * - Calculate raw motor outputs for a quadcopter in X configuration.
+   * - If any motor output exceeds maximum, calculate a possible offset to bring the highest output down to max.
+   * - Update ESC PWM values with constrained motor outputs minus possible offset.
+   * - Trigger PWM update for ESCs.
+   *
+   * Motor layout (X configuration):
+   *          |-----|-----|
+   *          |  M1 |  M2 |
+   *          |-----|-----|
+   *          |  M3 |  M4 |
+   *          |-----|-----|
+   *
+   * M1: Front-right (CCW)
+   * M2: Front-left (CW)
+   * M3: Rear-right (CW)
+   * M4: Rear-left (CCW)
+   *
+   * Note: MOTOR_MIN and MOTOR_MAX define the valid PWM range for ESCs.
+   */
   if (!FCU_IS_ACTIVE(fcu.status))
   {
     fcu.thrust = 0;
@@ -226,23 +248,19 @@ static inline void task_esc_update(void)
     memset(pid_state, 0, sizeof(pid_state));
   }
 
-  // Calculate raw motor outputs based on thrust and PID outputs
-  const float m1 = fcu.thrust + pid_state[0].out - pid_state[1].out - pid_state[2].out; // M1: Front-right (CCW)
-  const float m2 = fcu.thrust - pid_state[0].out - pid_state[1].out + pid_state[2].out; // M2: Front-left (CW)
-  const float m3 = fcu.thrust + pid_state[0].out + pid_state[1].out + pid_state[2].out; // M3: Rear-right (CW)
-  const float m4 = fcu.thrust - pid_state[0].out + pid_state[1].out - pid_state[2].out; // M4: Rear-left (CCW)
+  const float m1 = fcu.thrust + pid_state[0].out - pid_state[1].out - pid_state[2].out;
+  const float m2 = fcu.thrust - pid_state[0].out - pid_state[1].out + pid_state[2].out;
+  const float m3 = fcu.thrust + pid_state[0].out + pid_state[1].out + pid_state[2].out;
+  const float m4 = fcu.thrust - pid_state[0].out + pid_state[1].out - pid_state[2].out;
 
-  // Determine if any motor output exceeds maximum and calculate possible offset
   const float motor_max = __builtin_fmaxf(__builtin_fmaxf(m1, m2), __builtin_fmaxf(m3, m4));
   const float offset = __builtin_fmaxf(motor_max - MOTOR_MAX, 0.0f);
 
-  // Update ESC PWM values with constrained motor outputs minus possible offset
   esc.m1 = 0x8000 | (uint16_t)constrain(m1 - offset, MOTOR_MIN, MOTOR_MAX);
   esc.m2 = 0x8000 | (uint16_t)constrain(m2 - offset, MOTOR_MIN, MOTOR_MAX);
   esc.m3 = 0x8000 | (uint16_t)constrain(m3 - offset, MOTOR_MIN, MOTOR_MAX);
   esc.m4 = 0x8000 | (uint16_t)constrain(m4 - offset, MOTOR_MIN, MOTOR_MAX);
 
-  // Trigger PWM update
   NRF_PWM0->TASKS_SEQSTART[0] = 1;
 }
 
@@ -299,19 +317,31 @@ static inline void task_pof_update(void)
 static inline void pid_calculate(const float sp, const float pv, const float Kp, const float Ki,
                                  const float Kd, float *I, float *_pv, float *out)
 {
-  // Textbook PID controller implementation with anti-windup, derivative on measurement, and output constraining.
+  /**
+   * Standard PID control algorithm with anti-windup, derivative on measurement, and output constraining.
+   * - Proportional term (P) is the difference between setpoint and process variable.
+   * - Integral term (I) accumulates the error over time, constrained to prevent windup.
+   * - Derivative term (D) is based on the change in process variable to avoid derivative kick.
+   * - Final output is the sum of P, I, and D terms, constrained within specified limits.
+   * - Previous process variable is updated for next derivative calculation.
+   *
+   * Note: PID_LOOP_PERIOD and PID_LOOP_HZ are constants defining the control loop timing.
+   */
   const float P = sp - pv;
   *I = *I + P * PID_LOOP_PERIOD;
-  *I = constrain(*I, I_TERM_MIN, I_TERM_MAX); // Anti-windup
-  const float D = -(pv - *_pv) * PID_LOOP_HZ; // Derivative on measurement
+  *I = constrain(*I, I_TERM_MIN, I_TERM_MAX);
+  const float D = -(pv - *_pv) * PID_LOOP_HZ;
   *out = Kp * P + Ki * (*I) + Kd * D;
-  *out = constrain(*out, PID_OUT_MIN, PID_OUT_MAX); // Constrain output
+  *out = constrain(*out, PID_OUT_MIN, PID_OUT_MAX);
   *_pv = pv;
 }
 
 static inline void quaternion_multiply(DataQuaternion *r, const DataQuaternion *q1, const DataQuaternion *q2)
 {
-  // Multiply two quaternions using Hamilton product
+  /**
+   * Perform quaternion multiplication using the Hamilton product formula.
+   * Normalize the resulting quaternion to ensure it remains a unit quaternion.
+   */
   r->w = q1->w * q2->w - q1->x * q2->x - q1->y * q2->y - q1->z * q2->z;
   r->x = q1->w * q2->x + q1->x * q2->w + q1->y * q2->z - q1->z * q2->y;
   r->y = q1->w * q2->y - q1->x * q2->z + q1->y * q2->w + q1->z * q2->x;
@@ -322,11 +352,16 @@ static inline void quaternion_multiply(DataQuaternion *r, const DataQuaternion *
 
 static inline void quaternion_normalize(DataQuaternion *q)
 {
-  // Calculate squared magnitude and its inverse square root
-  const float mag = q->w * q->w + q->x * q->x + q->y * q->y + q->z * q->z;
-  const float inv = 1.0f / __builtin_sqrtf(mag + __FLT_EPSILON__); // Epsilon to avoid division by zero
+  /**
+   * Calculate the squared magnitude of the quaternion and compute its inverse square root.
+   * Scale each component of the quaternion by this inverse to normalize it to unit length.
+   *
+   * Note: Adding a small epsilon to the magnitude prevents division by zero.
+   */
 
-  // Normalize quaternion to unit length
+  const float mag = q->w * q->w + q->x * q->x + q->y * q->y + q->z * q->z;
+  const float inv = 1.0f / __builtin_sqrtf(mag + __FLT_EPSILON__);
+
   q->w *= inv;
   q->x *= inv;
   q->y *= inv;
