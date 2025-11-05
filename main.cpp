@@ -96,7 +96,7 @@ void setup(void)
   pmic_status = (pmic_status & ~0x3F) | 0x3F; // Set to maximum current limit and disable UVLO
   nicla::_pmic.writeByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL, pmic_status);
 
-  // Initialize all sensors (IMU, magnetometer, quaternion, pressure, humidity, temperature, ToF).
+  // Initialize all sensors with specified data rates, latencies, and ranges.
   sensortec.begin();
   accelerometer.begin(ACCELEROMETER_HZ, ACCELEROMETER_LATENCY);
   accelerometer.setRange(ACCELEROMETER_RANGE);
@@ -157,10 +157,10 @@ void loop(void)
     // Only handle packet if it is addressed to this node and zone.
     if (received_packet.node == NODE_ID &&
         received_packet.zone == ZONE_ID)
-      handle_type[received_packet.type % PACKET_TYPE_COUNT](); // Round-robin array safety
+      handle_type[received_packet.type % PACKET_TYPE_COUNT](); // Modulo to avoid out-of-bounds indexing (Round-robin)
   }
 
-  // Run all scheduled tasks (IMU, FCU, ESC, telemetry, ToF, power-fail).
+  // Execute scheduled tasks based on their defined intervals.
   for (uint8_t i = 0; i < SCHEDULER_TASK_COUNT; i++)
   {
     if ((int32_t)(loop_start_us - tasks[i].previous_us) >= 0)
@@ -170,17 +170,10 @@ void loop(void)
     }
   }
 
-  /**
-   * Automatic landing sequence:
-   * - Landing is triggered if no new RCU packet is received for 10 seconds, or if a power-fail warning is active.
-   * - While landing, thrust is reduced by 10 units every second until it reaches 10 or less.
-   * - When thrust drops to 10 or below, the active status bit is cleared and landing stops.
-   * - If a new RCU packet arrives or the power-fail warning clears, landing is aborted and normal flight control resumes.
-   * - If power-fail warning is active, landing continues and thrust can only be reduced (not increased).
-   * - Directional control remains active during landing for safety.
+  /** Automatic Landing Sequence:
+   * - Initiates landing if FCU is active and either RCU packet timeout or power-fail warning is detected.
+   * - Gradually reduces thrust in defined steps at specified intervals until landing is complete.
    */
-
-  // If landing conditions are met, reduce thrust and manage landing state.
   if ((FCU_IS_ACTIVE(fcu.status) && (packet_timeout || FCU_IS_POFWARN(fcu.status)) && landing_timeout))
   {
     last_landing_us = loop_start_us + HZ_TO_US(1);
@@ -195,7 +188,12 @@ static inline void task_imu_update(void)
 
 static inline void task_fcu_update(void)
 {
-  // Update FCU sensor readings with EMA filtering.
+  /**
+   * Update FCU sensor readings and compute PID controller outputs.
+   * - Apply exponential moving average (EMA) filtering to pressure, temperature, and humidity readings.
+   * - Compute orientation error quaternion relative to hover state.
+   * - Update PID controllers for roll, pitch, and yaw based on orientation error.
+   */
   fcu.pressure = EMA_ALPHA * pressure._value + EMA_BETA * fcu.pressure;
   fcu.temperature = EMA_ALPHA * (temperature._value + TEMPERATURE_OFFSET) + EMA_BETA * fcu.temperature;
   fcu.humidity = EMA_ALPHA * humidity._value + EMA_BETA * fcu.humidity;
@@ -341,7 +339,7 @@ static inline void quaternion_multiply(DataQuaternion *r, const DataQuaternion *
   /**
    * Perform quaternion multiplication using the Hamilton product formula.
    * Normalize the resulting quaternion to ensure it remains a unit quaternion.
-   * 
+   *
    * Note: Quaternion multiplication is not commutative; the order of operands matters.
    */
   r->w = q1->w * q2->w - q1->x * q2->x - q1->y * q2->y - q1->z * q2->z;
