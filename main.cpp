@@ -232,17 +232,17 @@ static inline void task_esc_update(void)
   const float m3 = fcu.thrust + pid_state[0].out + pid_state[1].out + pid_state[2].out; // M3: Rear-right (CCW)
   const float m4 = fcu.thrust - pid_state[0].out + pid_state[1].out - pid_state[2].out; // M4: Rear-left (CW)
 
-  // Determine only the maximum upper motor output and calculate offset if exceeding MOTOR_MAX.
+  // Determine if any motor output exceeds maximum and calculate possible offset
   const float motor_max = __builtin_fmaxf(__builtin_fmaxf(m1, m2), __builtin_fmaxf(m3, m4));
   const float offset = __builtin_fmaxf(motor_max - MOTOR_MAX, 0.0f);
 
-  // Apply offset if needed and constrain motor outputs to valid range
+  // Update ESC PWM values with constrained motor outputs minus possible offset
   esc.m1 = 0x8000 | (uint16_t)constrain(m1 - offset, MOTOR_MIN, MOTOR_MAX);
   esc.m2 = 0x8000 | (uint16_t)constrain(m2 - offset, MOTOR_MIN, MOTOR_MAX);
   esc.m3 = 0x8000 | (uint16_t)constrain(m3 - offset, MOTOR_MIN, MOTOR_MAX);
   esc.m4 = 0x8000 | (uint16_t)constrain(m4 - offset, MOTOR_MIN, MOTOR_MAX);
 
-  // Start PWM sequence to update motor outputs
+  // Trigger PWM update
   NRF_PWM0->TASKS_SEQSTART[0] = 1;
 }
 
@@ -311,6 +311,7 @@ static inline void pid_calculate(const float sp, const float pv, const float Kp,
 
 static inline void quaternion_multiply(DataQuaternion *r, const DataQuaternion *q1, const DataQuaternion *q2)
 {
+  // Multiply two quaternions using Hamilton product
   r->w = q1->w * q2->w - q1->x * q2->x - q1->y * q2->y - q1->z * q2->z;
   r->x = q1->w * q2->x + q1->x * q2->w + q1->y * q2->z - q1->z * q2->y;
   r->y = q1->w * q2->y - q1->x * q2->z + q1->y * q2->w + q1->z * q2->x;
@@ -321,9 +322,11 @@ static inline void quaternion_multiply(DataQuaternion *r, const DataQuaternion *
 
 static inline void quaternion_normalize(DataQuaternion *q)
 {
+  // Calculate squared magnitude and its inverse square root
   const float mag = q->w * q->w + q->x * q->x + q->y * q->y + q->z * q->z;
-  const float inv = 1.0f / __builtin_sqrtf(mag + __FLT_EPSILON__);
+  const float inv = 1.0f / __builtin_sqrtf(mag + __FLT_EPSILON__); // Epsilon to avoid division by zero
 
+  // Normalize quaternion to unit length
   q->w *= inv;
   q->x *= inv;
   q->y *= inv;
