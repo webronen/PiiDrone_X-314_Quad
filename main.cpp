@@ -194,9 +194,9 @@ static inline void task_fcu_update(void)
    * - Compute orientation error quaternion relative to hover state.
    * - Update PID controllers for roll, pitch, and yaw based on orientation error.
    */
-  fcu.pressure = EMA_ALPHA * pressure._value + EMA_BETA * fcu.pressure;
-  fcu.temperature = EMA_ALPHA * (temperature._value + TEMPERATURE_OFFSET) + EMA_BETA * fcu.temperature;
-  fcu.humidity = EMA_ALPHA * humidity._value + EMA_BETA * fcu.humidity;
+  fcu.pressure += (pressure._value - fcu.pressure) * ENV_ALPHA;
+  fcu.temperature += ((temperature._value + TEMPERATURE_OFFSET) - fcu.temperature) * ENV_ALPHA;
+  fcu.humidity += (humidity._value - fcu.humidity) * ENV_ALPHA;
 
   static const DataQuaternion hover_quaternion = {0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
   const DataQuaternion conjugate = {-quaternion._data.x, -quaternion._data.y,
@@ -206,13 +206,13 @@ static inline void task_fcu_update(void)
   quaternion_multiply(&error, &hover_quaternion, &conjugate);
 
   pid_calculate(fcu.pid_setpoint[0], error.x, fcu.pid_gain[0][0], fcu.pid_gain[0][1], fcu.pid_gain[0][2],
-                &pid_state[0].I, &pid_state[0].pv, &pid_state[0].out);
+                &pid_state[0].I, &pid_state[0].Df, &pid_state[0].pv, &pid_state[0].out);
 
   pid_calculate(fcu.pid_setpoint[1], error.y, fcu.pid_gain[1][0], fcu.pid_gain[1][1], fcu.pid_gain[1][2],
-                &pid_state[1].I, &pid_state[1].pv, &pid_state[1].out);
+                &pid_state[1].I, &pid_state[1].Df, &pid_state[1].pv, &pid_state[1].out);
 
   pid_calculate(fcu.pid_setpoint[2], error.z, fcu.pid_gain[2][0], fcu.pid_gain[2][1], fcu.pid_gain[2][2],
-                &pid_state[2].I, &pid_state[2].pv, &pid_state[2].out);
+                &pid_state[2].I, &pid_state[2].Df, &pid_state[2].pv, &pid_state[2].out);
 }
 
 static inline void task_esc_update(void)
@@ -259,7 +259,7 @@ static inline void task_tof_update(void)
         data.NumberOfObjectsFound > 0 &&
         data.RangeData[0].RangeStatus == 0)
     {
-      fcu.distance = EMA_ALPHA * data.RangeData[0].RangeMilliMeter + EMA_BETA * fcu.distance;
+      fcu.distance += (data.RangeData[0].RangeMilliMeter - fcu.distance) * ENV_ALPHA;
     }
     vl53l4cx.VL53L4CX_ClearInterruptAndStartMeasurement();
   }
@@ -299,13 +299,13 @@ static inline void task_pof_update(void)
 }
 
 static inline void pid_calculate(const float sp, const float pv, const float Kp, const float Ki,
-                                 const float Kd, float *I, float *_pv, float *out)
+                                 const float Kd, float *I, float *Df, float *_pv, float *out)
 {
   /**
    * Standard PID control algorithm with anti-windup, derivative on measurement, and output constraining.
    * - Proportional term (P) is the difference between setpoint and process variable.
    * - Integral term (I) accumulates the error over time, constrained to prevent windup and only updated when the final output is within limits.
-   * - Derivative term (D) is based on the change in process variable to avoid derivative kick.
+   * - Derivative term (D) is based on the change in process variable to avoid derivative kick and is filtered using an exponential moving average (EMA).
    * - Final output is the sum of P, I, and D terms, constrained within specified limits.
    * - Previous process variable is updated for next derivative calculation.
    *
@@ -314,14 +314,16 @@ static inline void pid_calculate(const float sp, const float pv, const float Kp,
   const float P = sp - pv;
   const float D = -(pv - *_pv) * PID_LOOP_HZ;
 
+  *Df += (D - *Df) * D_ALPHA;
+
   float I_temp = *I + P * PID_LOOP_PERIOD;
   I_temp = constrain(I_temp, I_TERM_MIN, I_TERM_MAX);
 
-  *out = Kp * P + Ki * (I_temp) + Kd * D;
+  *out = Kp * P + Ki * (I_temp) + Kd * (*Df);
   if (*out > PID_OUT_MIN && *out < PID_OUT_MAX)
     *I = I_temp;
 
-  *out = Kp * P + Ki * (*I) + Kd * D;
+  *out = Kp * P + Ki * (*I) + Kd * (*Df);
   *out = constrain(*out, PID_OUT_MIN, PID_OUT_MAX);
   *_pv = pv;
 }

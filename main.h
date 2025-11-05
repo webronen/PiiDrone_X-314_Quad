@@ -102,8 +102,8 @@ VL53L4CX vl53l4cx(&Wire, NC);
 #define SETPOINT_MIN -1.0f
 #define SETPOINT_MAX 1.0f
 
-#define EMA_ALPHA 0.3f
-#define EMA_BETA (1.0f - EMA_ALPHA)
+#define ENV_ALPHA 0.25f
+#define D_ALPHA 0.25f
 
 #define TEMPERATURE_OFFSET -3.8f
 #define DISTANCE_OFFSET -20
@@ -220,10 +220,10 @@ static_assert(sizeof(Rcu) == 255, "Rcu struct must be 255 bytes (63.75 words)");
 
 typedef struct __attribute__((packed, aligned(4)))
 {
-  float I, pv, out;
+  float I, Df, pv, out;
 } Pid;
 
-static_assert(sizeof(Pid) == 12, "Pid struct must be 12 bytes (3 words)");
+static_assert(sizeof(Pid) == 16, "Pid struct must be 16 bytes (4 words)");
 
 typedef struct __attribute__((packed, aligned(4)))
 {
@@ -282,7 +282,7 @@ static void (*const handle_type[PACKET_TYPE_COUNT])(void) = {
 
 // Utility function prototypes
 static inline void pid_calculate(const float sp, const float pv, const float Kp, const float Ki,
-                                 const float Kd, float *I, float *_pv, float *out);
+                                 const float Kd, float *I, float *Df, float *_pv, float *out);
 static inline void quaternion_multiply(DataQuaternion *result, const DataQuaternion *q1, const DataQuaternion *q2);
 static inline void quaternion_normalize(DataQuaternion *q);
 static inline void flash_read(void);
