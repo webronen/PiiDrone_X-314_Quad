@@ -33,18 +33,24 @@ VL53L4CX vl53l4cx(&Wire, NC);
 
 /**
  * Motor layout (X configuration):
+ *
+ *             Rear
+ *               |
  *          |----|----|
- *          | M1 | M2 |
+ *          | M4 | M3 |
  *          |----|----|
- *          | M3 | M4 |
+ *          | M2 | M1 |
  *          |----|----|
+ *               |
+ *             Front
  *
  * M1: Front-right (CCW)
  * M2: Front-left (CW)
  * M3: Rear-right (CW)
  * M4: Rear-left (CCW)
  *
- * Standard Quadcopter Control Response Table
+ *
+ * Setpoint response table:
  *
  * Axis   | Setpoint Change | Sign | Expected Drone Response
  * -------|-----------------|------|------------------------
@@ -55,10 +61,11 @@ VL53L4CX vl53l4cx(&Wire, NC);
  * Yaw    | Increase        |  +   | Yaws right (CW)
  * Yaw    | Decrease        |  –   | Yaws left (CCW)
  *
- * This is the standard convention for multicopter flight control.
  *
- * Maximum thrust is 50.5% of MOTOR_MAX (404), leaving 49.5% for PID mixing adjustments.
- * Hover thrust is approximately 350 (43.75% of MOTOR_MAX), leaving ~13.37% (54 units) headroom for altitude control.
+ * PID Mixing Budget Explanation:
+ *
+ * Maximum thrust is 50.5% (404 units) of MOTOR_MAX (800 units), leaving 49.5% (396 units) for PID mixing budget.
+ * Hover thrust is 350 (43.75%) units of MOTOR_MAX, leaving 13.3% (54 units) headroom for altitude control.
  */
 
 #define MOTOR1_PIN 11

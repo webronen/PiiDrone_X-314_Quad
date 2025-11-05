@@ -219,7 +219,7 @@ static inline void task_esc_update(void)
 {
   /**
    * Control motor outputs based on FCU thrust and PID controller outputs.
-   * - If FCU is not active, reset thrust and PID setpoints/outputs to zero.
+   * - If FCU is not active, reset thrust and PID setpoints/states to zero.
    * - Calculate raw motor outputs for a quadcopter in X configuration.
    * - Update ESC PWM values with constrained motor outputs.
    * - Trigger PWM update for ESCs.
