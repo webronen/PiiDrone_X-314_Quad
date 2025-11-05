@@ -234,10 +234,6 @@ static inline void task_esc_update(void)
     memset(pid_state, 0, sizeof(pid_state));
   }
 
-  /**
-   * Maximum thrust is 50.5% of MOTOR_MAX (404), leaving 49.5% for PID mixing adjustments.
-   * Hover thrust is approximately 350 (43.75% of MOTOR_MAX), leaving ~13.37% headroom for altitude control.
-   */
   const float m1 = fcu.thrust + pid_state[0].out - pid_state[1].out - pid_state[2].out;
   const float m2 = fcu.thrust - pid_state[0].out - pid_state[1].out + pid_state[2].out;
   const float m3 = fcu.thrust + pid_state[0].out + pid_state[1].out + pid_state[2].out;

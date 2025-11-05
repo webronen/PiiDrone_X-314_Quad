@@ -56,6 +56,9 @@ VL53L4CX vl53l4cx(&Wire, NC);
  * Yaw    | Decrease        |  –   | Yaws left (CCW)
  *
  * This is the standard convention for multicopter flight control.
+ *
+ * Maximum thrust is 50.5% of MOTOR_MAX (404), leaving 49.5% for PID mixing adjustments.
+ * Hover thrust is approximately 350 (43.75% of MOTOR_MAX), leaving ~13.37% (54 units) headroom for altitude control.
  */
 
 #define MOTOR1_PIN 11
