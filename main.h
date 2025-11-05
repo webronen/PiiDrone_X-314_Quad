@@ -89,7 +89,7 @@ VL53L4CX vl53l4cx(&Wire, NC);
 #define GAIN_MIN 0.0f
 #define GAIN_MAX 100.0f
 
-// 50.5% of MOTOR_MAX (Roll, Pitch, Yaw PID max at 16.5% of MOTOR_MAX, so total 49.5% + 50.5% = 100%)
+// Safe thrust limit to avoid motor saturation (50.5% of MOTOR_MAX)
 #define MAX_SAFE_THRUST 404
 
 #define SETPOINT_MIN -1.0f
