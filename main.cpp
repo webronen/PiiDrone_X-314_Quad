@@ -341,6 +341,8 @@ static inline void quaternion_multiply(DataQuaternion *r, const DataQuaternion *
   /**
    * Perform quaternion multiplication using the Hamilton product formula.
    * Normalize the resulting quaternion to ensure it remains a unit quaternion.
+   * 
+   * Note: Quaternion multiplication is not commutative; the order of operands matters.
    */
   r->w = q1->w * q2->w - q1->x * q2->x - q1->y * q2->y - q1->z * q2->z;
   r->x = q1->w * q2->x + q1->x * q2->w + q1->y * q2->z - q1->z * q2->y;
