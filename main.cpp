@@ -237,6 +237,19 @@ static inline void task_esc_update(void)
    * M3: Rear-right (CW)
    * M4: Rear-left (CCW)
    *
+   * Standard Quadcopter Control Response Table
+   *
+   * Axis   | Setpoint Change | Sign | Expected Drone Response
+   * -------|-----------------|------|-----------------------------
+   * Roll   | Increase        |  +   | Rolls right
+   * Roll   | Decrease        |  –   | Rolls left
+   * Pitch  | Increase        |  +   | Pitches forward
+   * Pitch  | Decrease        |  –   | Pitches backward
+   * Yaw    | Increase        |  +   | Yaws right (CW)
+   * Yaw    | Decrease        |  –   | Yaws left (CCW)
+   *
+   * This is the standard convention for multicopter flight control.
+   *
    * Note: MOTOR_MIN and MOTOR_MAX define the valid PWM range for ESCs.
    */
   if (!FCU_IS_ACTIVE(fcu.status))
