@@ -225,8 +225,8 @@ static inline void task_esc_update(void)
    * - Trigger PWM update for ESCs.
    *
    * Note: No need for additional offsetting or constraining here, because
-   * advanced mixing logic ensures outputs stay within safe limits. Only
-   * constrain to MOTOR_MIN and MOTOR_MAX for ESCs physical requirements.
+   * advanced PID mixing budget is already considered in FCU thrust and PID outputs.
+   * We only need to constrain final motor outputs for ESCs physical limits.
    */
   if (!FCU_IS_ACTIVE(fcu.status))
   {
