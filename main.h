@@ -69,26 +69,25 @@ VL53L4CX vl53l4cx(&Wire, NC);
 // Motor output range
 #define MOTOR_MIN 0
 #define MOTOR_MAX 800
-#define MOTOR_MAX_INV (1.0f / MOTOR_MAX)
 
 // PID loop timing
 #define PID_LOOP_HZ 211.0f
 #define PID_LOOP_PERIOD (1.0f / PID_LOOP_HZ)
 
-// PID output limits
-#define PID_OUT_MIN -200.0f
-#define PID_OUT_MAX 200.0f
+// PID output limits (16.5% of MOTOR_MAX)
+#define PID_OUT_MIN -132.0f
+#define PID_OUT_MAX 132.0f
 
-// Integral term limits (anti-windup)
-#define I_TERM_MIN -100.0f
-#define I_TERM_MAX 100.0f
+// Integral term limits (8.25% of MOTOR_MAX)
+#define I_TERM_MIN -66.0f
+#define I_TERM_MAX 66.0f
 
 // Gain tuning range
 #define GAIN_MIN 0.0f
 #define GAIN_MAX 100.0f
 
-// Safe thrust limit to avoid motor saturation
-#define MAX_SAFE_THRUST 200.0f
+// 50.5% of MOTOR_MAX (Roll, Pitch, Yaw PID max at 16.5% of MOTOR_MAX, so total 49.5% + 50.5% = 100%)
+#define MAX_SAFE_THRUST 404
 
 #define SETPOINT_MIN -1.0f
 #define SETPOINT_MAX 1.0f
