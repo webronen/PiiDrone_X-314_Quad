@@ -304,7 +304,7 @@ static inline void pid_calculate(const float sp, const float pv, const float Kp,
   /**
    * Standard PID control algorithm with anti-windup, derivative on measurement, and output constraining.
    * - Proportional term (P) is the difference between setpoint and process variable.
-   * - Integral term (I) accumulates the error over time, constrained to prevent windup.
+   * - Integral term (I) accumulates the error over time, constrained to prevent windup and only updated when the final output is within limits.
    * - Derivative term (D) is based on the change in process variable to avoid derivative kick.
    * - Final output is the sum of P, I, and D terms, constrained within specified limits.
    * - Previous process variable is updated for next derivative calculation.
@@ -312,9 +312,15 @@ static inline void pid_calculate(const float sp, const float pv, const float Kp,
    * Note: PID_LOOP_PERIOD and PID_LOOP_HZ are constants defining the control loop timing.
    */
   const float P = sp - pv;
-  *I = *I + P * PID_LOOP_PERIOD;
-  *I = constrain(*I, I_TERM_MIN, I_TERM_MAX);
   const float D = -(pv - *_pv) * PID_LOOP_HZ;
+
+  float I_temp = *I + P * PID_LOOP_PERIOD;
+  I_temp = constrain(I_temp, I_TERM_MIN, I_TERM_MAX);
+
+  *out = Kp * P + Ki * (I_temp) + Kd * D;
+  if (*out > PID_OUT_MIN && *out < PID_OUT_MAX)
+    *I = I_temp;
+
   *out = Kp * P + Ki * (*I) + Kd * D;
   *out = constrain(*out, PID_OUT_MIN, PID_OUT_MAX);
   *_pv = pv;
