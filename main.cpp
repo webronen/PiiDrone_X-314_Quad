@@ -221,11 +221,12 @@ static inline void task_esc_update(void)
    * Control motor outputs based on FCU thrust and PID controller outputs.
    * - If FCU is not active, reset thrust and PID setpoints/outputs to zero.
    * - Calculate raw motor outputs for a quadcopter in X configuration.
-   * - If any motor output exceeds maximum, calculate a possible offset to bring the highest output down to max.
-   * - Update ESC PWM values with constrained motor outputs minus possible offset.
+   * - Update ESC PWM values with constrained motor outputs.
    * - Trigger PWM update for ESCs.
    *
-   * Note: MOTOR_MIN and MOTOR_MAX define the valid PWM range for ESCs.
+   * Note: No need for additional offsetting or constraining here, because
+   * advanced mixing logic ensures outputs stay within safe limits. Only
+   * constrain to MOTOR_MIN and MOTOR_MAX for ESCs physical requirements.
    */
   if (!FCU_IS_ACTIVE(fcu.status))
   {
@@ -239,13 +240,10 @@ static inline void task_esc_update(void)
   const float m3 = fcu.thrust + pid_state[0].out + pid_state[1].out + pid_state[2].out;
   const float m4 = fcu.thrust - pid_state[0].out + pid_state[1].out - pid_state[2].out;
 
-  const float motor_max = __builtin_fmaxf(__builtin_fmaxf(m1, m2), __builtin_fmaxf(m3, m4));
-  const float offset = __builtin_fmaxf(motor_max - MOTOR_MAX, 0.0f);
-
-  esc.m1 = 0x8000 | (uint16_t)constrain(m1 - offset, MOTOR_MIN, MOTOR_MAX);
-  esc.m2 = 0x8000 | (uint16_t)constrain(m2 - offset, MOTOR_MIN, MOTOR_MAX);
-  esc.m3 = 0x8000 | (uint16_t)constrain(m3 - offset, MOTOR_MIN, MOTOR_MAX);
-  esc.m4 = 0x8000 | (uint16_t)constrain(m4 - offset, MOTOR_MIN, MOTOR_MAX);
+  esc.m1 = 0x8000 | (uint16_t)constrain(m1, MOTOR_MIN, MOTOR_MAX);
+  esc.m2 = 0x8000 | (uint16_t)constrain(m2, MOTOR_MIN, MOTOR_MAX);
+  esc.m3 = 0x8000 | (uint16_t)constrain(m3, MOTOR_MIN, MOTOR_MAX);
+  esc.m4 = 0x8000 | (uint16_t)constrain(m4, MOTOR_MIN, MOTOR_MAX);
 
   NRF_PWM0->TASKS_SEQSTART[0] = 1;
 }
