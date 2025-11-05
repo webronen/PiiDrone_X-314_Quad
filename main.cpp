@@ -75,10 +75,10 @@ void setup(void)
   NRF_PWM0->SEQ[0].PTR = (uint32_t)&esc;
   NRF_PWM0->SEQ[0].CNT = (sizeof(Esc) / sizeof(uint16_t));
   NRF_PWM0->SEQ[0].REFRESH = PWM_SEQ_REFRESH_CNT_Continuous;
-  NRF_PWM0->PSEL.OUT[0] = MOTOR1_PIN; // M1: Front-left (CCW)
-  NRF_PWM0->PSEL.OUT[1] = MOTOR2_PIN; // M2: Front-right (CW)
-  NRF_PWM0->PSEL.OUT[2] = MOTOR3_PIN; // M3: Rear-left (CW)
-  NRF_PWM0->PSEL.OUT[3] = MOTOR4_PIN; // M4: Rear-right (CCW)
+  NRF_PWM0->PSEL.OUT[0] = MOTOR1_PIN;
+  NRF_PWM0->PSEL.OUT[1] = MOTOR2_PIN;
+  NRF_PWM0->PSEL.OUT[2] = MOTOR3_PIN;
+  NRF_PWM0->PSEL.OUT[3] = MOTOR4_PIN;
   NRF_PWM0->ENABLE = PWM_ENABLE_ENABLE_Enabled;
   NRF_PWM0->TASKS_SEQSTART[0] = 1;
 
@@ -224,31 +224,6 @@ static inline void task_esc_update(void)
    * - If any motor output exceeds maximum, calculate a possible offset to bring the highest output down to max.
    * - Update ESC PWM values with constrained motor outputs minus possible offset.
    * - Trigger PWM update for ESCs.
-   *
-   * Motor layout (X configuration):
-   *          |-----|-----|
-   *          |  M1 |  M2 |
-   *          |-----|-----|
-   *          |  M3 |  M4 |
-   *          |-----|-----|
-   *
-   * M1: Front-right (CCW)
-   * M2: Front-left (CW)
-   * M3: Rear-right (CW)
-   * M4: Rear-left (CCW)
-   *
-   * Standard Quadcopter Control Response Table
-   *
-   * Axis   | Setpoint Change | Sign | Expected Drone Response
-   * -------|-----------------|------|-----------------------------
-   * Roll   | Increase        |  +   | Rolls right
-   * Roll   | Decrease        |  –   | Rolls left
-   * Pitch  | Increase        |  +   | Pitches forward
-   * Pitch  | Decrease        |  –   | Pitches backward
-   * Yaw    | Increase        |  +   | Yaws right (CW)
-   * Yaw    | Decrease        |  –   | Yaws left (CCW)
-   *
-   * This is the standard convention for multicopter flight control.
    *
    * Note: MOTOR_MIN and MOTOR_MAX define the valid PWM range for ESCs.
    */
