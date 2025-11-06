@@ -64,8 +64,14 @@ VL53L4CX vl53l4cx(&Wire, NC);
  *
  * PID Mixing Budget Explanation:
  *
- * Maximum thrust is 50.5% (404 units) of MOTOR_MAX (800 units), leaving 49.5% (396 units) for PID mixing budget.
- * Hover thrust is 350 (43.75%) units of MOTOR_MAX, leaving 13.3% (54 units) headroom for altitude control.
+ * Maximum thrust is 56.25% (450 units) of MOTOR_MAX (800 units),
+ * leaving 43.75% (350 units) for PID mixing budget.
+ *
+ * Hover thrust is 350 (43.75%) units of MOTOR_MAX,
+ * leaving 12.5% (100 units) headroom for altitude control.
+ *
+ * PID output limits are auto-calculated as (800 - 450) / 3 = ±116.667 units per axis,
+ * ensuring worst-case mixing (450 + 3*116.667 = 800) stays within motor limits.
  */
 
 #define MOTOR1_PIN 11
@@ -78,7 +84,7 @@ VL53L4CX vl53l4cx(&Wire, NC);
 
 #define MOTOR_MIN 0
 #define MOTOR_MAX 800
-#define HOVER_THRUST 350 // 70g/160g = 43.75% of MOTOR_MAX
+#define HOVER_THRUST 350    // 70g/160g = 43.75% of MOTOR_MAX
 #define THRUST_HEADROOM 100 // Additional 20g headroom for altitude control
 #define THRUST_MAX (HOVER_THRUST + THRUST_HEADROOM)
 #define THRUST_MIN 0
