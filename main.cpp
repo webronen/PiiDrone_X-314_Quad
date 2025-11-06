@@ -305,7 +305,7 @@ static inline void pid_calculate(const float sp, const float pv, const float Kp,
    * PID Controller Calculation:
    * - Proportional term (P): Difference between setpoint and process variable.
    * - Derivative term (D): Change in process variable (derivative on measurement), avoids derivative kick when setpoint changes. Filtered using EMA.
-   * - Integral term (I): Accumulates error over time. Clamped to prevent windup and updated only if output is in PID mixing budget.
+   * - Integral term (I): Accumulates error over time. Clamped to prevent windup and updated only if output is in PID mixing budget limits.
    * - PID output: Sum of P, I, and D terms, clamped to PID mixing budget limits.
    * - Previous process variable (_pv) is updated for next derivative calculation.
    *
