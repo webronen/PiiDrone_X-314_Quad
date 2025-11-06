@@ -122,7 +122,7 @@ void setup(void)
   vl53l4cx.VL53L4CX_SetUserROI(&roi);
   vl53l4cx.VL53L4CX_StartMeasurement();
 
-  // TODO: Read permanent FCU settings from UICR flash memory
+  // TODO: Load persistent FCU settings from UICR flash memory
 }
 
 /**
@@ -393,6 +393,6 @@ static inline void handle_thrust_update(void)
 
 static inline void handle_flash_update(void)
 {
-  // TODO: Write permanent FCU settings to UICR flash memory
+  // TODO: Save persistent FCU settings to UICR flash memory
   return;
 }
