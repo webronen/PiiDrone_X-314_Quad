@@ -71,7 +71,7 @@ VL53L4CX vl53l4cx(&Wire, NC);
  * leaving 12.5% (100 units) headroom for altitude control.
  *
  * PID output limits are auto-calculated as (800 - 450) / 3 = ±116.667 units per axis,
- * ensuring worst-case mixing (450 + 3*116.667 = 800) stays within motor limits.
+ * ensuring worst-case mixing (450 + 3*116.667 = 800) stays within ESCs physical limits.
  */
 
 #define MOTOR1_PIN 11
