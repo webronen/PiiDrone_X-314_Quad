@@ -103,7 +103,7 @@ VL53L4CX vl53l4cx(&Wire, NC);
 #define SETPOINT_MAX 1.0f
 
 #define ENV_ALPHA 0.25f
-#define D_ALPHA 0.25f
+#define D_ALPHA 0.75f
 
 #define TEMPERATURE_OFFSET -3.8f
 #define DISTANCE_OFFSET -20
