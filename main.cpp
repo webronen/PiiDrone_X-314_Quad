@@ -302,7 +302,7 @@ static inline void pid_calculate(const float sp, const float pv, const float Kp,
                                  const float Kd, float *_I, float *_D, float *_pv, float *out)
 {
   /**
-   * PID control algorithm with anti-windup, integral clamping, derivative filtering, and output constraining.
+   * PID Controller Calculation:
    * - Proportional term (P): Difference between setpoint and process variable, scaled by Kp.
    * - Derivative term (D): Change in process variable (derivative on measurement), scaled by Kd and filtered using EMA (_D). Avoids derivative kick when setpoint changes.
    * - Integral term (I): Accumulates error over time, scaled by Ki. Only updated if output is not saturated, and clamped to prevent windup.
