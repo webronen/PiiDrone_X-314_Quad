@@ -302,14 +302,14 @@ static inline void pid_calculate(const float sp, const float pv, const float Kp,
                                  const float Kd, float *I, float *Df, float *_pv, float *out)
 {
   /**
-   * Standard PID control algorithm with anti-windup, derivative on measurement, and output constraining.
-   * - Proportional term (P) is the difference between setpoint and process variable.
-   * - Integral term (I) accumulates the error over time, constrained to prevent windup and only updated when the final output is within limits.
-   * - Derivative term (D) is based on the change in process variable to avoid derivative kick and is filtered using an exponential moving average (EMA).
-   * - Final output is the sum of P, I, and D terms, constrained within specified limits.
-   * - Previous process variable is updated for next derivative calculation.
+   * PID control algorithm with anti-windup, integral clamping, derivative filtering, and output constraining.
+   * - Proportional term (P): Difference between setpoint and process variable, scaled by Kp.
+   * - Derivative term (D): Change in process variable (derivative on measurement), scaled by Kd and filtered using EMA (Df).
+   * - Integral term (I): Accumulates error over time, scaled by Ki. Only updated if output is not saturated, and clamped to prevent windup.
+   * - PID output: Sum of P, I, and D terms, constrained to output limits.
+   * - Previous process variable (_pv) is updated for next derivative calculation.
    *
-   * Note: PID_LOOP_PERIOD and PID_LOOP_HZ are constants defining the control loop timing.
+   * Note: PID_LOOP_PERIOD and PID_LOOP_HZ define control loop timing.
    */
   const float P = sp - pv;
   const float D = -(pv - *_pv) * PID_LOOP_HZ;
