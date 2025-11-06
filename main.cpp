@@ -320,8 +320,8 @@ static inline void pid_calculate(const float sp, const float pv, const float Kp,
   I = constrain(I, I_TERM_MIN, I_TERM_MAX);
 
   *out = Kp * P + Ki * (I) + Kd * (*_D);
-  const bool integral_active = (*out > PID_OUT_MIN && *out < PID_OUT_MAX);
-  *_I = integral_active ? I : *_I;
+  const bool update_integral = (*out > PID_OUT_MIN && *out < PID_OUT_MAX);
+  *_I = update_integral ? I : *_I;
 
   *out = Kp * P + Ki * (*_I) + Kd * (*_D);
   *out = constrain(*out, PID_OUT_MIN, PID_OUT_MAX);
