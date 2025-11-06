@@ -299,7 +299,7 @@ static inline void task_pof_update(void)
 }
 
 static inline void pid_calculate(const float sp, const float pv, const float Kp, const float Ki,
-                                 const float Kd, float *I, float *Df, float *_pv, float *out)
+                                 const float Kd, float *_I, float *_D, float *_pv, float *out)
 {
   /**
    * PID control algorithm with anti-windup, integral clamping, derivative filtering, and output constraining.
@@ -314,16 +314,16 @@ static inline void pid_calculate(const float sp, const float pv, const float Kp,
   const float P = sp - pv;
   const float D = -(pv - *_pv) * PID_LOOP_HZ;
 
-  *Df += (D - *Df) * D_ALPHA;
+  *_D += (D - *_D) * D_ALPHA;
 
-  float I_temp = *I + P * PID_LOOP_PERIOD;
-  I_temp = constrain(I_temp, I_TERM_MIN, I_TERM_MAX);
+  float I = *_I + P * PID_LOOP_PERIOD;
+  I = constrain(I, I_TERM_MIN, I_TERM_MAX);
 
-  *out = Kp * P + Ki * (I_temp) + Kd * (*Df);
-  if (*out > PID_OUT_MIN && *out < PID_OUT_MAX)
-    *I = I_temp;
+  *out = Kp * P + Ki * (I) + Kd * (*_D);
+  const bool integral_active = (*out > PID_OUT_MIN && *out < PID_OUT_MAX);
+  *_I = integral_active ? I : *_I;
 
-  *out = Kp * P + Ki * (*I) + Kd * (*Df);
+  *out = Kp * P + Ki * (*_I) + Kd * (*_D);
   *out = constrain(*out, PID_OUT_MIN, PID_OUT_MAX);
   *_pv = pv;
 }

@@ -282,7 +282,7 @@ static void (*const handle_type[PACKET_TYPE_COUNT])(void) = {
 
 // Utility function prototypes
 static inline void pid_calculate(const float sp, const float pv, const float Kp, const float Ki,
-                                 const float Kd, float *I, float *Df, float *_pv, float *out);
+                                 const float Kd, float *_I, float *_D, float *_pv, float *out);
 static inline void quaternion_multiply(DataQuaternion *result, const DataQuaternion *q1, const DataQuaternion *q2);
 static inline void quaternion_normalize(DataQuaternion *q);
 static inline void flash_read(void);
