@@ -169,9 +169,12 @@ void loop(void)
     }
   }
 
-  /** Automatic Landing Sequence:
+  /** 
+   * Automatic Landing Sequence:
    * - Initiates landing if FCU is active and either RCU packet timeout or power-fail warning is detected.
    * - Gradually reduces thrust in defined steps at specified intervals until landing is complete.
+   * - If landing is in progress and no power-fail warning, landing can be interrupted by RCU packets.
+   * - If landing is in progress because of power-fail warning, landing cannot be interrupted.
    */
   if ((FCU_IS_ACTIVE(fcu.status) && (packet_timeout || FCU_IS_POFWARN(fcu.status)) && landing_timeout))
   {
