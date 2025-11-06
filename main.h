@@ -144,21 +144,6 @@ VL53L4CX vl53l4cx(&Wire, NC);
 #define FCU_UPDATE_THRUST(status, thrust, value, min, max) \
   (thrust = constrain(FCU_IS_POFWARN(status) ? ((value) < (thrust) ? (value) : (thrust)) : (value), (min), (max)))
 
-#define FLASH_SCK_PIN 3
-#define FLASH_MOSI_PIN 4
-#define FLASH_MISO_PIN 5
-#define FLASH_CS_PIN 26
-#define FLASH_WREN_CMD 0x06
-#define FLASH_WRDI_CMD 0x04
-#define FLASH_READ_CMD 0x0B
-#define FLASH_WRITE_CMD 0x02
-#define FLASH_RDSR_CMD 0x05
-#define FLASH_SE_CMD 0x20
-#define FLASH_RDID_CMD 0x9F
-#define FLASH_FCU_ADDR 0x000000
-#define FLASH_CS_LOW() (NRF_P0->OUTCLR = (1UL << FLASH_CS_PIN))
-#define FLASH_CS_HIGH() (NRF_P0->OUTSET = (1UL << FLASH_CS_PIN))
-
 #define ACCELEROMETER_HZ 400
 #define ACCELEROMETER_LATENCY 1
 #define ACCELEROMETER_RANGE 8
@@ -283,13 +268,5 @@ static inline void pid_calculate(const float sp, const float pv, const float Kp,
                                  const float Kd, float *_I, float *_D, float *_pv, float *out);
 static inline void quaternion_multiply(DataQuaternion *result, const DataQuaternion *q1, const DataQuaternion *q2);
 static inline void quaternion_normalize(DataQuaternion *q);
-static inline void flash_read(void);
-
-static void flash_spim_init(void);
-static uint8_t flash_read_status(void);
-static bool flash_write_enable(void);
-static bool flash_wait_ready(void);
-static inline bool flash_erase(const uint32_t addr);
-static inline bool flash_write(void);
 
 #endif // MAIN_H
