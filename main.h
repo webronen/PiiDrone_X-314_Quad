@@ -76,31 +76,23 @@ VL53L4CX vl53l4cx(&Wire, NC);
 #define HZ_TO_US(Hz) ((uint32_t)(1000000.0f / (Hz)))
 #define VL53L4CX_I2C_SPEED 400000 // 400kHz
 
-// Motor output range
 #define MOTOR_MIN 0
 #define MOTOR_MAX 800
-
-// PID loop timing
-#define PID_LOOP_HZ 211.0f
-#define PID_LOOP_PERIOD (1.0f / PID_LOOP_HZ)
-
-// PID output limits (16.5% of MOTOR_MAX)
-#define PID_OUT_MIN -132.0f
-#define PID_OUT_MAX 132.0f
-
-// Integral term limits (8.25% of MOTOR_MAX)
-#define I_TERM_MIN -66.0f
-#define I_TERM_MAX 66.0f
-
-// Gain tuning range
-#define GAIN_MIN 0.0f
-#define GAIN_MAX 100.0f
-
-// Safe thrust limit to avoid motor saturation (50.5% of MOTOR_MAX)
-#define MAX_SAFE_THRUST 404
-
+#define HOVER_THRUST 350 // 70g/160g = 43.75% of MOTOR_MAX
+#define THRUST_HEADROOM 100
+#define THRUST_MAX (HOVER_THRUST + THRUST_HEADROOM)
+#define THRUST_MIN 0
 #define SETPOINT_MIN -1.0f
 #define SETPOINT_MAX 1.0f
+
+#define PID_GAIN_MAX 100.0f
+#define PID_GAIN_MIN 0.0f
+#define PID_OUT_MAX ((MOTOR_MAX - THRUST_MAX) / 3.0f)
+#define PID_OUT_MIN (-PID_OUT_MAX)
+#define PID_I_MAX (PID_OUT_MAX / 2.0f)
+#define PID_I_MIN (-PID_I_MAX)
+#define PID_LOOP_HZ 211.0f
+#define PID_LOOP_PERIOD (1.0f / PID_LOOP_HZ)
 
 #define ENV_ALPHA 0.25f
 #define D_ALPHA 0.75f

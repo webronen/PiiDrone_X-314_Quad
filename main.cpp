@@ -317,7 +317,7 @@ static inline void pid_calculate(const float sp, const float pv, const float Kp,
   *_D += (D - *_D) * D_ALPHA;
 
   float I = *_I + P * PID_LOOP_PERIOD;
-  I = constrain(I, I_TERM_MIN, I_TERM_MAX);
+  I = constrain(I, PID_I_MIN, PID_I_MAX);
 
   *out = Kp * P + Ki * (I) + Kd * (*_D);
   const bool update_integral = (*out > PID_OUT_MIN && *out < PID_OUT_MAX);
@@ -370,7 +370,7 @@ static inline void handle_pid_update(void)
   float pid_gain;
   memcpy(&pid_gain, (const void *)&received_packet.data[2], sizeof(pid_gain));
 
-  FCU_UPDATE_GAIN(fcu.pid_gain, axis, gain, pid_gain, GAIN_MIN, GAIN_MAX);
+  FCU_UPDATE_GAIN(fcu.pid_gain, axis, gain, pid_gain, PID_GAIN_MIN, PID_GAIN_MAX);
 }
 
 static inline void handle_setpoint_update(void)
@@ -388,8 +388,8 @@ static inline void handle_thrust_update(void)
   uint16_t thrust;
   memcpy(&thrust, (const void *)&received_packet.data[0], sizeof(thrust));
 
-  FCU_UPDATE_THRUST(fcu.status, fcu.thrust, thrust, MOTOR_MIN, MAX_SAFE_THRUST);
-  FCU_UPDATE_ACTIVE(fcu.status, fcu.thrust > MOTOR_MIN);
+  FCU_UPDATE_THRUST(fcu.status, fcu.thrust, thrust, THRUST_MIN, THRUST_MAX);
+  FCU_UPDATE_ACTIVE(fcu.status, fcu.thrust > THRUST_MIN);
 }
 
 static void flash_spim_init(void)
