@@ -231,7 +231,6 @@ static Fcu fcu = {0};
 static Esc esc = {0x8000, 0x8000, 0x8000, 0x8000};
 static volatile Rcu received_packet = {0};
 static Pid pid_state[3] = {0};
-static Flash flash = {0};
 
 // Task function prototypes
 static inline void task_imu_update(void);
