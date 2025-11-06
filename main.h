@@ -79,7 +79,7 @@ VL53L4CX vl53l4cx(&Wire, NC);
 #define MOTOR_MIN 0
 #define MOTOR_MAX 800
 #define HOVER_THRUST 350 // 70g/160g = 43.75% of MOTOR_MAX
-#define THRUST_HEADROOM 100
+#define THRUST_HEADROOM 100 // Additional 20g headroom for altitude control
 #define THRUST_MAX (HOVER_THRUST + THRUST_HEADROOM)
 #define THRUST_MIN 0
 #define SETPOINT_MIN -1.0f
