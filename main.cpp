@@ -147,7 +147,7 @@ void loop(void)
   const bool packet_timeout = (int32_t)(loop_start_us - last_packet_us) >= 0;
   const bool landing_timeout = (int32_t)(loop_start_us - last_landing_us) >= 0;
 
-  // Check for received RCU packet and handle it.
+  // Check for received RCU packet via radio and handle it.
   if (NRF_RADIO->EVENTS_CRCOK)
   {
     NRF_RADIO->EVENTS_CRCOK = 0;
@@ -169,12 +169,15 @@ void loop(void)
     }
   }
 
-  /** 
+  /**
    * Automatic Landing Sequence:
    * - Initiates landing if FCU is active and either RCU packet timeout or power-fail warning is detected.
    * - Gradually reduces thrust in defined steps at specified intervals until landing is complete.
    * - If landing is in progress and no power-fail warning, landing can be interrupted by RCU packets.
    * - If landing is in progress because of power-fail warning, landing cannot be interrupted.
+   * 
+   * Note: This landing logic ensures safe descent during signal loss or power-fail conditions,
+   * while allowing for manual override when appropriate.
    */
   if ((FCU_IS_ACTIVE(fcu.status) && (packet_timeout || FCU_IS_POFWARN(fcu.status)) && landing_timeout))
   {
@@ -195,6 +198,8 @@ static inline void task_fcu_update(void)
    * - Apply exponential moving average (EMA) filtering to pressure, temperature, and humidity readings.
    * - Compute orientation error quaternion relative to hover state.
    * - Update PID controllers for roll, pitch, and yaw based on orientation error.
+   *
+   * Note: FCU thrust and PID setpoints are managed externally via RCU packets for control.
    */
   fcu.pressure += (pressure._value - fcu.pressure) * ENV_ALPHA;
   fcu.temperature += ((temperature._value + TEMPERATURE_OFFSET) - fcu.temperature) * ENV_ALPHA;
@@ -220,15 +225,14 @@ static inline void task_fcu_update(void)
 static inline void task_esc_update(void)
 {
   /**
-   * Control motor outputs based on FCU thrust and PID controller outputs.
+   * Update ESC motor outputs based on FCU thrust and PID controller outputs.
    * - If FCU is not active, reset thrust and PID setpoints/states to zero.
    * - Calculate raw motor outputs for a quadcopter in X configuration.
    * - Update ESC PWM values with constrained motor outputs.
    * - Trigger PWM update for ESCs.
    *
-   * Note: No need for additional offsetting or constraining here, because
+   * - Note: No need for additional offsetting or constraining here, because
    * advanced PID mixing budget is already considered in FCU thrust and PID outputs.
-   * We only need to constrain final motor outputs for ESCs physical limits.
    */
   if (!FCU_IS_ACTIVE(fcu.status))
   {
@@ -305,13 +309,14 @@ static inline void pid_calculate(const float sp, const float pv, const float Kp,
 {
   /**
    * PID Controller Calculation:
-   * - Proportional term (P): Difference between setpoint and process variable.
-   * - Derivative term (D): Change in process variable (derivative on measurement), avoids derivative kick when setpoint changes. Filtered using EMA.
-   * - Integral term (I): Accumulates error over time. Clamped to prevent windup and updated only if output is in PID mixing budget limits.
-   * - PID output: Sum of P, I, and D terms, clamped to PID mixing budget limits.
-   * - Previous process variable (_pv) is updated for next derivative calculation.
+   * - Uses derivative on measurement (DOM) approach to avoid derivative kick.
+   * - Derivative term is filtered using an exponential moving average (EMA).
+   * - Clamp integral term to prevent windup and only update it when output is in PID mixing budget limits.
+   * - Clamp final output to PID mixing budget limits.
+   * - Save previous process variable (_pv) for next derivative calculation.
+   * - Designed for high-frequency control loops with deterministic timing.
    *
-   * Note: PID_LOOP_PERIOD and PID_LOOP_HZ define control loop timing.
+   * Note: This PID implementation assumes a fixed loop period defined by PID_LOOP_HZ.
    */
   const float P = sp - pv;
   const float D = -(pv - *_pv) * PID_LOOP_HZ;
@@ -333,8 +338,9 @@ static inline void pid_calculate(const float sp, const float pv, const float Kp,
 static inline void quaternion_multiply(DataQuaternion *r, const DataQuaternion *q1, const DataQuaternion *q2)
 {
   /**
-   * Perform quaternion multiplication using the Hamilton product formula.
-   * Normalize the resulting quaternion to ensure it remains a unit quaternion.
+   * Quaternion Multiplication:
+   * - Performs quaternion multiplication using the Hamilton product formula.
+   * - Normalizes the resulting quaternion to ensure it remains a unit quaternion.
    *
    * Note: Quaternion multiplication is not commutative; the order of operands matters.
    */
@@ -397,5 +403,5 @@ static inline void handle_thrust_update(void)
 static inline void handle_flash_update(void)
 {
   // TODO: Save persistent FCU settings to UICR flash memory
-  return;
+  __NOP();
 }
