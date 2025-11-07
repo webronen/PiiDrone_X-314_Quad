@@ -50,8 +50,9 @@
  * Design Advantage:
  * - 100% mass-equivalent stabilization exceeds typical commercial budgets
  * - Conservative allocation provides robust performance in turbulence
- *
- * Overall, this authority budget balances aggressive control with safety and exceeds typical commercial standards.
+ * - Balanced approach optimizes control without risking motor saturation.
+ * 
+ * Overall, this budget supports agile and stable flight for the PiiDrone X-314 Quad.
  */
 
 #include "main.h"
