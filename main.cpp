@@ -44,8 +44,7 @@
  *
  * Performance & Safety:
  * - 1.0g lateral acceleration enables aggressive disturbance rejection
- * - PID limits: ±116.67 units/axis ensures worst-case (450 + 3×117 = 801)
- *   stays within motor saturation limits
+ * - PID limits: ±116.67 units/axis ensures worst-case (450 + 3×117 = 801) stays within motor saturation limits
  * - Integral clamp is half from PID limits: ±58.33 units prevents windup consuming control authority.
  *
  * Design Advantage:
