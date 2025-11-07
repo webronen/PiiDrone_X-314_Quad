@@ -1,66 +1,85 @@
 /**
- * FCU-Centered Non-blocking Event Polling Approach:
+ * Motor layout (X configuration):
  *
- * This firmware uses a non-blocking, polling-based architecture where all flight control unit (FCU) state updates,
- * event handling, and safety checks are performed centrally in the main control loop. Instead of relying on
- * interrupt service routines (ISRs), all hardware event flags—such as radio packet reception, power-fail warnings,
- * and sensor updates—are checked and processed sequentially within the loop, without blocking the execution flow.
+ *             Rear
+ *               |
+ *          |----|----|
+ *          | M4 | M3 |
+ *          |----|----|
+ *          | M2 | M1 |
+ *          |----|----|
+ *               |
+ *             Front
  *
- * Benefits:
- * - Centralized State Management: All critical state (thrust, setpoints, PID gains, status flags) is updated in one place,
- *   making system behavior predictable and easy to reason about.
- * - Non-blocking: The main loop never waits for events, ensuring all tasks and checks run at high frequency.
- * - Simpler Code Flow: Logic is not fragmented across ISRs and callbacks, reducing complexity and risk of subtle bugs.
- * - No Concurrency Issues: All state changes happen in the main loop, avoiding race conditions and data sharing problems.
- * - Deterministic Timing: The order and timing of all actions are controlled, which is important for real-time flight control.
- * - Easier Debugging and Maintenance: The main loop acts as the “center” of the system, making it straightforward to trace and modify behavior.
- * - Full Control: The main loop can prioritize tasks and events as needed, and all state changes are explicit.
+ * M1: Front-right (CCW)
+ * M2: Front-left (CW)
+ * M3: Rear-right (CW)
+ * M4: Rear-left (CCW)
  *
- * This approach is well-suited for high-frequency control loops (such as drones), where the loop runs fast enough
- * to respond to events promptly without missing critical updates, while keeping the codebase robust and maintainable.
+ *
+ * Setpoint response table:
+ *
+ * Axis   | Setpoint Change | Sign | Expected Drone Response
+ * -------|-----------------|------|------------------------
+ * Roll   | Increase        |  +   | Rolls right
+ * Roll   | Decrease        |  –   | Rolls left
+ * Pitch  | Increase        |  +   | Pitches forward
+ * Pitch  | Decrease        |  –   | Pitches backward
+ * Yaw    | Increase        |  +   | Yaws right (CW)
+ * Yaw    | Decrease        |  –   | Yaws left (CCW)
+ *
+ *
+ * Mixing Budget Explanation:
+ *
+ * - Maximum thrust using four motors is 160g (800 units).
+ * - Total weight and hover thrust is 70g (350 units).
+ * - Altitude control headroom is 20g (100 units).
+ * - Mixing budget for stabilization is 70g (350 units).
+ *
+ * - Mixing budget is auto-calculated as (MOTOR_MAX - THRUST_MAX) = 800 - 450 = 350 units.
+ * - PID output limits are derived as ±(mixing budget / 3) = ±(350 / 3) ≈ ±116.67 units per axis,
+ *   ensuring worst-case mixing (450 + 3*116.67 = 800) stays within ESCs physical limits.
+ *
+ * - Integral term clamp is set to half of the mixing budget per axis: ±(PID_OUT_MAX / 2) ≈ ±58.33 units.
+ *
+ * Note:
+ * In real flight, all three PID axes rarely saturate at once, so actual motor outputs are usually below the theoretical maximum.
+ * This budget ensures safe operation and prevents motor saturation during aggressive maneuvers.
  */
 
 #include "main.h"
 
-/**
- * System Initialization (setup):
- * - Initializes clocks, timers, radio, GPIO, PWM, and power-fail warning.
- * - Configures all sensors and peripherals required for flight control.
- * - Loads persisted FCU settings from flash memory.
- * - All hardware and sensor interfaces are set up for non-blocking, event-driven operation.
- */
-
 void setup(void)
 {
-  // Start high-frequency clock (32MHz) and configure 1MHz timer for timekeeping.
   NRF_CLOCK->TASKS_HFCLKSTART = 1;
   while (!NRF_CLOCK->EVENTS_HFCLKSTARTED)
     ;
 
   NRF_TIMER0->BITMODE = TIMER_BITMODE_BITMODE_32Bit;
-  NRF_TIMER0->PRESCALER = 4; // 1MHz timer frequency (1us ticks)
+  NRF_TIMER0->PRESCALER = 4;
   NRF_TIMER0->TASKS_START = 1;
 
-  // Configure radio for RCU packet reception using proprietary 1Mbps protocol.
   NRF_RADIO->SHORTS = (RADIO_SHORTS_READY_START_Msk | RADIO_SHORTS_END_START_Msk);
   NRF_RADIO->PACKETPTR = (uint32_t)&received_packet;
   NRF_RADIO->TXPOWER = RADIO_TXPOWER_TXPOWER_Pos4dBm;
 
   NRF_RADIO->PCNF1 = (sizeof(Rcu) << RADIO_PCNF1_MAXLEN_Pos) | (sizeof(Rcu) << RADIO_PCNF1_STATLEN_Pos) |
                      (2 << RADIO_PCNF1_BALEN_Pos) | (RADIO_PCNF1_WHITEEN_Enabled << RADIO_PCNF1_WHITEEN_Pos);
+
   NRF_RADIO->BASE0 = 0x0000BABE;
   NRF_RADIO->PREFIX0 = 0x41 << RADIO_PREFIX0_AP0_Pos;
   NRF_RADIO->RXADDRESSES = RADIO_RXADDRESSES_ADDR0_Msk;
   NRF_RADIO->CRCCNF = (RADIO_CRCCNF_LEN_Two << RADIO_CRCCNF_LEN_Pos) |
                       (RADIO_CRCCNF_SKIPADDR_Skip << RADIO_CRCCNF_SKIPADDR_Pos);
+
   NRF_RADIO->CRCPOLY = 0x0000AAAA;
   NRF_RADIO->CRCINIT = 0x12345678;
   NRF_RADIO->DATAWHITEIV = 0x55;
   NRF_RADIO->MODECNF0 = (RADIO_MODECNF0_DTX_B0 << RADIO_MODECNF0_DTX_Pos) |
                         (RADIO_MODECNF0_RU_Fast << RADIO_MODECNF0_RU_Pos);
+
   NRF_RADIO->TASKS_RXEN = 1;
 
-  // Set up motor pins and configure PWM for ESC control.
   NRF_P0->PIN_CNF[MOTOR1_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) |
                                  (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
   NRF_P0->PIN_CNF[MOTOR2_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) |
@@ -69,7 +88,8 @@ void setup(void)
                                  (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
   NRF_P0->PIN_CNF[MOTOR4_PIN] = ((GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) |
                                  (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos));
-  NRF_PWM0->COUNTERTOP = MOTOR_MAX; // Set PWM period to match MOTOR_MAX for ESCs (0-800 range, 20kHz)
+
+  NRF_PWM0->COUNTERTOP = MOTOR_MAX;
   NRF_PWM0->PRESCALER = PWM_PRESCALER_PRESCALER_DIV_1;
   NRF_PWM0->DECODER = PWM_DECODER_LOAD_Individual;
   NRF_PWM0->SEQ[0].PTR = (uint32_t)&esc;
@@ -82,25 +102,23 @@ void setup(void)
   NRF_PWM0->ENABLE = PWM_ENABLE_ENABLE_Enabled;
   NRF_PWM0->TASKS_SEQSTART[0] = 1;
 
-  // Configure power-fail warning and PMIC settings.
   NRF_POWER->POFCON = (POWER_POFCON_THRESHOLD_V27 << POWER_POFCON_THRESHOLD_Pos) | POWER_POFCON_POF_Enabled;
+
   nicla::begin(false);
   nicla::setBatteryNTCEnabled(false);
   nicla::disableCharging();
   nicla::disableLDO();
   nicla::enable3V3LDO();
   uint8_t pmic_status = nicla::_pmic.readByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL);
-  pmic_status = (pmic_status & ~0x3F) | 0x3F; // Set to maximum current limit and disable UVLO
+  pmic_status = (pmic_status & ~0x3F) | 0x3F;
   nicla::_pmic.writeByte(BQ25120A_ADDRESS, BQ25120A_ILIM_UVLO_CTRL, pmic_status);
 
-  // Initialize all sensors with specified data rates, latencies, and ranges.
   sensortec.begin();
   accelerometer.begin(ACCELEROMETER_HZ, ACCELEROMETER_LATENCY);
   accelerometer.setRange(ACCELEROMETER_RANGE);
   gyroscope.begin(GYROSCOPE_HZ, GYROSCOPE_LATENCY);
   gyroscope.setRange(GYROSCOPE_RANGE);
 
-  // TODO: Calibrate magnetometer hard-iron offsets
   magnetometer.begin(MAGNETOMETER_HZ, MAGNETOMETER_LATENCY);
   magnetometer.setRange(MAGNETOMETER_RANGE);
   quaternion.begin(QUATERNION_HZ, QUATERNION_LATENCY);
@@ -108,7 +126,6 @@ void setup(void)
   humidity.begin(HUMIDITY_HZ, HUMIDITY_LATENCY);
   temperature.begin(TEMPERATURE_HZ, TEMPERATURE_LATENCY);
 
-  // Initialize VL53L4CX Time-of-Flight sensor over I2C.
   Wire.begin();
   Wire.setClock(VL53L4CX_I2C_SPEED);
 
@@ -118,48 +135,32 @@ void setup(void)
   vl53l4cx.VL53L4CX_SetDistanceMode(VL53L4CX_DISTANCEMODE_MEDIUM);
   vl53l4cx.VL53L4CX_SetMeasurementTimingBudgetMicroSeconds(33000);
 
-  VL53L4CX_UserRoi_t roi = {6, 6, 9, 9}; // Set ROI to 4x4 centered
+  VL53L4CX_UserRoi_t roi = {6, 6, 9, 9};
   vl53l4cx.VL53L4CX_SetUserROI(&roi);
   vl53l4cx.VL53L4CX_StartMeasurement();
-
-  // TODO: Load persistent FCU settings from UICR flash memory
 }
-
-/**
- * FCU-Centered Non-blocking Event Polling Loop:
- * - Polls hardware event flags and updates FCU state in the main loop.
- * - Handles RCU packet reception, scheduled tasks, and automatic landing sequence.
- * - Ensures all control logic, safety checks, and state updates are performed centrally.
- * - Maintains deterministic timing and avoids blocking or concurrency issues.
- * - Designed for high-frequency, real-time flight control.
- */
 
 void loop(void)
 {
-  // Capture current timer value for loop timing.
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
   const uint32_t loop_start_us = NRF_TIMER0->CC[0];
 
-  // Manage RCU packet timeout and landing sequence timing.
   static uint32_t last_packet_us = loop_start_us;
   static uint32_t last_landing_us = loop_start_us;
 
   const bool packet_timeout = (int32_t)(loop_start_us - last_packet_us) >= 0;
   const bool landing_timeout = (int32_t)(loop_start_us - last_landing_us) >= 0;
 
-  // Check for received RCU packet via radio and handle it.
   if (NRF_RADIO->EVENTS_CRCOK)
   {
     NRF_RADIO->EVENTS_CRCOK = 0;
     last_packet_us = loop_start_us + HZ_TO_US(0.1f);
 
-    // Only handle packet if it is addressed to this node and zone.
     if (received_packet.node == NODE_ID &&
         received_packet.zone == ZONE_ID)
-      handle_type[received_packet.type % PACKET_TYPE_COUNT](); // Modulo to avoid out-of-bounds indexing (Round-robin)
+      handle_type[received_packet.type % PACKET_TYPE_COUNT]();
   }
 
-  // Execute scheduled tasks based on their defined intervals.
   for (uint8_t i = 0; i < SCHEDULER_TASK_COUNT; i++)
   {
     if ((int32_t)(loop_start_us - tasks[i].previous_us) >= 0)
@@ -169,16 +170,6 @@ void loop(void)
     }
   }
 
-  /**
-   * Automatic Landing Sequence:
-   * - Initiates landing if FCU is active and either RCU packet timeout or power-fail warning is detected.
-   * - Gradually reduces thrust in defined steps at specified intervals until landing is complete.
-   * - If landing is in progress and no power-fail warning, landing can be interrupted by RCU packets.
-   * - If landing is in progress because of power-fail warning, landing cannot be interrupted.
-   * 
-   * Note: This landing logic ensures safe descent during signal loss or power-fail conditions,
-   * while allowing for manual override when appropriate.
-   */
   if ((FCU_IS_ACTIVE(fcu.status) && (packet_timeout || FCU_IS_POFWARN(fcu.status)) && landing_timeout))
   {
     last_landing_us = loop_start_us + HZ_TO_US(1);
@@ -193,14 +184,6 @@ static inline void task_imu_update(void)
 
 static inline void task_fcu_update(void)
 {
-  /**
-   * Update FCU sensor readings and compute PID controller outputs.
-   * - Apply exponential moving average (EMA) filtering to pressure, temperature, and humidity readings.
-   * - Compute orientation error quaternion relative to hover state.
-   * - Update PID controllers for roll, pitch, and yaw based on orientation error.
-   *
-   * Note: FCU thrust and PID setpoints are managed externally via RCU packets for control.
-   */
   fcu.pressure += (pressure._value - fcu.pressure) * ENV_ALPHA;
   fcu.temperature += ((temperature._value + TEMPERATURE_OFFSET) - fcu.temperature) * ENV_ALPHA;
   fcu.humidity += (humidity._value - fcu.humidity) * ENV_ALPHA;
@@ -224,16 +207,6 @@ static inline void task_fcu_update(void)
 
 static inline void task_esc_update(void)
 {
-  /**
-   * Update ESC motor outputs based on FCU thrust and PID controller outputs.
-   * - If FCU is not active, reset thrust and PID setpoints/states to zero.
-   * - Calculate raw motor outputs for a quadcopter in X configuration.
-   * - Update ESC PWM values with constrained motor outputs.
-   * - Trigger PWM update for ESCs.
-   *
-   * - Note: No need for additional offsetting or constraining here, because
-   * advanced PID mixing budget is already considered in FCU thrust and PID outputs.
-   */
   if (!FCU_IS_ACTIVE(fcu.status))
   {
     fcu.thrust = 0;
@@ -307,17 +280,6 @@ static inline void task_pof_update(void)
 static inline void pid_calculate(const float sp, const float pv, const float Kp, const float Ki,
                                  const float Kd, float *_I, float *_D, float *_pv, float *out)
 {
-  /**
-   * PID Controller Calculation:
-   * - Uses derivative on measurement (DOM) approach to avoid derivative kick.
-   * - Derivative term is filtered using an exponential moving average (EMA).
-   * - Clamp integral term to prevent windup and only update it when output is in PID mixing budget limits.
-   * - Clamp final output to PID mixing budget limits.
-   * - Save previous process variable (_pv) for next derivative calculation.
-   * - Designed for high-frequency control loops with deterministic timing.
-   *
-   * Note: This PID implementation assumes a fixed loop period defined by PID_LOOP_HZ.
-   */
   const float P = sp - pv;
   const float D = -(pv - *_pv) * PID_LOOP_HZ;
 
@@ -337,13 +299,6 @@ static inline void pid_calculate(const float sp, const float pv, const float Kp,
 
 static inline void quaternion_multiply(DataQuaternion *r, const DataQuaternion *q1, const DataQuaternion *q2)
 {
-  /**
-   * Quaternion Multiplication:
-   * - Performs quaternion multiplication using the Hamilton product formula.
-   * - Normalizes the resulting quaternion to ensure it remains a unit quaternion.
-   *
-   * Note: Quaternion multiplication is not commutative; the order of operands matters.
-   */
   r->w = q1->w * q2->w - q1->x * q2->x - q1->y * q2->y - q1->z * q2->z;
   r->x = q1->w * q2->x + q1->x * q2->w + q1->y * q2->z - q1->z * q2->y;
   r->y = q1->w * q2->y - q1->x * q2->z + q1->y * q2->w + q1->z * q2->x;
@@ -354,13 +309,6 @@ static inline void quaternion_multiply(DataQuaternion *r, const DataQuaternion *
 
 static inline void quaternion_normalize(DataQuaternion *q)
 {
-  /**
-   * Calculate the squared magnitude of the quaternion and compute its inverse square root.
-   * Scale each component of the quaternion by this inverse to normalize it to unit length.
-   *
-   * Note: Adding a small epsilon to the magnitude prevents division by zero.
-   */
-
   const float mag = q->w * q->w + q->x * q->x + q->y * q->y + q->z * q->z;
   const float inv = 1.0f / __builtin_sqrtf(mag + __FLT_EPSILON__);
 
@@ -402,6 +350,5 @@ static inline void handle_thrust_update(void)
 
 static inline void handle_flash_update(void)
 {
-  // TODO: Save persistent FCU settings to UICR flash memory
   __NOP();
 }

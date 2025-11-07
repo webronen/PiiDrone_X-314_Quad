@@ -29,61 +29,18 @@ SensorQuaternion quaternion(BHY2_SENSOR_ID_RV);
 #include <vl53l4cx_class.h>
 VL53L4CX vl53l4cx(&Wire, NC);
 
-/**
- * Motor layout (X configuration):
- *
- *             Rear
- *               |
- *          |----|----|
- *          | M4 | M3 |
- *          |----|----|
- *          | M2 | M1 |
- *          |----|----|
- *               |
- *             Front
- *
- * M1: Front-right (CCW)
- * M2: Front-left (CW)
- * M3: Rear-right (CW)
- * M4: Rear-left (CCW)
- *
- *
- * Setpoint response table:
- *
- * Axis   | Setpoint Change | Sign | Expected Drone Response
- * -------|-----------------|------|------------------------
- * Roll   | Increase        |  +   | Rolls right
- * Roll   | Decrease        |  –   | Rolls left
- * Pitch  | Increase        |  +   | Pitches forward
- * Pitch  | Decrease        |  –   | Pitches backward
- * Yaw    | Increase        |  +   | Yaws right (CW)
- * Yaw    | Decrease        |  –   | Yaws left (CCW)
- *
- *
- * PID Mixing Budget Explanation:
- *
- * Maximum thrust is 56.25% (450 units) of MOTOR_MAX (800 units),
- * leaving 43.75% (350 units) for PID mixing budget.
- *
- * Hover thrust is 350 (43.75%) units of MOTOR_MAX,
- * leaving 12.5% (100 units) headroom for altitude control.
- *
- * PID output limits are auto-calculated as (800 - 450) / 3 = ±116.667 units per axis,
- * ensuring worst-case mixing (450 + 3*116.667 = 800) stays within ESCs physical limits.
- */
-
 #define MOTOR1_PIN 11
 #define MOTOR2_PIN 28
 #define MOTOR3_PIN 27
 #define MOTOR4_PIN 29
 
 #define HZ_TO_US(Hz) ((uint32_t)(1000000.0f / (Hz)))
-#define VL53L4CX_I2C_SPEED 400000 // 400kHz
+#define VL53L4CX_I2C_SPEED 400000
 
 #define MOTOR_MIN 0
 #define MOTOR_MAX 800
-#define HOVER_THRUST 350    // 70g/160g = 43.75% of MOTOR_MAX
-#define THRUST_HEADROOM 100 // Additional 20g headroom for altitude control
+#define HOVER_THRUST 350
+#define THRUST_HEADROOM 100
 #define THRUST_MAX (HOVER_THRUST + THRUST_HEADROOM)
 #define THRUST_MIN 0
 #define SETPOINT_MIN -1.0f
@@ -97,6 +54,7 @@ VL53L4CX vl53l4cx(&Wire, NC);
 #define PID_I_MIN (-PID_I_MAX)
 #define PID_LOOP_HZ 211.0f
 #define PID_LOOP_PERIOD (1.0f / PID_LOOP_HZ)
+#define PID_ARRAY_SIZE 3
 
 #define ENV_ALPHA 0.25f
 #define D_ALPHA 0.75f
@@ -112,10 +70,6 @@ VL53L4CX vl53l4cx(&Wire, NC);
 #define TYPE_THRUST 2
 #define TYPE_FLASH 3
 #define TYPE_TELEMETRY 4
-
-#define PID_DEPTH 3
-#define PID_FILE_WORDS (PID_DEPTH * 3)
-#define PID_FILE_BYTES (PID_FILE_WORDS * 4)
 
 #define FCU_STATUS_ACTIVE (1U << 0)
 #define FCU_STATUS_POFWARN (1U << 1)
@@ -134,10 +88,10 @@ VL53L4CX vl53l4cx(&Wire, NC);
   ((thrust) >= (threshold) ? ((thrust) -= (step)) : FCU_CLEAR_ACTIVE(status))
 
 #define FCU_UPDATE_GAIN(gain_array, axis, gain, value, min, max) \
-  (gain_array[(axis) % PID_DEPTH][(gain) % PID_DEPTH] = constrain((value), (min), (max)))
+  (gain_array[(axis) % PID_ARRAY_SIZE][(gain) % PID_ARRAY_SIZE] = constrain((value), (min), (max)))
 
 #define FCU_UPDATE_SETPOINT(setpoint_array, axis, value, min, max) \
-  (setpoint_array[(axis) % PID_DEPTH] = constrain((value), (min), (max)))
+  (setpoint_array[(axis) % PID_ARRAY_SIZE] = constrain((value), (min), (max)))
 
 #define FCU_UPDATE_THRUST(status, thrust, value, min, max) \
   (thrust = constrain(FCU_IS_POFWARN(status) ? ((value) < (thrust) ? (value) : (thrust)) : (value), (min), (max)))
@@ -168,8 +122,8 @@ VL53L4CX vl53l4cx(&Wire, NC);
 
 typedef struct __attribute__((packed, aligned(4)))
 {
-  float pid_gain[PID_DEPTH][PID_DEPTH];
-  float pid_setpoint[PID_DEPTH];
+  float pid_gain[PID_ARRAY_SIZE][PID_ARRAY_SIZE];
+  float pid_setpoint[PID_ARRAY_SIZE];
   float pressure;
   float humidity;
   float temperature;
@@ -216,21 +170,11 @@ typedef struct __attribute__((packed, aligned(4)))
 
 static_assert(sizeof(Task) == 16, "Task struct must be 16 bytes (4 words)");
 
-typedef struct __attribute__((packed, aligned(4)))
-{
-  float pid_gain[PID_DEPTH][PID_DEPTH];
-  uint32_t reserved[53];
-} Flash;
-
-static_assert(sizeof(Flash) == 248, "Flash struct must be 248 bytes (62 words)");
-
-// Global utility instances
 static Fcu fcu = {0};
 static Esc esc = {0x8000, 0x8000, 0x8000, 0x8000};
 static volatile Rcu received_packet = {0};
 static Pid pid_state[3] = {0};
 
-// Task function prototypes
 static inline void task_imu_update(void);
 static inline void task_fcu_update(void);
 static inline void task_esc_update(void);
@@ -238,7 +182,6 @@ static inline void task_tof_update(void);
 static inline void task_tel_update(void);
 static inline void task_pof_update(void);
 
-// Scheduler task array
 static Task tasks[SCHEDULER_TASK_COUNT] = {
     {"IMU", task_imu_update, HZ_TO_US(401), 0},
     {"FCU", task_fcu_update, HZ_TO_US(211), 0},
@@ -247,7 +190,6 @@ static Task tasks[SCHEDULER_TASK_COUNT] = {
     {"TEL", task_tel_update, HZ_TO_US(3), 0},
     {"POF", task_pof_update, HZ_TO_US(2), 0}};
 
-// Handler function prototypes
 static inline void handle_pid_update(void);
 static inline void handle_setpoint_update(void);
 static inline void handle_thrust_update(void);
@@ -260,10 +202,9 @@ static void (*const handle_type[PACKET_TYPE_COUNT])(void) = {
     handle_flash_update,
 };
 
-// Utility function prototypes
 static inline void pid_calculate(const float sp, const float pv, const float Kp, const float Ki,
                                  const float Kd, float *_I, float *_D, float *_pv, float *out);
 static inline void quaternion_multiply(DataQuaternion *result, const DataQuaternion *q1, const DataQuaternion *q2);
 static inline void quaternion_normalize(DataQuaternion *q);
 
-#endif // MAIN_H
+#endif
