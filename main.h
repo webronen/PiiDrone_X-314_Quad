@@ -123,16 +123,16 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 
 typedef struct __attribute__((packed, aligned(4)))
 {
-  float pid_gain[PID_ARRAY_SIZE][PID_ARRAY_SIZE];
-  float pid_setpoint[PID_ARRAY_SIZE];
-  float pressure;
-  float humidity;
-  float temperature;
-  float battery;
-  uint16_t thrust;
-  uint16_t distance;
-  uint8_t status;
-  uint8_t reserved[183];
+  float pid_gain[PID_ARRAY_SIZE][PID_ARRAY_SIZE]; // [roll,pitch,yaw][P,I,D]: 0.0 to 100.0
+  float pid_setpoint[PID_ARRAY_SIZE];             // roll, pitch, yaw: -1.0 to 1.0
+  float pressure;                                 // hectopascal (hPa)
+  float humidity;                                 // percent (%)
+  float temperature;                              // Celsius (°C)
+  float battery;                                  // Volts (V)
+  uint16_t thrust;                                // PWM value (0-800)
+  uint16_t distance;                              // millimeters (mm)
+  uint8_t status;                                 // bit 0: active, bit 1: pofwarn
+  uint8_t reserved[183];                          // padding to 252 bytes
 } Fcu;
 
 static_assert(sizeof(Fcu) == 252, "Fcu struct must be 252 bytes (63 words)");
