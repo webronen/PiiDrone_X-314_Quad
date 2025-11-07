@@ -1,7 +1,7 @@
 /**
  * PiiDrone X-314 Quad | 70g (incl. LiPo) Ultra light, agile and stable powerhouse.
- * 
- * 
+ *
+ *
  * Motor layout (X configuration):
  *
  *             Rear
@@ -54,7 +54,7 @@
  * - 100% mass-equivalent stabilization exceeds typical commercial budgets
  * - Conservative allocation provides robust performance in turbulence
  * - Balanced approach optimizes control without risking motor saturation.
- * 
+ *
  * Overall, this budget supports agile and stable flight for the PiiDrone X-314 Quad.
  */
 
