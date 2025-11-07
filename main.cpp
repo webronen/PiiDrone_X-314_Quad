@@ -134,9 +134,7 @@ void setup(void)
   vl53l4cx.VL53L4CX_DataInit();
   vl53l4cx.VL53L4CX_SetDistanceMode(VL53L4CX_DISTANCEMODE_MEDIUM);
   vl53l4cx.VL53L4CX_SetMeasurementTimingBudgetMicroSeconds(33000);
-
-  VL53L4CX_UserRoi_t roi = {6, 6, 9, 9};
-  vl53l4cx.VL53L4CX_SetUserROI(&roi);
+  vl53l4cx.VL53L4CX_SetUserROI(&vl53l4cx_UserRoi);
   vl53l4cx.VL53L4CX_StartMeasurement();
 }
 

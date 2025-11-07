@@ -28,6 +28,7 @@ SensorQuaternion quaternion(BHY2_SENSOR_ID_RV);
 
 #include <vl53l4cx_class.h>
 VL53L4CX vl53l4cx(&Wire, NC);
+VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 
 #define MOTOR1_PIN 11
 #define MOTOR2_PIN 28
