@@ -29,31 +29,30 @@
  * Yaw    | Decrease        |  –   | Yaws left (CCW)
  *
  *
- * Control Authority Budget Analysis:
+ * Control Authority Budget:
  *
  * Physical Capabilities:
  * - Total thrust capacity: 160g (800 units) across 4 motors
- * - Vehicle mass: 70g → Hover thrust: 70g (350 units)
+ * - Drone mass: 70g → Hover thrust: 70g (350 units)
  * - Maximum lateral acceleration: 1.0g available
  * - Thrust-to-weight ratio: 2.28:1
  *
  * Authority Allocation:
  * - Altitude control: 90g total (450 units = hover + 20g margin)
- * - Attitude control: 70g (350 units = 100% of vehicle mass)
+ * - Stabilization control: 70g (350 units = 100% of drone mass)
  * - Mixing budget: (MOTOR_MAX - THRUST_MAX) = 800 - 450 = 350 units
  *
- * Performance Implications:
- * - Can execute 1.0g lateral maneuvers while maintaining altitude
+ * Performance & Safety:
+ * - 1.0g lateral acceleration enables aggressive disturbance rejection
  * - PID limits: ±116.67 units/axis ensures worst-case (450 + 3×117 = 801)
  *   stays within motor saturation limits
  * - Integral clamp: ±58.33 units prevents windup consuming control authority
  *
  * Design Advantage:
- * - 100% mass-equivalent stabilization enables aggressive recovery
- * - Commercial drones typically budget 50-80% mass equivalent
- * - Excellent disturbance rejection for windy conditions
+ * - 100% mass-equivalent stabilization exceeds typical commercial budgets
+ * - Conservative allocation provides robust performance in turbulence
  *
- * Overall, this budget provides robust control authority for stable flight performance.
+ * Overall, this authority budget balances aggressive control with safety and exceeds typical commercial standards.
  */
 
 #include "main.h"
