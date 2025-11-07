@@ -1,4 +1,7 @@
 /**
+ * PiiDrone X-314 Quad | 70g (incl. LiPo) Ultra light, agile and stable powerhouse.
+ * 
+ * 
  * Motor layout (X configuration):
  *
  *             Rear
