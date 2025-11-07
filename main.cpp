@@ -307,13 +307,13 @@ static inline void quaternion_multiply(DataQuaternion *r, const DataQuaternion *
 
 static inline void quaternion_normalize(DataQuaternion *q)
 {
-  const float mag = q->w * q->w + q->x * q->x + q->y * q->y + q->z * q->z;
+  const float mag = q->x * q->x + q->y * q->y + q->z * q->z + q->w * q->w;
   const float inv = 1.0f / __builtin_sqrtf(mag + __FLT_EPSILON__);
 
-  q->w *= inv;
   q->x *= inv;
   q->y *= inv;
   q->z *= inv;
+  q->w *= inv;
 }
 
 static inline void handle_pid_update(void)
