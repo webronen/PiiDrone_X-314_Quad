@@ -7,10 +7,8 @@
 #define ZONE_ID 0
 
 #include <nrf.h>
-#include <nrf_delay.h>
 #include <Nicla_System.h>
 
-#include <common.h>
 #include <sensors/SensorXYZ.h>
 SensorXYZ accelerometer(BHY2_SENSOR_ID_ACC);
 SensorXYZ gyroscope(BHY2_SENSOR_ID_GYRO);
