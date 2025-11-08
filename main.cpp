@@ -328,6 +328,12 @@ static inline void quaternion_normalize(DataQuaternion *q)
   q->w *= inv;
 }
 
+static inline void handle_pid_tune(void)
+{
+  // To be implemented
+  __NOP();
+}
+
 static inline void handle_pid_update(void)
 {
   const uint8_t axis = received_packet.data[0];
@@ -356,9 +362,4 @@ static inline void handle_thrust_update(void)
 
   FCU_UPDATE_THRUST(fcu.status, fcu.thrust, thrust, THRUST_MIN, THRUST_MAX);
   FCU_UPDATE_ACTIVE(fcu.status, fcu.thrust > THRUST_MIN);
-}
-
-static inline void handle_flash_update(void)
-{
-  __NOP();
 }

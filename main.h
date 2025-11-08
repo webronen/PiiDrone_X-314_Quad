@@ -66,10 +66,10 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 #define SCHEDULER_TASK_COUNT 6
 #define PACKET_TYPE_COUNT 4
 
-#define TYPE_PID 0
-#define TYPE_SETPOINT 1
-#define TYPE_THRUST 2
-#define TYPE_FLASH 3
+#define TYPE_PID_TUNE 0
+#define TYPE_PID 1
+#define TYPE_SETPOINT 2
+#define TYPE_THRUST 3
 #define TYPE_TELEMETRY 4
 
 #define FCU_STATUS_ACTIVE (1U << 0)
@@ -191,16 +191,16 @@ static Task tasks[SCHEDULER_TASK_COUNT] = {
     {"TEL", task_tel_update, HZ_TO_US(3), 0},
     {"POF", task_pof_update, HZ_TO_US(2), 0}};
 
+static inline void handle_pid_tune(void);
 static inline void handle_pid_update(void);
 static inline void handle_setpoint_update(void);
 static inline void handle_thrust_update(void);
-static inline void handle_flash_update(void);
 
 static void (*const handle_type[PACKET_TYPE_COUNT])(void) = {
+    handle_pid_tune,
     handle_pid_update,
     handle_setpoint_update,
     handle_thrust_update,
-    handle_flash_update,
 };
 
 static inline void pid_calculate(const float sp, const float pv, const float Kp, const float Ki,
