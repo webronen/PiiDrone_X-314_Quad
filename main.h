@@ -176,7 +176,7 @@ static Esc esc = {0x8000, 0x8000, 0x8000, 0x8000};
 static volatile Rcu received_packet = {0};
 static Pid pid_state[3] = {0};
 
-// Ziegler-Nichols Auto-Tune System for balanced test bench
+// Ziegler-Nichols Auto-Tune System
 static bool auto_tune_complete = true;
 static bool thrust_at_hover = false;
 static uint8_t tuning_axis = 0;

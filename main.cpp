@@ -59,7 +59,7 @@
  * Overall, this budget supports agile and stable flight for the PiiDrone X-314 Quad.
  *
  *
- * Ziegler-Nichols Auto-Tune System for balanced test bench:
+ * Ziegler-Nichols Auto-Tune System:
  *
  * Key Features:
  * - Battery friendly ramp-up to hover thrust before tuning begins.
@@ -354,6 +354,7 @@ static inline void handle_pid_tune(void)
 
   memset(fcu.pid_setpoint, 0, sizeof(fcu.pid_setpoint));
   memset(pid_state, 0, sizeof(pid_state));
+  memset(fcu.pid_gain, 0, sizeof(fcu.pid_gain));
 
   FCU_UPDATE_ACTIVE(fcu.status, true);
 }
@@ -389,6 +390,7 @@ static inline void handle_thrust_update(void)
     auto_tune_complete = true;
     thrust_at_hover = false;
     tuning_axis = 0;
+
     memset(fcu.pid_setpoint, 0, sizeof(fcu.pid_setpoint));
     memset(pid_state, 0, sizeof(pid_state));
     memset(fcu.pid_gain, 0, sizeof(fcu.pid_gain));
