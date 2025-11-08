@@ -176,6 +176,11 @@ static Esc esc = {0x8000, 0x8000, 0x8000, 0x8000};
 static volatile Rcu received_packet = {0};
 static Pid pid_state[3] = {0};
 
+// Ziegler-Nichols Auto-Tune System for balanced test bench
+static uint8_t tuning_axis = 0;
+static bool auto_tune_complete = true;
+static bool thrust_at_hover = true;
+
 static inline void task_imu_update(void);
 static inline void task_fcu_update(void);
 static inline void task_esc_update(void);
@@ -207,14 +212,5 @@ static inline void pid_calculate(const float sp, const float pv, const float Kp,
                                  const float Kd, float *_I, float *_D, float *_pv, float *out);
 static inline void quaternion_multiply(DataQuaternion *result, const DataQuaternion *q1, const DataQuaternion *q2);
 static inline void quaternion_normalize(DataQuaternion *q);
-
-
-/**
- * Ziegler-Nichols Auto-Tune System for Balanced Test Bench
- * - Creates oscillations in the specified axis by adjusting setpoint
- * - Measures ultimate gain (Ku) and oscillation period (Pu)
- * - Calculates PID gains based on Ku and Pu
- * - Stops tuning after a set number of oscillations
- */
 
 #endif

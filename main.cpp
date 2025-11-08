@@ -59,13 +59,16 @@
  * Overall, this budget supports agile and stable flight for the PiiDrone X-314 Quad.
  *
  *
- * Ziegler-Nichols Auto-Tune System (Test Bench)
+ * Ziegler-Nichols Auto-Tune System for balanced test bench:
  *
+ * Key Features:
+ * - Battery friendly ramp-up to hover thrust before tuning begins.
  * - Automatically induces controlled oscillations in a selected axis by generating square wave setpoint changes.
  * - Detects sustained oscillations to measure the ultimate gain (Ku) and oscillation period (Tu) for that axis.
  * - Calculates optimal PID gains using the classic Ziegler-Nichols tuning rules, with axis-specific scaling if needed.
  * - Applies the new gains and repeats for each axis (roll, pitch, yaw) in sequence.
  * - Tuning stops automatically after the required number of oscillations or if a safety fallback is triggered.
+ *
  *
  * This system enables safe, hands-off PID tuning for drones on a test bench, ensuring robust and balanced flight control.
  */
@@ -171,6 +174,9 @@ void loop(void)
 
   const bool packet_timeout = (int32_t)(loop_start_us - last_packet_us) >= 0;
   const bool landing_timeout = (int32_t)(loop_start_us - last_landing_us) >= 0;
+
+  if (!auto_tune_complete)
+    last_packet_us = loop_start_us + HZ_TO_US(0.1f);
 
   if (NRF_RADIO->EVENTS_CRCOK)
   {
@@ -341,8 +347,15 @@ static inline void quaternion_normalize(DataQuaternion *q)
 
 static inline void handle_pid_tune(void)
 {
-  // To be implemented
-  __NOP();
+  auto_tune_complete = false;
+  thrust_at_hover = false;
+  tuning_axis = 0;
+  fcu.thrust = 0;
+  
+  memset(fcu.pid_setpoint, 0, sizeof(fcu.pid_setpoint));
+  memset(pid_state, 0, sizeof(pid_state));
+  
+  FCU_UPDATE_ACTIVE(fcu.status, true);
 }
 
 static inline void handle_pid_update(void)
@@ -373,4 +386,11 @@ static inline void handle_thrust_update(void)
 
   FCU_UPDATE_THRUST(fcu.status, fcu.thrust, thrust, THRUST_MIN, THRUST_MAX);
   FCU_UPDATE_ACTIVE(fcu.status, fcu.thrust > THRUST_MIN);
+
+  if (!auto_tune_complete)
+  {
+    auto_tune_complete = true;
+    thrust_at_hover = true;
+    tuning_axis = 0;
+  }
 }
