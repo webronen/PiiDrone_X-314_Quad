@@ -8,13 +8,13 @@
 
 ```
             Rear
-              |
-         |----|----|
-         | M4 | M3 |
-         |----|----|
-         | M2 | M1 |
-         |----|----|
-              |
+              |      |
+              | ---- | ---- |
+              | M4   | M3   |
+              | ---- | ---- |
+              | M2   | M1   |
+              | ---- | ---- |
+              |      |
             Front
 ```
 - **M1:** Front-right (CCW)
@@ -26,14 +26,14 @@
 
 ## Setpoint Response Table
 
-| Axis  | Setpoint Change | Sign | Expected Drone Response   |
-|-------|-----------------|------|--------------------------|
-| Roll  | Increase        |  +   | Rolls right              |
-| Roll  | Decrease        |  –   | Rolls left               |
-| Pitch | Increase        |  +   | Pitches forward          |
-| Pitch | Decrease        |  –   | Pitches backward         |
-| Yaw   | Increase        |  +   | Yaws right (CW)          |
-| Yaw   | Decrease        |  –   | Yaws left (CCW)          |
+| Axis  | Setpoint Change | Sign | Expected Drone Response |
+| ----- | --------------- | ---- | ----------------------- |
+| Roll  | Increase        | +    | Rolls right             |
+| Roll  | Decrease        | –    | Rolls left              |
+| Pitch | Increase        | +    | Pitches forward         |
+| Pitch | Decrease        | –    | Pitches backward        |
+| Yaw   | Increase        | +    | Yaws right (CW)         |
+| Yaw   | Decrease        | –    | Yaws left (CCW)         |
 
 ---
 
@@ -85,7 +85,7 @@
 
 ## Summary
 
-This system enables **safe, hands-off PID tuning** for drones, ensuring robust and balanced flight control.  
-The control authority budget and safety features support agile and stable flight for the PiiDrone X-314 Quad.
+This system enables **safe, hands-off PID tuning** for drones, ensuring robust and balanced flight control
+The control authority budget and safety features support agile and stable flight for the PiiDrone X-314 Quad
 
 ---
