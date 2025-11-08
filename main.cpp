@@ -55,8 +55,19 @@
  * - Conservative allocation provides robust performance in turbulence
  * - Balanced approach optimizes control without risking motor saturation.
  *
- * 
+ *
  * Overall, this budget supports agile and stable flight for the PiiDrone X-314 Quad.
+ *
+ *
+ * Ziegler-Nichols Auto-Tune System (Test Bench)
+ *
+ * - Automatically induces controlled oscillations in a selected axis by generating square wave setpoint changes.
+ * - Detects sustained oscillations to measure the ultimate gain (Ku) and oscillation period (Tu) for that axis.
+ * - Calculates optimal PID gains using the classic Ziegler-Nichols tuning rules, with axis-specific scaling if needed.
+ * - Applies the new gains and repeats for each axis (roll, pitch, yaw) in sequence.
+ * - Tuning stops automatically after the required number of oscillations or if a safety fallback is triggered.
+ *
+ * This system enables safe, hands-off PID tuning for drones on a test bench, ensuring robust and balanced flight control.
  */
 
 #include "main.h"

@@ -208,4 +208,13 @@ static inline void pid_calculate(const float sp, const float pv, const float Kp,
 static inline void quaternion_multiply(DataQuaternion *result, const DataQuaternion *q1, const DataQuaternion *q2);
 static inline void quaternion_normalize(DataQuaternion *q);
 
+
+/**
+ * Ziegler-Nichols Auto-Tune System for Balanced Test Bench
+ * - Creates oscillations in the specified axis by adjusting setpoint
+ * - Measures ultimate gain (Ku) and oscillation period (Pu)
+ * - Calculates PID gains based on Ku and Pu
+ * - Stops tuning after a set number of oscillations
+ */
+
 #endif
