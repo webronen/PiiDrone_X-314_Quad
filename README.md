@@ -85,7 +85,7 @@
 
 ## Summary
 
-This system enables **safe, hands-off PID tuning** for drones, ensuring robust and balanced flight control
+This system enables **safe, hands-off PID tuning** for drones, ensuring robust and balanced flight control 
 The control authority budget and safety features support agile and stable flight for the PiiDrone X-314 Quad
 
 ---
