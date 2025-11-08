@@ -351,10 +351,10 @@ static inline void handle_pid_tune(void)
   thrust_at_hover = false;
   tuning_axis = 0;
   fcu.thrust = 0;
-  
+
   memset(fcu.pid_setpoint, 0, sizeof(fcu.pid_setpoint));
   memset(pid_state, 0, sizeof(pid_state));
-  
+
   FCU_UPDATE_ACTIVE(fcu.status, true);
 }
 
@@ -384,13 +384,16 @@ static inline void handle_thrust_update(void)
   uint16_t thrust;
   memcpy(&thrust, (const void *)&received_packet.data[0], sizeof(thrust));
 
-  FCU_UPDATE_THRUST(fcu.status, fcu.thrust, thrust, THRUST_MIN, THRUST_MAX);
-  FCU_UPDATE_ACTIVE(fcu.status, fcu.thrust > THRUST_MIN);
-
   if (!auto_tune_complete)
   {
     auto_tune_complete = true;
-    thrust_at_hover = true;
+    thrust_at_hover = false;
     tuning_axis = 0;
+    memset(fcu.pid_setpoint, 0, sizeof(fcu.pid_setpoint));
+    memset(pid_state, 0, sizeof(pid_state));
+    memset(fcu.pid_gain, 0, sizeof(fcu.pid_gain));
   }
+
+  FCU_UPDATE_THRUST(fcu.status, fcu.thrust, thrust, THRUST_MIN, THRUST_MAX);
+  FCU_UPDATE_ACTIVE(fcu.status, fcu.thrust > THRUST_MIN);
 }

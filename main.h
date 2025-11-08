@@ -177,9 +177,9 @@ static volatile Rcu received_packet = {0};
 static Pid pid_state[3] = {0};
 
 // Ziegler-Nichols Auto-Tune System for balanced test bench
-static uint8_t tuning_axis = 0;
 static bool auto_tune_complete = true;
-static bool thrust_at_hover = true;
+static bool thrust_at_hover = false;
+static uint8_t tuning_axis = 0;
 
 static inline void task_imu_update(void);
 static inline void task_fcu_update(void);
