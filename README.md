@@ -7,15 +7,15 @@
 ## Motor Layout (X Configuration)
 
 ```
-            Rear
-              |      |
-              | ---- | ---- |
-              | M4   | M3   |
-              | ---- | ---- |
-              | M2   | M1   |
-              | ---- | ---- |
-              |      |
-            Front
+   Rear
+     |
+| -- | -- |
+| M4 | M3 |
+| -- | -- |
+| M2 | M1 |
+| -- | -- |
+     |
+   Front
 ```
 - **M1:** Front-right (CCW)
 - **M2:** Front-left (CW)
