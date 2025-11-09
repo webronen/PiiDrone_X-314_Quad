@@ -180,6 +180,8 @@ static inline void task_fcu_update(void)
         if (tuning_axis >= 3)
         {
           auto_tune_complete = true;
+          thrust_at_hover = false;
+          tuning_axis = 0;
           memset(fcu.pid_setpoint, 0, sizeof(fcu.pid_setpoint));
           // TODO: store the tuned PID gains to non-volatile memory
         }
