@@ -97,8 +97,8 @@ void loop(void)
   static uint32_t last_packet_us = loop_start_us;
   static uint32_t last_landing_us = loop_start_us;
 
-  const bool packet_timeout = (int32_t)(loop_start_us - last_packet_us) >= 0;
-  const bool landing_timeout = (int32_t)(loop_start_us - last_landing_us) >= 0;
+  const bool packet_timeout = (loop_start_us - last_packet_us) >= HZ_TO_US(0.1f);
+  const bool landing_timeout = (loop_start_us - last_landing_us) >= HZ_TO_US(1.0f);
 
   if (!auto_tune_complete)
     last_packet_us = loop_start_us + HZ_TO_US(0.1f);
@@ -115,7 +115,7 @@ void loop(void)
 
   for (uint8_t i = 0; i < SCHEDULER_TASK_COUNT; i++)
   {
-    if ((int32_t)(loop_start_us - tasks[i].previous_us) >= 0)
+    if ((loop_start_us - tasks[i].previous_us) >= tasks[i].interval_us)
     {
       tasks[i].previous_us += tasks[i].interval_us;
       tasks[i].task();
@@ -354,26 +354,26 @@ static inline bool pid_auto_tune_step(const uint8_t axis, const float current_er
 
   static struct
   {
-    float Ku, Tu;
+    uint32_t first_crossing, last_setpoint_change;
     uint8_t zero_crossings;
-    uint32_t last_crossing;
-    uint32_t last_setpoint_change;
     float setpoint_value;
   } tune[3] = {0};
 
-  // Initialize setpoint
-  if (tune[axis].zero_crossings == 0 && tune[axis].last_setpoint_change == 0)
+  // Initialize
+  if (!tune[axis].zero_crossings && !tune[axis].last_setpoint_change)
   {
     tune[axis].setpoint_value = 10.0f * M_PI / 180.0f;
     tune[axis].last_setpoint_change = NRF_TIMER0->CC[0];
+    tune[axis].first_crossing = 0;
     fcu.pid_setpoint[axis] = tune[axis].setpoint_value;
     fcu.pid_gain[axis][0] = 0.5f;
     fcu.pid_gain[axis][1] = 0.0f;
     fcu.pid_gain[axis][2] = 0.0f;
   }
 
-  // Square wave setpoint changes
-  uint32_t now = NRF_TIMER0->CC[0];
+  const uint32_t now = NRF_TIMER0->CC[0];
+
+  // Simple unsigned comparisons (no overflow in ~30s tune time)
   if ((now - tune[axis].last_setpoint_change) > HZ_TO_US(0.5f))
   {
     tune[axis].setpoint_value = -tune[axis].setpoint_value;
@@ -381,7 +381,7 @@ static inline bool pid_auto_tune_step(const uint8_t axis, const float current_er
     tune[axis].last_setpoint_change = now;
   }
 
-  // Detect zero crossings
+  // Zero crossing detection
   static float last_error[3] = {0};
   if (last_error[axis] * current_error < 0.0f && fabsf(current_error) > 0.01f)
   {
@@ -389,25 +389,18 @@ static inline bool pid_auto_tune_step(const uint8_t axis, const float current_er
 
     if (tune[axis].zero_crossings == 1)
     {
-      tune[axis].last_crossing = now;
+      tune[axis].first_crossing = now;
     }
     else if (tune[axis].zero_crossings >= 4)
     {
-      // Ziegler-Nichols
-      tune[axis].Ku = fcu.pid_gain[axis][0];
-      uint32_t total_time = now - tune[axis].last_crossing;
-      tune[axis].Tu = (float)total_time / 1000000.0f / (tune[axis].zero_crossings - 1);
+      const uint32_t total_time = now - tune[axis].first_crossing;
+      const float num_periods = (tune[axis].zero_crossings - 1) / 2.0f;
+      const float Tu = (float)total_time / 1000000.0f / num_periods;
+      const float Ku = fcu.pid_gain[axis][0];
 
-      float Kp = 0.6f * tune[axis].Ku;
-      float Ki = 1.2f * tune[axis].Ku / tune[axis].Tu;
-      float Kd = 0.075f * tune[axis].Ku * tune[axis].Tu;
-
-      if (axis == 2)
-        Kp *= 0.7f, Ki *= 0.7f, Kd *= 1.5f;
-
-      fcu.pid_gain[axis][0] = constrain(Kp, PID_GAIN_MIN, PID_GAIN_MAX);
-      fcu.pid_gain[axis][1] = constrain(Ki, PID_GAIN_MIN, PID_GAIN_MAX);
-      fcu.pid_gain[axis][2] = constrain(Kd, PID_GAIN_MIN, PID_GAIN_MAX);
+      fcu.pid_gain[axis][0] = constrain(0.6f * Ku, 0.1f, 8.0f);
+      fcu.pid_gain[axis][1] = constrain(1.2f * Ku / Tu, 0.01f, 5.0f);
+      fcu.pid_gain[axis][2] = constrain(0.075f * Ku * Tu, 0.001f, 2.0f);
 
       fcu.pid_setpoint[axis] = 0.0f;
       return true;
@@ -417,9 +410,12 @@ static inline bool pid_auto_tune_step(const uint8_t axis, const float current_er
   last_error[axis] = current_error;
 
   // Increase P gain
-  if (tune[axis].zero_crossings < 4 && (now - tune[axis].last_setpoint_change) > HZ_TO_US(2.0f))
+  if (tune[axis].zero_crossings < 4 &&
+      (now - tune[axis].last_setpoint_change) > HZ_TO_US(2.0f))
   {
     fcu.pid_gain[axis][0] += 0.2f;
+    tune[axis].last_setpoint_change = now;
+
     if (fcu.pid_gain[axis][0] > 8.0f)
     {
       fcu.pid_gain[axis][0] = 2.0f;
@@ -438,12 +434,11 @@ static inline bool pid_thrust_to_hover(void)
   static uint32_t start_time = 0;
   start_time = !start_time ? NRF_TIMER0->CC[0] : start_time;
 
-  const int32_t elapsed = (int32_t)(NRF_TIMER0->CC[0] - start_time);
-  const int32_t clamped_elapsed = elapsed < 0 ? 0 : elapsed;
-  const int32_t duration_us = S_TO_US(PID_THRUST_TO_HOVER_DURATION_S);
-  const bool done = clamped_elapsed >= duration_us;
+  const uint32_t elapsed = NRF_TIMER0->CC[0] - start_time;
+  const uint32_t duration_us = S_TO_US(PID_THRUST_TO_HOVER_DURATION_S);
+  const bool done = elapsed >= duration_us;
 
-  fcu.thrust = done ? HOVER_THRUST : (HOVER_THRUST * clamped_elapsed) / duration_us;
+  fcu.thrust = done ? HOVER_THRUST : (HOVER_THRUST * elapsed) / duration_us;
   thrust_at_hover = done;
 
   return done;
