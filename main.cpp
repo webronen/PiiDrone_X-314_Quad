@@ -446,12 +446,10 @@ static inline bool pid_thrust_to_hover(void)
 {
   static uint32_t start_time = 0;
   start_time = !start_time ? NRF_TIMER0->CC[0] : start_time;
-
   const uint32_t elapsed = NRF_TIMER0->CC[0] - start_time;
-  const bool done = elapsed >= S_TO_US(PID_THRUST_TO_HOVER_S);
-
-  fcu.thrust = done ? 50 : (50 * elapsed) / S_TO_US(PID_THRUST_TO_HOVER_S);
-  thrust_at_hover = done;
-
-  return done;
+  float x = (float)elapsed / S_TO_US(PID_THRUST_TO_HOVER_S);
+  x = constrain(x, 0.0f, 1.0f);
+  const float y = (x * x * (3.0f - 2.0f * x));
+  fcu.thrust = constrain(y * HOVER_THRUST, THRUST_MIN, THRUST_MAX);
+  return (elapsed >= S_TO_US(PID_THRUST_TO_HOVER_S));
 }
