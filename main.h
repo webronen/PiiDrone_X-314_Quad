@@ -51,7 +51,6 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 #define SETPOINT_MAX 1.0f
 
 #define PID_THRUST_TO_HOVER_DURATION_S 5.0f
-#define PID_THRUST_RAMP_QUADRATIC(t) ((t) * (t))
 #define PID_GAIN_MAX 100.0f
 #define PID_GAIN_MIN 0.0f
 #define PID_OUT_MAX ((MOTOR_MAX - THRUST_MAX) / 3.0f)

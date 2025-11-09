@@ -436,27 +436,15 @@ static inline bool pid_auto_tune_step(const uint8_t axis, const float current_er
 static inline bool pid_thrust_to_hover(void)
 {
   static uint32_t start_time = 0;
+  start_time = !start_time ? NRF_TIMER0->CC[0] : start_time;
 
-  if (start_time == 0)
-  {
-    start_time = NRF_TIMER0->CC[0];
-    fcu.thrust = 0;
-  }
+  const int32_t elapsed = (int32_t)(NRF_TIMER0->CC[0] - start_time);
+  const int32_t clamped_elapsed = elapsed < 0 ? 0 : elapsed;
+  const int32_t duration_us = S_TO_US(PID_THRUST_TO_HOVER_DURATION_S);
+  const bool done = clamped_elapsed >= duration_us;
 
-  const uint32_t elapsed = NRF_TIMER0->CC[0] - start_time;
+  fcu.thrust = done ? HOVER_THRUST : (HOVER_THRUST * clamped_elapsed) / duration_us;
+  thrust_at_hover = done;
 
-  // Calculate normalized time (0.0 to 1.0) over the ramp duration
-  float t = (float)elapsed * S_TO_INV_US_F(PID_THRUST_TO_HOVER_DURATION_S);
-
-  if (t < 1.0f)
-  {
-    // Quadratic ramp to hover thrust over the specified duration
-    fcu.thrust = constrain(HOVER_THRUST * PID_THRUST_RAMP_QUADRATIC(t), THRUST_MIN, HOVER_THRUST);
-    return false;
-  }
-
-  // Set exact hover thrust once ramp is complete
-  fcu.thrust = HOVER_THRUST;
-  thrust_at_hover = true;
-  return true;
+  return done;
 }
