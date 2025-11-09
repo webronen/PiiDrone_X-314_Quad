@@ -81,8 +81,8 @@
 - **Failsafe and landing logic** on packet timeout or power warning
 - **Auto-tune aborts** if thrust is changed during ramp-up or tuning, resetting all tuning state
 
-## Source: 
-**[Ziegler–Nichols method (Wikipedia)]**(https://en.wikipedia.org/wiki/Ziegler%E2%80%93Nichols_method)
+## Source
+- [Ziegler–Nichols method (Wikipedia)](https://en.wikipedia.org/wiki/Ziegler%E2%80%93Nichols_method)
 ---
 
 ## Summary
