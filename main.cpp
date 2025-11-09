@@ -91,46 +91,43 @@ void setup(void)
 
 void loop(void)
 {
+  // Capture current timer value
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
   const uint32_t loop_start_us = NRF_TIMER0->CC[0];
-
   // Async packet loss and landing (target = now + interval, Recovery from delays)
   static uint32_t last_packet_us = loop_start_us;
   static uint32_t last_landing_us = loop_start_us;
-
+  // Check if async timeouts occurred
   const bool packet_timeout = loop_start_us >= last_packet_us;
   const bool landing_timeout = loop_start_us >= last_landing_us;
-
+  // Update packet timeout to prevent packet loss landing during auto-tuning
   if (!auto_tune_complete)
-    // If auto-tuning is not complete, update new async packet timeout
     last_packet_us = loop_start_us + HZ_TO_US(0.1f);
-
+  // Handle received radio packets before strict periodic tasks
   if (NRF_RADIO->EVENTS_CRCOK)
   {
+    // Clear packet received event, so next packet can be detected
     NRF_RADIO->EVENTS_CRCOK = 0;
-
-    // Update new async packet timeout
+    // Update async packet target time
     last_packet_us = loop_start_us + HZ_TO_US(0.1f);
-
+    // Process received packet if addressed to this node and zone
     if (received_packet.node == NODE_ID && received_packet.zone == ZONE_ID)
       handle_type[received_packet.type % PACKET_TYPE_COUNT]();
   }
-
   // Strict periodic tasks (target += interval, Cannot recover from delays)
   for (uint8_t i = 0; i < SCHEDULER_TASK_COUNT; i++)
   {
     if (loop_start_us >= tasks[i].previous_us)
     {
-      // Update new target time
+      // Update strict periodic target time
       tasks[i].previous_us += tasks[i].interval_us;
       tasks[i].task();
     }
   }
-
   // Async landing step for packet loss or POF warning
   if (FCU_IS_ACTIVE(fcu.status) && (packet_timeout || FCU_IS_POFWARN(fcu.status)) && landing_timeout)
   {
-    // Update new async landing timeout
+    // Update async landing target time
     last_landing_us = loop_start_us + HZ_TO_US(1);
     FCU_LANDING_STEP(fcu.thrust, 10, 10, fcu.status);
   }
@@ -369,7 +366,7 @@ static inline bool pid_auto_tune_step(const uint8_t axis, const float current_er
   // Initialize
   if (!tune[axis].zero_crossings && !tune[axis].last_setpoint_change)
   {
-    tune[axis].setpoint_value = 10.0f * M_PI / 180.0f;
+    tune[axis].setpoint_value = 10.0f * DEG_TO_RAD;
     tune[axis].last_setpoint_change = NRF_TIMER0->CC[0] + HZ_TO_US(0.5f); // 2 second square wave
     tune[axis].last_gain_increase = NRF_TIMER0->CC[0] + HZ_TO_US(2.0f);   // 0.5 second gain increase
     tune[axis].first_crossing = 0;
@@ -442,10 +439,9 @@ static inline bool pid_thrust_to_hover(void)
   start_time = !start_time ? NRF_TIMER0->CC[0] : start_time;
 
   const uint32_t elapsed = NRF_TIMER0->CC[0] - start_time;
-  const uint32_t duration_us = S_TO_US(PID_THRUST_TO_HOVER_DURATION_S);
-  const bool done = elapsed >= duration_us;
+  const bool done = elapsed >= S_TO_US(PID_THRUST_TO_HOVER_DURATION_S);
 
-  fcu.thrust = done ? HOVER_THRUST : (HOVER_THRUST * elapsed) / duration_us;
+  fcu.thrust = done ? 50 : (50 * elapsed) / S_TO_US(PID_THRUST_TO_HOVER_DURATION_S);
   thrust_at_hover = done;
 
   return done;
