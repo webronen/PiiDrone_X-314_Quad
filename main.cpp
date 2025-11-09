@@ -94,26 +94,33 @@ void loop(void)
   // Capture current timer value
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
   const uint32_t loop_start_us = NRF_TIMER0->CC[0];
+
   // Async packet loss and landing (target = now + interval, Recovery from delays)
   static uint32_t last_packet_us = loop_start_us;
   static uint32_t last_landing_us = loop_start_us;
+
   // Check if async timeouts occurred
   const bool packet_timeout = loop_start_us >= last_packet_us;
   const bool landing_timeout = loop_start_us >= last_landing_us;
+
   // Update packet timeout to prevent packet loss landing during auto-tuning
   if (!auto_tune_complete)
     last_packet_us = loop_start_us + HZ_TO_US(0.1f);
+
   // Handle received radio packets before strict periodic tasks
   if (NRF_RADIO->EVENTS_CRCOK)
   {
     // Clear packet received event, so next packet can be detected
     NRF_RADIO->EVENTS_CRCOK = 0;
+
     // Update async packet target time
     last_packet_us = loop_start_us + HZ_TO_US(0.1f);
+
     // Process received packet if addressed to this node and zone
     if (received_packet.node == NODE_ID && received_packet.zone == ZONE_ID)
       handle_type[received_packet.type % PACKET_TYPE_COUNT]();
   }
+
   // Strict periodic tasks (target += interval, Cannot recover from delays)
   for (uint8_t i = 0; i < SCHEDULER_TASK_COUNT; i++)
   {
@@ -124,6 +131,7 @@ void loop(void)
       tasks[i].task();
     }
   }
+
   // Async landing step for packet loss or POF warning
   if (FCU_IS_ACTIVE(fcu.status) && (packet_timeout || FCU_IS_POFWARN(fcu.status)) && landing_timeout)
   {
