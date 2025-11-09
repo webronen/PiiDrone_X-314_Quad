@@ -390,7 +390,7 @@ static inline bool pid_auto_tune_step(const uint8_t axis, const float current_er
   // Square wave - 0.5Hz (2 second period)
   if (now >= tune[axis].last_setpoint_change)
   {
-    tune[axis].setpoint_value = -tune[axis].setpoint_value;
+    tune[axis].setpoint_value = -(tune[axis].setpoint_value);
     fcu.pid_setpoint[axis] = tune[axis].setpoint_value;
     tune[axis].last_setpoint_change = now + HZ_TO_US(0.5f);
   }
@@ -448,9 +448,9 @@ static inline bool pid_thrust_to_hover(void)
   start_time = !start_time ? NRF_TIMER0->CC[0] : start_time;
 
   const uint32_t elapsed = NRF_TIMER0->CC[0] - start_time;
-  const bool done = elapsed >= S_TO_US(PID_THRUST_TO_HOVER_DURATION_S);
+  const bool done = elapsed >= S_TO_US(PID_THRUST_TO_HOVER_S);
 
-  fcu.thrust = done ? 50 : (50 * elapsed) / S_TO_US(PID_THRUST_TO_HOVER_DURATION_S);
+  fcu.thrust = done ? 50 : (50 * elapsed) / S_TO_US(PID_THRUST_TO_HOVER_S);
   thrust_at_hover = done;
 
   return done;

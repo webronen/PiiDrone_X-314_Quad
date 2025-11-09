@@ -37,7 +37,6 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 
 #define HZ_TO_US(Hz) ((uint32_t)(1000000.0f / (Hz)))
 #define S_TO_US(s) ((uint32_t)((s) * 1000000.0f))
-#define S_TO_INV_US_F(s) (1.0f / ((s) * 1000000.0f))
 
 #define VL53L4CX_I2C_SPEED 400000
 
@@ -50,7 +49,7 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 #define SETPOINT_MIN -1.0f
 #define SETPOINT_MAX 1.0f
 
-#define PID_THRUST_TO_HOVER_DURATION_S 5.0f
+#define PID_THRUST_TO_HOVER_S 5.0f
 #define PID_GAIN_MAX 100.0f
 #define PID_GAIN_MIN 0.0f
 #define PID_OUT_MAX ((MOTOR_MAX - THRUST_MAX) / 3.0f)
