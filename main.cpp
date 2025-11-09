@@ -147,6 +147,28 @@ static inline void task_fcu_update(void)
   DataQuaternion error;
   quaternion_multiply(&error, &hover_quaternion, &conjugate);
 
+  // Ziegler-Nichols Auto-Tune System
+  if (!auto_tune_complete)
+  {
+    if (!thrust_at_hover)
+    {
+      pid_thrust_to_hover();
+      memset(fcu.pid_setpoint, 0, sizeof(fcu.pid_setpoint));
+    }
+    else
+    {
+      static float *const error_ptr[3] = {&error.x, &error.y, &error.z};
+      const float current_error = *error_ptr[tuning_axis];
+
+      if (pid_auto_tune_step(tuning_axis, current_error) && ++tuning_axis >= 3)
+      {
+        auto_tune_complete = true;
+        memset(fcu.pid_setpoint, 0, sizeof(fcu.pid_setpoint));
+        // TODO: store the tuned PID gains to non-volatile memory
+      }
+    }
+  }
+
   pid_calculate(fcu.pid_setpoint[0], error.x, fcu.pid_gain[0][0], fcu.pid_gain[0][1], fcu.pid_gain[0][2],
                 &pid_state[0].I, &pid_state[0].Df, &pid_state[0].pv, &pid_state[0].out);
 
@@ -323,4 +345,118 @@ static inline void handle_thrust_update(void)
 
   FCU_UPDATE_THRUST(fcu.status, fcu.thrust, thrust, THRUST_MIN, THRUST_MAX);
   FCU_UPDATE_ACTIVE(fcu.status, fcu.thrust > THRUST_MIN);
+}
+
+static inline bool pid_auto_tune_step(const uint8_t axis, const float current_error)
+{
+  if (axis >= 3)
+    return true;
+
+  static struct
+  {
+    float Ku, Tu;
+    uint8_t zero_crossings;
+    uint32_t last_crossing;
+    uint32_t last_setpoint_change;
+    float setpoint_value;
+  } tune[3] = {0};
+
+  // Initialize setpoint
+  if (tune[axis].zero_crossings == 0 && tune[axis].last_setpoint_change == 0)
+  {
+    tune[axis].setpoint_value = 10.0f * M_PI / 180.0f;
+    tune[axis].last_setpoint_change = NRF_TIMER0->CC[0];
+    fcu.pid_setpoint[axis] = tune[axis].setpoint_value;
+    fcu.pid_gain[axis][0] = 0.5f;
+    fcu.pid_gain[axis][1] = 0.0f;
+    fcu.pid_gain[axis][2] = 0.0f;
+  }
+
+  // Square wave setpoint changes
+  uint32_t now = NRF_TIMER0->CC[0];
+  if ((now - tune[axis].last_setpoint_change) > HZ_TO_US(0.5f))
+  {
+    tune[axis].setpoint_value = -tune[axis].setpoint_value;
+    fcu.pid_setpoint[axis] = tune[axis].setpoint_value;
+    tune[axis].last_setpoint_change = now;
+  }
+
+  // Detect zero crossings
+  static float last_error[3] = {0};
+  if (last_error[axis] * current_error < 0.0f && fabsf(current_error) > 0.01f)
+  {
+    tune[axis].zero_crossings++;
+
+    if (tune[axis].zero_crossings == 1)
+    {
+      tune[axis].last_crossing = now;
+    }
+    else if (tune[axis].zero_crossings >= 4)
+    {
+      // Ziegler-Nichols
+      tune[axis].Ku = fcu.pid_gain[axis][0];
+      uint32_t total_time = now - tune[axis].last_crossing;
+      tune[axis].Tu = (float)total_time / 1000000.0f / (tune[axis].zero_crossings - 1);
+
+      float Kp = 0.6f * tune[axis].Ku;
+      float Ki = 1.2f * tune[axis].Ku / tune[axis].Tu;
+      float Kd = 0.075f * tune[axis].Ku * tune[axis].Tu;
+
+      if (axis == 2)
+        Kp *= 0.7f, Ki *= 0.7f, Kd *= 1.5f;
+
+      fcu.pid_gain[axis][0] = constrain(Kp, PID_GAIN_MIN, PID_GAIN_MAX);
+      fcu.pid_gain[axis][1] = constrain(Ki, PID_GAIN_MIN, PID_GAIN_MAX);
+      fcu.pid_gain[axis][2] = constrain(Kd, PID_GAIN_MIN, PID_GAIN_MAX);
+
+      fcu.pid_setpoint[axis] = 0.0f;
+      return true;
+    }
+  }
+
+  last_error[axis] = current_error;
+
+  // Increase P gain
+  if (tune[axis].zero_crossings < 4 && (now - tune[axis].last_setpoint_change) > HZ_TO_US(2.0f))
+  {
+    fcu.pid_gain[axis][0] += 0.2f;
+    if (fcu.pid_gain[axis][0] > 8.0f)
+    {
+      fcu.pid_gain[axis][0] = 2.0f;
+      fcu.pid_gain[axis][1] = 0.5f;
+      fcu.pid_gain[axis][2] = 0.1f;
+      fcu.pid_setpoint[axis] = 0.0f;
+      return true;
+    }
+  }
+
+  return false;
+}
+
+static inline bool pid_thrust_to_hover(void)
+{
+  static uint32_t start_time = 0;
+
+  if (start_time == 0)
+  {
+    start_time = NRF_TIMER0->CC[0];
+    fcu.thrust = 0;
+  }
+
+  const uint32_t elapsed = NRF_TIMER0->CC[0] - start_time;
+
+  // Calculate normalized time (0.0 to 1.0) over the ramp duration
+  float t = (float)elapsed * S_TO_INV_US_F(PID_THRUST_TO_HOVER_DURATION_S);
+
+  if (t < 1.0f)
+  {
+    // Quadratic ramp to hover thrust over the specified duration
+    fcu.thrust = constrain(HOVER_THRUST * PID_THRUST_RAMP_QUADRATIC(t), THRUST_MIN, HOVER_THRUST);
+    return false;
+  }
+
+  // Set exact hover thrust once ramp is complete
+  fcu.thrust = HOVER_THRUST;
+  thrust_at_hover = true;
+  return true;
 }

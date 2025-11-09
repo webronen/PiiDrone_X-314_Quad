@@ -36,6 +36,9 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 #define MOTOR4_PIN 29
 
 #define HZ_TO_US(Hz) ((uint32_t)(1000000.0f / (Hz)))
+#define S_TO_US(s) ((uint32_t)((s) * 1000000.0f))
+#define S_TO_INV_US_F(s) (1.0f / ((s) * 1000000.0f))
+
 #define VL53L4CX_I2C_SPEED 400000
 
 #define MOTOR_MIN 0
@@ -176,11 +179,6 @@ static Esc esc = {0x8000, 0x8000, 0x8000, 0x8000};
 static volatile Rcu received_packet = {0};
 static Pid pid_state[3] = {0};
 
-// Ziegler-Nichols Auto-Tune System
-static bool auto_tune_complete = true;
-static bool thrust_at_hover = false;
-static uint8_t tuning_axis = 0;
-
 static inline void task_imu_update(void);
 static inline void task_fcu_update(void);
 static inline void task_esc_update(void);
@@ -212,5 +210,17 @@ static inline void pid_calculate(const float sp, const float pv, const float Kp,
                                  const float Kd, float *_I, float *_D, float *_pv, float *out);
 static inline void quaternion_multiply(DataQuaternion *result, const DataQuaternion *q1, const DataQuaternion *q2);
 static inline void quaternion_normalize(DataQuaternion *q);
+
+// Ziegler-Nichols Auto-Tune System
+#define PID_THRUST_TO_HOVER_DURATION_S 5.0f
+#define PID_THRUST_RAMP_QUADRATIC(t) ((t) * (t))
+
+
+static bool auto_tune_complete = true;
+static bool thrust_at_hover = false;
+static uint8_t tuning_axis = 0;
+
+static inline bool pid_auto_tune_step(const uint8_t axis, const float current_error);
+static inline bool pid_thrust_to_hover(void);
 
 #endif
