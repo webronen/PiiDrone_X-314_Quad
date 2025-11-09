@@ -344,6 +344,22 @@ static inline void handle_setpoint_update(void)
   FCU_UPDATE_SETPOINT(fcu.pid_setpoint, axis, pid_setpoint, SETPOINT_MIN, SETPOINT_MAX);
 }
 
+static inline void handle_thrust_update(void)
+{
+  float thrust;
+  memcpy(&thrust, (const void *)&received_packet.data[0], sizeof(thrust));
+
+  if (!auto_tune_complete)
+  {
+    auto_tune_complete = true;
+    thrust_at_hover = false;
+    tuning_axis = 0;
+  }
+
+  FCU_UPDATE_THRUST(fcu.status, fcu.thrust, thrust, THRUST_MIN, THRUST_MAX);
+  FCU_UPDATE_ACTIVE(fcu.status, (fcu.thrust > THRUST_MIN));
+}
+
 // Ziegler-Nichols Auto-Tune System
 
 // Clean thrust ramp with smoothstep interpolation
@@ -358,7 +374,7 @@ static inline bool pid_thrust_to_hover(void)
   float x = (float)elapsed / S_TO_US(PID_THRUST_TO_HOVER_S);
   x = constrain(x, 0.0f, 1.0f);
   const float y = (x * x * (3.0f - 2.0f * x));
-  fcu.thrust = constrain(y * 50.0f, THRUST_MIN, THRUST_HOVER);
+  fcu.thrust = constrain(y * 50.0f, THRUST_MIN, THRUST_HOVER); // Assume hover at 50 units for safe initial logic testing
 
   return (elapsed >= S_TO_US(PID_THRUST_TO_HOVER_S));
 }
@@ -405,7 +421,7 @@ static inline bool pid_auto_tune_step(const uint8_t axis, const float err)
   }
 
   // Zero crossing detection with noise threshold
-  if (last_err[axis] * err < 0.0f && fabsf(err) > 0.01f)
+  if (last_err[axis] * err < 0.0f && __builtin_fabsf(err) > 0.01f)
   {
     if (tune[axis].crosses++ == 0)
     {
