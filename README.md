@@ -74,9 +74,9 @@
   - `P = 0.6 × Ku`
   - `I = 1.2 × Ku / Tu`
   - `D = 0.075 × Ku × Tu`
-- **Tunes axes sequentially**—completes one axis before starting the next, with independent state tracking
-- **Fast completion**—typically ~8 seconds per axis with automatic fallback if oscillations aren't detected
-- **Safety-constrained gains**—all PID parameters are bounded to prevent instability
+- **Tunes axes sequentially:** Completes one axis before starting the next, with independent state tracking
+- **Fast completion:** Typically 8 seconds per axis with automatic fallback if oscillations aren't detected
+- **Safety-constrained gains:** All PID parameters are bounded to prevent instability
 
 ### Tuning Process
 
