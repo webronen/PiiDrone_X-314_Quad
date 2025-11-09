@@ -345,18 +345,25 @@ static inline void handle_setpoint_update(void)
 }
 
 // Ziegler-Nichols Auto-Tune System
+
+// Clean thrust ramp with smoothstep interpolation
 static inline bool pid_thrust_to_hover(void)
 {
   static uint32_t start_time = 0;
-  start_time = !start_time ? NRF_TIMER0->CC[0] : start_time;
+
+  if (fcu.thrust == 0)
+    start_time = NRF_TIMER0->CC[0];
+
   const uint32_t elapsed = NRF_TIMER0->CC[0] - start_time;
   float x = (float)elapsed / S_TO_US(PID_THRUST_TO_HOVER_S);
   x = constrain(x, 0.0f, 1.0f);
   const float y = (x * x * (3.0f - 2.0f * x));
   fcu.thrust = constrain(y * 50.0f, THRUST_MIN, THRUST_HOVER);
+
   return (elapsed >= S_TO_US(PID_THRUST_TO_HOVER_S));
 }
 
+// Single-phase Ziegler-Nichols auto-tune per axis
 static inline bool pid_auto_tune_step(const uint8_t axis, const float err)
 {
   if (axis >= 3)
@@ -373,7 +380,7 @@ static inline bool pid_auto_tune_step(const uint8_t axis, const float err)
   static float last_err[3] = {0};
   const uint32_t now = NRF_TIMER0->CC[0];
 
-  // Initialize
+  // Initialize tuning for this axis
   if (!tune[axis].active)
   {
     tune[axis].setpoint = 10.0f * DEG_TO_RAD;
@@ -389,7 +396,7 @@ static inline bool pid_auto_tune_step(const uint8_t axis, const float err)
     fcu.pid_gain[axis][2] = 0.0f; // Zero D
   }
 
-  // Square wave - 0.5Hz (2 second period)
+  // Square wave excitation - 0.5Hz (2 second period)
   if (now >= tune[axis].last_change)
   {
     tune[axis].setpoint = -tune[axis].setpoint;
@@ -397,7 +404,7 @@ static inline bool pid_auto_tune_step(const uint8_t axis, const float err)
     tune[axis].last_change = now + HZ_TO_US(0.5f);
   }
 
-  // Zero crossing detection
+  // Zero crossing detection with noise threshold
   if (last_err[axis] * err < 0.0f && fabsf(err) > 0.01f)
   {
     if (tune[axis].crosses++ == 0)
@@ -412,7 +419,7 @@ static inline bool pid_auto_tune_step(const uint8_t axis, const float err)
       const float Tu = (float)total_time / 1000000.0f / num_periods;
       const float Ku = fcu.pid_gain[axis][0];
 
-      // Apply Ziegler-Nichols formulas
+      // Apply Ziegler-Nichols formulas with constraints
       fcu.pid_gain[axis][0] = constrain(0.6f * Ku, 0.1f, 8.0f);
       fcu.pid_gain[axis][1] = constrain(1.2f * Ku / Tu, 0.01f, 5.0f);
       fcu.pid_gain[axis][2] = constrain(0.075f * Ku * Tu, 0.001f, 2.0f);
@@ -425,15 +432,15 @@ static inline bool pid_auto_tune_step(const uint8_t axis, const float err)
 
   last_err[axis] = err;
 
-  // Increase P gain - 2.0Hz (0.5 second period)
+  // Increase P gain until oscillation detected
   if (tune[axis].crosses < 4 && now >= tune[axis].last_adj)
   {
     fcu.pid_gain[axis][0] += 0.2f;
     tune[axis].last_adj = now + HZ_TO_US(2.0f);
 
+    // Fallback if no oscillation detected
     if (fcu.pid_gain[axis][0] > 8.0f)
     {
-      // Fallback values
       fcu.pid_gain[axis][0] = 2.0f;
       fcu.pid_gain[axis][1] = 0.5f;
       fcu.pid_gain[axis][2] = 0.1f;
