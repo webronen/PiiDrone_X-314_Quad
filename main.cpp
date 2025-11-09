@@ -91,7 +91,7 @@ void setup(void)
 
 void loop(void)
 {
-  // Capture current timer value
+  // Capture current timer value for this loop iteration
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
   const uint32_t loop_start_us = NRF_TIMER0->CC[0];
 
@@ -132,11 +132,12 @@ void loop(void)
     }
   }
 
-  // Async landing step for packet loss or POF warning
+  // Async landing step for packet loss or power-fail warning
   if (FCU_IS_ACTIVE(fcu.status) && (packet_timeout || FCU_IS_POFWARN(fcu.status)) && landing_timeout)
   {
     // Update async landing target time
     last_landing_us = loop_start_us + HZ_TO_US(1);
+    // Decrement thrust smoothly (units per target time)
     FCU_LANDING_STEP(fcu.thrust, 10, 10, fcu.status);
   }
 }
