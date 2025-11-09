@@ -450,6 +450,6 @@ static inline bool pid_thrust_to_hover(void)
   float x = (float)elapsed / S_TO_US(PID_THRUST_TO_HOVER_S);
   x = constrain(x, 0.0f, 1.0f);
   const float y = (x * x * (3.0f - 2.0f * x));
-  fcu.thrust = constrain(y * HOVER_THRUST, THRUST_MIN, THRUST_MAX);
+  fcu.thrust = constrain(y * 50.0f, THRUST_MIN, THRUST_HOVER); // 50 units is initial test value. Change to actual THRUST_HOVER after testing
   return (elapsed >= S_TO_US(PID_THRUST_TO_HOVER_S));
 }
