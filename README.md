@@ -64,15 +64,27 @@
 
 ## Ziegler-Nichols Auto-Tune System
 
-**This project uses a single-phase Ziegler-Nichols method with multi-axis tuning.**
-
 ### Key Features
+
 - **Battery-friendly ramp-up** to hover thrust before tuning begins
-- **Automatically induces controlled oscillations** in a selected axis by generating square wave setpoint changes
-- **Detects sustained oscillations** to measure the ultimate gain (Ku) and oscillation period (Tu) for that axis
-- **Calculates optimal PID gains** using the classic Ziegler-Nichols tuning rules, with axis-specific scaling if needed
-- **Tunes each axis (roll, pitch, yaw) sequentially in a single auto-tune session**
-- **Tuning stops automatically** after the required number of oscillations or if a safety fallback is triggered
+- **Pure single-phase tuning** using the classic Ziegler-Nichols oscillation method
+- **Automatically induces controlled oscillations** in each axis sequentially using 0.5 Hz square wave setpoint changes
+- **Detects sustained oscillations** by monitoring zero-crossings to measure ultimate gain (Ku) and oscillation period (Tu)
+- **Calculates optimal PID gains** using Ziegler-Nichols formulas:
+  - `P = 0.6 × Ku`
+  - `I = 1.2 × Ku / Tu`
+  - `D = 0.075 × Ku × Tu`
+- **Tunes axes sequentially**—completes one axis before starting the next, with independent state tracking
+- **Fast completion**—typically ~8 seconds per axis with automatic fallback if oscillations aren't detected
+- **Safety-constrained gains**—all PID parameters are bounded to prevent instability
+
+### Tuning Process
+
+1. **Thrust ramp-up** to stable hover state
+2. **Axis selection** (roll → pitch → yaw)
+3. **Oscillation induction** via square wave excitation
+4. **Gain calculation** using Ziegler-Nichols method
+5. **Parameter application** and progression to next axis
 
 ---
 
