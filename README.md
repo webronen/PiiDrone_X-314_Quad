@@ -82,7 +82,7 @@
 - **Auto-tune aborts** if thrust is changed during ramp-up or tuning, resetting all tuning state
 
 ## Source
-- [Ziegler–Nichols method (Wikipedia)](https://en.wikipedia.org/wiki/Ziegler%E2%80%93Nichols_method)
+- <a href="https://en.wikipedia.org/wiki/Ziegler%E2%80%93Nichols_method" target="_blank">Ziegler–Nichols method (Wikipedia)</a>
 ---
 
 ## Summary
