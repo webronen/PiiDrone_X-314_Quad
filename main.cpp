@@ -175,7 +175,7 @@ static inline void task_fcu_update(void)
 
       if (pid_auto_tune_step(tuning_axis, current_error))
       {
-        tuning_axis++; // Progress to next axis
+        tuning_axis++;
 
         if (tuning_axis >= 3)
         {
