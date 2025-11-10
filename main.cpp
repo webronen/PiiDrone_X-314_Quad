@@ -375,12 +375,9 @@ static inline bool pid_thrust_to_hover(void)
   x = constrain(x, 0.0f, 1.0f);
   const float y = (x * x * (3.0f - 2.0f * x));
 
-  fcu.thrust = (uint16_t)constrain(y * 20.0f, THRUST_MIN, THRUST_HOVER);
+  fcu.thrust = (uint16_t)constrain(y * 50.0f, THRUST_MIN, THRUST_HOVER); // 50 is only for initial logic test to be safe
 
-  if (x >= 1.0f)
-    start_time = 0;
-
-  return start_time == 0;
+  return (x >= 1.0f) ? !(start_time = 0) : false;
 }
 
 static inline bool pid_auto_tune_step(const uint8_t axis, const float err)
