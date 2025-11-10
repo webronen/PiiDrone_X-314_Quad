@@ -102,7 +102,10 @@
 - **Auto-tune is aborted and state cleared** if thrust input is modified during ramp-up or tuning
 
 ## Source
+- [Quaternion (Wikipedia)](https://en.wikipedia.org/wiki/Quaternion)
+- [Smoothstep (Wikipedia)](https://en.wikipedia.org/wiki/Smoothstep)
 - [Ziegler–Nichols method (Wikipedia)](https://en.wikipedia.org/wiki/Ziegler%E2%80%93Nichols_method)
+- [PiiDrone X-314 Quad (Maker World)](https://makerworld.com/en/models/1153207-piidrone-x-314-quad)
 ---
 
 ## Summary
