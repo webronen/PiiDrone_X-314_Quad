@@ -320,6 +320,13 @@ static inline void quaternion_normalize(DataQuaternion *q)
 static inline void handle_pid_tune(void)
 {
   pid_auto_tune_clear();
+  auto_tune_complete = false;
+  fcu.thrust = 0;
+
+  memset(fcu.pid_setpoint, 0, sizeof(fcu.pid_setpoint));
+  memset(pid_state, 0, sizeof(pid_state));
+  memset(fcu.pid_gain, 0, sizeof(fcu.pid_gain));
+
   FCU_SET_ACTIVE(fcu.status);
 }
 
