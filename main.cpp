@@ -161,24 +161,17 @@ static inline void task_fcu_update(void)
   quaternion_multiply(&error, &hover_quaternion, &conjugate);
 
   if (!auto_tune_complete && !thrust_at_hover)
-  {
     thrust_at_hover = pid_thrust_to_hover();
-  }
 
   if (!auto_tune_complete && thrust_at_hover)
   {
     static float *const error_ptr[3] = {&error.x, &error.y, &error.z};
     const float current_error = *error_ptr[tuning_axis];
 
-    if (pid_auto_tune_step(tuning_axis, current_error))
+    if (pid_auto_tune_step(tuning_axis, current_error) && ++tuning_axis == 3)
     {
-      tuning_axis++;
-
-      if (tuning_axis >= 1)
-      {
-        pid_auto_tune_clear();
-        pid_store_gains();
-      }
+      pid_auto_tune_clear();
+      pid_store_gains();
     }
   }
 
@@ -404,42 +397,36 @@ static inline bool pid_auto_tune_step(const uint8_t axis, const float err)
     fcu.pid_gain[axis][0] = 0.0f;
     fcu.pid_gain[axis][1] = 0.0f;
     fcu.pid_gain[axis][2] = 0.0f;
+
+    last_err[axis] = err;
+    return false;
   }
 
   // Square wave excitation - 0.5Hz (2 second period)
-  if (now >= tune[axis].last_change)
+  if ((int32_t)(now - tune[axis].last_change) >= 0)
   {
     tune[axis].setpoint = -tune[axis].setpoint;
     fcu.pid_setpoint[axis] = tune[axis].setpoint;
     tune[axis].last_change = now + HZ_TO_US(0.5f);
   }
 
-  // Adaptive hysteresis: third of square wave amplitude
+  // Adaptive hysteresis
   const float hysteresis = fabsf(tune[axis].setpoint) * PID_SETPOINT_HYSTERESIS;
 
-  // Check for valid zero crossing
-  bool valid_crossing = (last_err[axis] * err < 0.0f) && (fabsf(err) > hysteresis);
-
-  if (valid_crossing)
+  // Zero-crossing detection
+  if ((last_err[axis] * err < 0.0f) && (fabsf(err) > hysteresis))
   {
-    tune[axis].crosses++;
-
-    // Record first crossing time
-    if (tune[axis].crosses == 1)
+    if (++tune[axis].crosses == 1)
     {
       tune[axis].first_cross = now;
     }
 
-    // Check if tuning complete for this axis
+    // Check if tuning complete
     if (tune[axis].crosses >= 6)
     {
-      // Calculate Ziegler-Nichols parameters
-      const uint32_t total_time = now - tune[axis].first_cross;
-      const float num_periods = (tune[axis].crosses - 1) / 2.0f;
-      const float Tu = (float)total_time / 1000000.0f / num_periods;
       const float Ku = fcu.pid_gain[axis][0];
+      const float Tu = (float)(now - tune[axis].first_cross) * 4e-7f; // Optimized: / 1000000.0f / 2.5f
 
-      // Apply Ziegler-Nichols formulas
       fcu.pid_gain[axis][0] = constrain(0.6f * Ku, 0.1f, 8.0f);
       fcu.pid_gain[axis][1] = constrain(1.2f * Ku / Tu, 0.01f, 5.0f);
       fcu.pid_gain[axis][2] = constrain(0.075f * Ku * Tu, 0.001f, 2.0f);
@@ -451,15 +438,14 @@ static inline bool pid_auto_tune_step(const uint8_t axis, const float err)
     }
   }
 
-  // Increase P gain until oscillation detected
-  if (tune[axis].crosses < 6 && now >= tune[axis].last_adj)
+  // Gain scheduling
+  if ((tune[axis].crosses < 6) && ((int32_t)(now - tune[axis].last_adj) >= 0))
   {
     fcu.pid_gain[axis][0] += 0.1f;
     tune[axis].last_adj = now + HZ_TO_US(2.0f);
 
     if (fcu.pid_gain[axis][0] > 8.0f)
     {
-      // Fallback values
       fcu.pid_gain[axis][0] = 2.0f;
       fcu.pid_gain[axis][1] = 0.5f;
       fcu.pid_gain[axis][2] = 0.1f;

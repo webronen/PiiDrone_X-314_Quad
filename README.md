@@ -66,31 +66,36 @@
 
 ---
 
-## Ziegler-Nichols Auto-Tune System
+## Astrom-Hägglund Relay Auto-Tuning System
 
-### Key Features
+### Overview
 
-- **Battery- and system-friendly smoothstep ramp-up** to hover thrust for gentle motor activation
-- **Single-phase PID tuning** using the classic Ziegler-Nichols oscillation method
-- **Controlled oscillation induction** in each axis using 0.5 Hz square wave setpoints
-- **Adaptive zero-crossing detection with hysteresis** based on the square wave amplitude
-- **Oscillation analysis** to measure ultimate gain (Ku) and oscillation period (Tu)
-- **PID gain calculation** using Ziegler-Nichols formulas:
-  - `P = 0.6 × Ku`
-  - `I = 1.2 × Ku / Tu`
-  - `D = 0.075 × Ku × Tu`
-- **Sequential axis tuning** with independent state tracking for roll, pitch, and yaw
-- **Fast tuning completion** in approximately 8 seconds per axis (2.5 periods at 0.5 Hz)
-- **Safety-constrained gain limits** to prevent instability during or after tuning
-- **Fallback logic** to apply conservative default gains if oscillations are not detected
+Automates the Ziegler-Nichols PID tuning method using relay feedback for embedded flight controllers.
+
+### Features
+
+- **Smoothstep thrust ramp** for battery-friendly, gentle motor activation
+- **Single-phase PID tuning** via induced oscillation (relay/relay-feedback)
+- **0.5 Hz square wave excitation** with adaptive hysteresis for robust zero-crossing detection
+- **Sequential axis tuning:** roll → pitch → yaw, each with independent state
+- **Safety-constrained gain limits** and fallback to conservative defaults if oscillation fails
 
 ### Tuning Process
 
-1. **Thrust ramp-up** to stable hover  
-2. **Axis selection** (roll → pitch → yaw)  
-3. **Oscillation triggering** using 0.5 Hz square wave setpoints  
-4. **Gain calculation** using Ziegler-Nichols method  
-5. **Apply calculated gains** and continue to the next axis
+1. **Smoothstep thrust ramp** to hover
+2. **Axis excitation** with 0.5 Hz square wave setpoint
+3. **Gain scheduling** until sustained oscillation is detected
+4. **Oscillation analysis:** measure ultimate gain (Ku) and period (Tu)
+5. **Gain calculation:**
+   - `P = 0.6 × Ku`
+   - `I = 1.2 × Ku / Tu`
+   - `D = 0.075 × Ku × Tu`
+6. **Repeat** for each axis
+
+### Performance
+
+- ~8 seconds per axis (6 zero-crossings, 2.5 periods)
+- Adaptive noise rejection via hysteresis
 
 ---
 
