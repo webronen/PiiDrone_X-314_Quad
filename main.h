@@ -37,6 +37,7 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 
 #define HZ_TO_US(Hz) ((uint32_t)(1000000.0f / (Hz)))
 #define S_TO_US(s) ((uint32_t)((s) * 1000000.0f))
+#define S_TO_US_INV(s) (1.0f / ((s) * 1000000.0f))
 
 #define VL53L4CX_I2C_SPEED 400000
 
@@ -211,6 +212,7 @@ static void (*const handle_type[PACKET_TYPE_COUNT])(void) = {
 };
 
 static inline void pid_store_gains(void);
+static inline void pid_auto_tune_clear(void);
 static inline void pid_calculate(const float sp, const float pv, const float Kp, const float Ki,
                                  const float Kd, float *_I, float *_D, float *_pv, float *out);
 static inline bool pid_auto_tune_step(const uint8_t axis, const float current_error);

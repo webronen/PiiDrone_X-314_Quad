@@ -69,6 +69,7 @@
 - **Battery-friendly ramp-up** to hover thrust before tuning
 - **Single-phase tuning** using the classic Ziegler-Nichols oscillation method
 - **Induces controlled oscillations** in each axis with 0.5 Hz square wave setpoints
+- **Adaptive zero-crossing detection** using hysteresis set to one-third of the square wave amplitude
 - **Detects oscillations** by monitoring zero-crossings to measure ultimate gain (Ku) and period (Tu)
 - **Calculates optimal PID gains** using Ziegler-Nichols formulas:
   - `P = 0.6 × Ku`

@@ -163,7 +163,6 @@ static inline void task_fcu_update(void)
   if (!auto_tune_complete && !thrust_at_hover)
   {
     thrust_at_hover = pid_thrust_to_hover();
-    memset(fcu.pid_setpoint, 0, sizeof(fcu.pid_setpoint));
   }
 
   if (!auto_tune_complete && thrust_at_hover)
@@ -177,10 +176,7 @@ static inline void task_fcu_update(void)
 
       if (tuning_axis >= 3)
       {
-        auto_tune_complete = true;
-        thrust_at_hover = false;
-        tuning_axis = 0;
-        memset(fcu.pid_setpoint, 0, sizeof(fcu.pid_setpoint));
+        pid_auto_tune_clear();
         pid_store_gains();
       }
     }
@@ -268,6 +264,13 @@ static inline void task_pof_update(void)
   NRF_POWER->EVENTS_POFWARN = 0;
 }
 
+static inline void pid_auto_tune_clear(void)
+{
+  auto_tune_complete = true;
+  thrust_at_hover = false;
+  tuning_axis = 0;
+}
+
 static inline void pid_store_gains(void)
 {
   // TODO: Store PID gains to non-volatile memory
@@ -316,15 +319,8 @@ static inline void quaternion_normalize(DataQuaternion *q)
 
 static inline void handle_pid_tune(void)
 {
-  auto_tune_complete = false;
-  thrust_at_hover = false;
-  tuning_axis = 0;
-  fcu.thrust = 0;
-
-  memset(fcu.pid_setpoint, 0, sizeof(fcu.pid_setpoint));
-  memset(pid_state, 0, sizeof(pid_state));
-
-  FCU_UPDATE_ACTIVE(fcu.status, true);
+  pid_auto_tune_clear();
+  FCU_SET_ACTIVE(fcu.status);
 }
 
 static inline void handle_pid_update(void)
@@ -354,11 +350,7 @@ static inline void handle_thrust_update(void)
   memcpy(&thrust, (const void *)&received_packet.data[0], sizeof(thrust));
 
   if (!auto_tune_complete)
-  {
-    auto_tune_complete = true;
-    thrust_at_hover = false;
-    tuning_axis = 0;
-  }
+    pid_auto_tune_clear();
 
   FCU_UPDATE_THRUST(fcu.status, fcu.thrust, thrust, THRUST_MIN, THRUST_MAX);
   FCU_UPDATE_ACTIVE(fcu.status, (fcu.thrust > THRUST_MIN));
@@ -371,20 +363,17 @@ static inline bool pid_thrust_to_hover(void)
   if (fcu.thrust == 0)
     start_time = NRF_TIMER0->CC[0];
 
-  const uint32_t elapsed = NRF_TIMER0->CC[0] - start_time;
-  float x = (float)elapsed / S_TO_US(PID_THRUST_TO_HOVER_S);
+  const uint32_t elapsed = (NRF_TIMER0->CC[0] - start_time);
+  float x = ((float)elapsed * S_TO_US_INV(PID_THRUST_TO_HOVER_S));
   x = constrain(x, 0.0f, 1.0f);
   const float y = (x * x * (3.0f - 2.0f * x));
-  fcu.thrust = constrain(y * 50.0f, THRUST_MIN, THRUST_HOVER);
+  fcu.thrust = constrain(y * 50.0f, THRUST_MIN, THRUST_HOVER); // Change 50.0f to HOVER_THRUST after initial logic testing
 
   return (elapsed >= S_TO_US(PID_THRUST_TO_HOVER_S));
 }
 
 static inline bool pid_auto_tune_step(const uint8_t axis, const float err)
 {
-  if (axis >= 3)
-    return true;
-
   static struct
   {
     uint32_t first_cross, last_change, last_adj;
@@ -396,6 +385,7 @@ static inline bool pid_auto_tune_step(const uint8_t axis, const float err)
   static float last_err[3] = {0};
   const uint32_t now = NRF_TIMER0->CC[0];
 
+  // Initialize tuning for this axis
   if (!tune[axis].active)
   {
     tune[axis].setpoint = 10.0f * DEG_TO_RAD;
@@ -411,6 +401,7 @@ static inline bool pid_auto_tune_step(const uint8_t axis, const float err)
     fcu.pid_gain[axis][2] = 0.0f;
   }
 
+  // Square wave excitation - 0.5Hz (2 second period)
   if (now >= tune[axis].last_change)
   {
     tune[axis].setpoint = -tune[axis].setpoint;
@@ -418,31 +409,44 @@ static inline bool pid_auto_tune_step(const uint8_t axis, const float err)
     tune[axis].last_change = now + HZ_TO_US(0.5f);
   }
 
-  if (last_err[axis] * err < 0.0f && __builtin_fabsf(err) > 0.01f)
+  // Adaptive hysteresis: third of square wave amplitude
+  const float hysteresis = fabsf(tune[axis].setpoint) * (1.0f / 3.0f);
+
+  // Check for valid zero crossing
+  bool valid_crossing = (last_err[axis] * err < 0.0f) && (fabsf(err) > hysteresis);
+
+  if (valid_crossing)
   {
-    if (tune[axis].crosses++ == 0)
+    tune[axis].crosses++;
+
+    // Record first crossing time
+    if (tune[axis].crosses == 1)
     {
       tune[axis].first_cross = now;
     }
-    else if (tune[axis].crosses >= 4)
+
+    // Check if tuning complete for this axis
+    if (tune[axis].crosses >= 4)
     {
+      // Calculate Ziegler-Nichols parameters
       const uint32_t total_time = now - tune[axis].first_cross;
       const float num_periods = (tune[axis].crosses - 1) / 2.0f;
       const float Tu = (float)total_time / 1000000.0f / num_periods;
       const float Ku = fcu.pid_gain[axis][0];
 
+      // Apply Ziegler-Nichols formulas
       fcu.pid_gain[axis][0] = constrain(0.6f * Ku, 0.1f, 8.0f);
       fcu.pid_gain[axis][1] = constrain(1.2f * Ku / Tu, 0.01f, 5.0f);
       fcu.pid_gain[axis][2] = constrain(0.075f * Ku * Tu, 0.001f, 2.0f);
 
       fcu.pid_setpoint[axis] = 0.0f;
       tune[axis].active = false;
+      last_err[axis] = err;
       return true;
     }
   }
 
-  last_err[axis] = err;
-
+  // Increase P gain until oscillation detected
   if (tune[axis].crosses < 4 && now >= tune[axis].last_adj)
   {
     fcu.pid_gain[axis][0] += 0.2f;
@@ -450,6 +454,7 @@ static inline bool pid_auto_tune_step(const uint8_t axis, const float err)
 
     if (fcu.pid_gain[axis][0] > 8.0f)
     {
+      // Fallback values
       fcu.pid_gain[axis][0] = 2.0f;
       fcu.pid_gain[axis][1] = 0.5f;
       fcu.pid_gain[axis][2] = 0.1f;
@@ -459,5 +464,6 @@ static inline bool pid_auto_tune_step(const uint8_t axis, const float err)
     }
   }
 
+  last_err[axis] = err;
   return false;
 }
