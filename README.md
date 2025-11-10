@@ -70,7 +70,7 @@
 
 ### Key Features
 
-- **Battery-friendly smoothstep ramp-up** to hover thrust before tuning for gentle motor activation
+- **Battery- and system-friendly smoothstep ramp-up** to hover thrust for gentle motor activation
 - **Single-phase PID tuning** using the classic Ziegler-Nichols oscillation method
 - **Controlled oscillation induction** in each axis using 0.5 Hz square wave setpoints
 - **Adaptive zero-crossing detection with hysteresis** based on the square wave amplitude
