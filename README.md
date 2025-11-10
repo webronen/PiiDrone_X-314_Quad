@@ -66,7 +66,7 @@
 
 ### Key Features
 
-- **Battery-friendly ramp-up** to hover thrust before tuning
+- **Battery-friendly ramp-up** to hover thrust before tuning using a smoothstep easing function for gentle motor activation
 - **Single-phase tuning** using the classic Ziegler-Nichols oscillation method
 - **Induces controlled oscillations** in each axis with 0.5 Hz square wave setpoints
 - **Adaptive zero-crossing detection** using hysteresis set to one-third of the square wave amplitude
