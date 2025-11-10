@@ -99,13 +99,13 @@ void loop(void)
   static uint32_t last_packet_us = loop_start_us;
   static uint32_t last_landing_us = loop_start_us;
 
-  // Check if async timeouts occurred
-  const bool packet_timeout = loop_start_us >= last_packet_us;
-  const bool landing_timeout = loop_start_us >= last_landing_us;
-
   // Update packet timeout to prevent packet loss landing during auto-tuning
   if (!auto_tune_complete)
     last_packet_us = loop_start_us + HZ_TO_US(0.1f);
+
+  // Check if async timeouts occurred
+  const bool packet_timeout = loop_start_us >= last_packet_us;
+  const bool landing_timeout = loop_start_us >= last_landing_us;
 
   // Handle received radio packets before strict periodic tasks
   if (NRF_RADIO->EVENTS_CRCOK)
@@ -353,7 +353,7 @@ static inline void handle_setpoint_update(void)
 
 static inline void handle_thrust_update(void)
 {
-  float thrust;
+  uint16_t thrust;
   memcpy(&thrust, (const void *)&received_packet.data[0], sizeof(thrust));
 
   if (!auto_tune_complete)
@@ -367,16 +367,20 @@ static inline bool pid_thrust_to_hover(void)
 {
   static uint32_t start_time = 0;
 
-  if (fcu.thrust == 0)
+  if (start_time == 0)
     start_time = NRF_TIMER0->CC[0];
 
   const uint32_t elapsed = (NRF_TIMER0->CC[0] - start_time);
-  float x = ((float)elapsed * S_TO_US_INV(PID_THRUST_TO_HOVER_S));
+  float x = ((float)elapsed / S_TO_US(PID_THRUST_TO_HOVER_S));
   x = constrain(x, 0.0f, 1.0f);
   const float y = (x * x * (3.0f - 2.0f * x));
-  fcu.thrust = constrain(y * 50.0f, THRUST_MIN, THRUST_HOVER); // Change 50.0f to HOVER_THRUST after initial logic testing
 
-  return (elapsed >= S_TO_US(PID_THRUST_TO_HOVER_S));
+  fcu.thrust = (uint16_t)constrain(y * 20.0f, THRUST_MIN, THRUST_HOVER);
+
+  if (x >= 1.0f)
+    start_time = 0;
+
+  return start_time == 0;
 }
 
 static inline bool pid_auto_tune_step(const uint8_t axis, const float err)
