@@ -101,15 +101,18 @@
 - **Failsafe and landing logic** activate on packet timeout or power warning  
 - **Auto-tune is aborted and state cleared** if thrust input is modified during ramp-up or tuning
 
-## Source
-- [Quaternion (Wikipedia)](https://en.wikipedia.org/wiki/Quaternion)
-- [Smoothstep (Wikipedia)](https://en.wikipedia.org/wiki/Smoothstep)
-- [Ziegler–Nichols method (Wikipedia)](https://en.wikipedia.org/wiki/Ziegler%E2%80%93Nichols_method)
-- [PiiDrone X-314 Quad (Maker World)](https://makerworld.com/en/models/1153207-piidrone-x-314-quad)
 ---
 
 ## Summary
 
 This system enables **safe, hands-off PID tuning** for drones, delivering reliable initial gain estimates for stable flight. While further fine-tuning **is needed** for optimal performance, the auto-tune process provides a strong starting point for agile and balanced control. The control authority budget and safety features support robust flight dynamics for the PiiDrone X-314 Quad.
+
+---
+
+## Source
+- [Quaternion (Wikipedia)](https://en.wikipedia.org/wiki/Quaternion)
+- [Smoothstep (Wikipedia)](https://en.wikipedia.org/wiki/Smoothstep)
+- [Ziegler–Nichols method (Wikipedia)](https://en.wikipedia.org/wiki/Ziegler%E2%80%93Nichols_method)
+- [PiiDrone X-314 Quad (Maker World)](https://makerworld.com/en/models/1153207-piidrone-x-314-quad)
 
 ---
