@@ -40,25 +40,29 @@
 ## Control Authority Budget
 
 ### Physical Capabilities
-- **Total thrust capacity:** 160g (800 units) across 4 motors
-- **Drone mass:** 70g → Hover thrust: 70g (350 units)
-- **Maximum lateral acceleration:** 1.0g available
+
+- **Total thrust capacity:** 160g (800 units) across 4 motors  
+- **Drone mass:** 70g → Hover thrust: 70g (350 units)  
+- **Maximum lateral acceleration:** 1.0g available  
 - **Thrust-to-weight ratio:** 2.28:1
 
 ### Authority Allocation
-- **Altitude control:** 90g total (450 units = hover + 20g margin)
-- **Stabilization control:** 70g (350 units = 100% of drone mass)
-- **Mixing budget:** (MOTOR_MAX - THRUST_MAX) = 800 - 450 = 350 units
+
+- **Altitude control budget:** 90g total (450 units = hover + 20g margin)  
+- **Stabilization control budget:** 70g (350 units = 100% of drone mass)  
+- **Mixing margin:** 350 units (MOTOR_MAX – THRUST_MAX = 800 – 450)
 
 ### Performance & Safety
-- **1.0g lateral acceleration** enables aggressive disturbance rejection
-- **PID limits:** ±116.67 units/axis ensures worst-case (450 + 3×117 = 801) stays within motor saturation limits
-- **Integral clamp:** ±58.33 units (half of PID limits) prevents windup consuming control authority
+
+- **1.0g lateral acceleration** enables aggressive disturbance rejection  
+- **PID output limits:** ±116.67 units/axis ensures worst-case (450 + 3×117 = 801) remains within motor saturation  
+- **Integral clamp:** ±58.33 units (50% of PID limit) prevents windup from consuming control authority
 
 ### Design Advantage
-- **100% mass-equivalent stabilization** exceeds typical commercial budgets
-- **Conservative allocation** provides robust performance in turbulence
-- **Balanced approach** optimizes control without risking motor saturation
+
+- **Mass-equivalent stabilization budget** exceeds typical commercial allocations  
+- **Conservative thrust allocation** ensures robust performance in turbulence  
+- **Balanced control strategy** maximizes agility without risking motor saturation
 
 ---
 
@@ -92,10 +96,10 @@
 
 ## Safety & Robustness
 
-- **All PID states, setpoints, and gains are reset** on abort or disarm
-- **Final motor outputs are always constrained** to physical limits
-- **Failsafe and landing logic** on packet timeout or power warning
-- **Auto-tune aborts** if thrust is changed during ramp-up or tuning, resetting all tuning state
+- **All PID states, setpoints, and gains are reset** when tuning is aborted  
+- **Final motor outputs are always constrained** to physical limits  
+- **Failsafe and landing logic** activate on packet timeout or power warning  
+- **Auto-tune is aborted and state cleared** if thrust input is modified during ramp-up or tuning
 
 ## Source
 - [Ziegler–Nichols method (Wikipedia)](https://en.wikipedia.org/wiki/Ziegler%E2%80%93Nichols_method)
