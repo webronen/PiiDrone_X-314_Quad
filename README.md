@@ -130,10 +130,10 @@ This system enables **safe, hands-off PID tuning** for drones, delivering reliab
 
 ## Source
 
-- [Quaternion (Wikipedia)](https://en.wikipedia.org/wiki/Quaternion)
-- [Smoothstep (Wikipedia)](https://en.wikipedia.org/wiki/Smoothstep)
+- [Quaternion](https://en.wikipedia.org/wiki/Quaternion)
+- [Smoothstep](https://en.wikipedia.org/wiki/Smoothstep)
 - [Proportional–integral–derivative controller](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller)
 - [Relay (Åström–Hägglund) method](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller#Relay_(%C3%85str%C3%B6m%E2%80%93H%C3%A4gglund)_method)
-- [Ziegler–Nichols method (Wikipedia)](https://en.wikipedia.org/wiki/Ziegler%E2%80%93Nichols_method)
+- [Ziegler–Nichols method](https://en.wikipedia.org/wiki/Ziegler%E2%80%93Nichols_method)
 
 ---
