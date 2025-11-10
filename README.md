@@ -82,11 +82,11 @@
 
 ### Tuning Process
 
-1. **Thrust ramp-up** to stable hover
-2. **Axis selection** (roll → pitch → yaw)
-3. **Oscillation induction** via square wave excitation
-4. **Gain calculation** using Ziegler-Nichols method
-5. **Parameter application** and progression to next axis
+1. **Thrust ramp-up** to stable hover  
+2. **Axis selection** (roll → pitch → yaw)  
+3. **Oscillation triggering** using 0.5 Hz square wave setpoints  
+4. **Gain calculation** using Ziegler-Nichols method  
+5. **Apply calculated gains** and continue to the next axis
 
 ---
 
