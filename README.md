@@ -67,17 +67,18 @@
 ### Key Features
 
 - **Battery-friendly smoothstep ramp-up** to hover thrust before tuning for gentle motor activation
-- **Single-phase tuning** using the classic Ziegler-Nichols oscillation method
-- **Induces controlled oscillations** in each axis with 0.5 Hz square wave setpoints
-- **Adaptive zero-crossing detection** using hysteresis set to one-third of the square wave amplitude
-- **Detects oscillations** by monitoring zero-crossings to measure ultimate gain (Ku) and period (Tu)
-- **Calculates optimal PID gains** using Ziegler-Nichols formulas:
+- **Single-phase PID tuning** using the classic Ziegler-Nichols oscillation method
+- **Controlled oscillation induction** in each axis using 0.5 Hz square wave setpoints
+- **Adaptive hysteresis-based zero-crossing detection** using a threshold set to one-third of the square wave amplitude
+- **Oscillation analysis** to measure ultimate gain (Ku) and oscillation period (Tu)
+- **PID gain calculation** using Ziegler-Nichols formulas:
   - `P = 0.6 × Ku`
   - `I = 1.2 × Ku / Tu`
   - `D = 0.075 × Ku × Tu`
-- **Tunes axes sequentially:** Completes one axis before starting the next, with independent state tracking
-- **Fast completion:** Typically 8 seconds per axis with automatic fallback if oscillations aren't detected
-- **Safety-constrained gains:** All PID parameters are bounded to prevent instability
+- **Sequential axis tuning** with independent state tracking for roll, pitch, and yaw
+- **Fast tuning completion** in approximately 8 seconds per axis
+- **Safety-constrained gain limits** to prevent instability during or after tuning
+- **Fallback logic** to apply conservative default gains if oscillations are not detected
 
 ### Tuning Process
 
