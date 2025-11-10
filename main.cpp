@@ -426,7 +426,7 @@ static inline bool pid_auto_tune_step(const uint8_t axis, const float err)
     }
 
     // Check if tuning complete for this axis
-    if (tune[axis].crosses >= 4)
+    if (tune[axis].crosses >= 6)
     {
       // Calculate Ziegler-Nichols parameters
       const uint32_t total_time = now - tune[axis].first_cross;

@@ -80,7 +80,7 @@
   - `I = 1.2 × Ku / Tu`
   - `D = 0.075 × Ku × Tu`
 - **Sequential axis tuning** with independent state tracking for roll, pitch, and yaw
-- **Fast tuning completion** in approximately 8 seconds per axis
+- **Fast tuning completion** in approximately 8 seconds per axis (2.5 periods at 0.5 Hz)
 - **Safety-constrained gain limits** to prevent instability during or after tuning
 - **Fallback logic** to apply conservative default gains if oscillations are not detected
 
