@@ -402,7 +402,6 @@ static inline bool pid_auto_tune_step(const uint8_t axis, const float err)
     return false;
   }
 
-  // Square wave excitation
   if (now >= tune[axis].last_change)
   {
     tune[axis].setpoint = -tune[axis].setpoint;
@@ -410,10 +409,10 @@ static inline bool pid_auto_tune_step(const uint8_t axis, const float err)
     tune[axis].last_change = now + HZ_TO_US(0.5f);
   }
 
-  // Zero-crossing detection
-  const float hysteresis = fabsf(tune[axis].setpoint) * PID_SETPOINT_HYSTERESIS;
+  const float hysteresis = __builtin_fabsf(tune[axis].setpoint) * PID_SETPOINT_HYSTERESIS;
+  const bool crossed_zero = (last_err[axis] > 0.0f) != (err > 0.0f);
 
-  if ((last_err[axis] * err < 0.0f) && (fabsf(err) > hysteresis))
+  if (crossed_zero && (__builtin_fabsf(err) > hysteresis))
   {
     if (++tune[axis].crosses == 1)
     {
@@ -424,10 +423,10 @@ static inline bool pid_auto_tune_step(const uint8_t axis, const float err)
     {
       const float Ku = fcu.pid_gain[axis][0];
       const float Tu = (float)(now - tune[axis].first_cross) * 4e-7f;
+      const float inv_Tu = 1.0f / (Tu + __FLT_EPSILON__);
 
-      // Apply Ziegler-Nichols
       fcu.pid_gain[axis][0] = constrain(0.6f * Ku, 0.1f, 8.0f);
-      fcu.pid_gain[axis][1] = constrain(1.2f * Ku / Tu, 0.01f, 5.0f);
+      fcu.pid_gain[axis][1] = constrain(1.2f * Ku * inv_Tu, 0.01f, 5.0f);
       fcu.pid_gain[axis][2] = constrain(0.075f * Ku * Tu, 0.001f, 2.0f);
 
       fcu.pid_setpoint[axis] = 0.0f;
@@ -437,7 +436,6 @@ static inline bool pid_auto_tune_step(const uint8_t axis, const float err)
     }
   }
 
-  // Gain scheduling
   if ((tune[axis].crosses < 6) && (now >= tune[axis].last_adj))
   {
     fcu.pid_gain[axis][0] += 0.1f;
