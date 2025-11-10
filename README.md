@@ -96,7 +96,7 @@
 
 ## Safety & Robustness
 
-- **All PID states, setpoints, and gains are reset** when tuning is aborted  
+- **All PID states, setpoints, and gains are reset** when the FCU is inactive  
 - **Final motor outputs are always constrained** to physical limits  
 - **Failsafe and landing logic** activate on packet timeout or power warning  
 - **Auto-tune is aborted and state cleared** if thrust input is modified during ramp-up or tuning
