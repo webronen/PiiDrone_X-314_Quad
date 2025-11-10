@@ -366,9 +366,7 @@ static inline void handle_thrust_update(void)
 static inline bool pid_thrust_to_hover(void)
 {
   static uint32_t start_time = 0;
-
-  if (start_time == 0)
-    start_time = NRF_TIMER0->CC[0];
+  start_time = !start_time ? NRF_TIMER0->CC[0] : start_time;
 
   const uint32_t elapsed = (NRF_TIMER0->CC[0] - start_time);
   float x = ((float)elapsed / S_TO_US(PID_THRUST_TO_HOVER_S));
