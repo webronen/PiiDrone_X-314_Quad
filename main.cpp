@@ -385,7 +385,6 @@ static inline bool pid_auto_tune_step(const uint8_t axis, const float err)
   static float last_err[3] = {0};
   const uint32_t now = NRF_TIMER0->CC[0];
 
-  // Initialize tuning for this axis
   if (!tune[axis].active)
   {
     tune[axis].setpoint = 10.0f * DEG_TO_RAD;
@@ -396,7 +395,7 @@ static inline bool pid_auto_tune_step(const uint8_t axis, const float err)
     tune[axis].active = true;
 
     fcu.pid_setpoint[axis] = tune[axis].setpoint;
-    fcu.pid_gain[axis][0] = 0.5f;
+    fcu.pid_gain[axis][0] = 0.0f;
     fcu.pid_gain[axis][1] = 0.0f;
     fcu.pid_gain[axis][2] = 0.0f;
   }
@@ -410,7 +409,7 @@ static inline bool pid_auto_tune_step(const uint8_t axis, const float err)
   }
 
   // Adaptive hysteresis: third of square wave amplitude
-  const float hysteresis = fabsf(tune[axis].setpoint) * (1.0f / 3.0f);
+  const float hysteresis = fabsf(tune[axis].setpoint) * PID_SETPOINT_HYSTERESIS;
 
   // Check for valid zero crossing
   bool valid_crossing = (last_err[axis] * err < 0.0f) && (fabsf(err) > hysteresis);
@@ -447,9 +446,9 @@ static inline bool pid_auto_tune_step(const uint8_t axis, const float err)
   }
 
   // Increase P gain until oscillation detected
-  if (tune[axis].crosses < 4 && now >= tune[axis].last_adj)
+  if (tune[axis].crosses < 6 && now >= tune[axis].last_adj)
   {
-    fcu.pid_gain[axis][0] += 0.2f;
+    fcu.pid_gain[axis][0] += 0.1f;
     tune[axis].last_adj = now + HZ_TO_US(2.0f);
 
     if (fcu.pid_gain[axis][0] > 8.0f)
