@@ -73,7 +73,7 @@
 - **Battery-friendly smoothstep ramp-up** to hover thrust before tuning for gentle motor activation
 - **Single-phase PID tuning** using the classic Ziegler-Nichols oscillation method
 - **Controlled oscillation induction** in each axis using 0.5 Hz square wave setpoints
-- **Adaptive hysteresis-based zero-crossing detection** using a threshold set to one-third of the square wave amplitude
+- **Adaptive zero-crossing detection with hysteresis** based on the square wave amplitude
 - **Oscillation analysis** to measure ultimate gain (Ku) and oscillation period (Tu)
 - **PID gain calculation** using Ziegler-Nichols formulas:
   - `P = 0.6 × Ku`
