@@ -174,7 +174,7 @@ static inline void task_fcu_update(void)
     {
       tuning_axis++;
 
-      if (tuning_axis >= 3)
+      if (tuning_axis >= 1)
       {
         pid_auto_tune_clear();
         pid_store_gains();
