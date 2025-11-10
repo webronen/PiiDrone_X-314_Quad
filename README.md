@@ -109,10 +109,14 @@ This system enables **safe, hands-off PID tuning** for drones, delivering reliab
 
 ---
 
+## 3D Model
+- [PiiDrone X-314 Quad (Maker World)](https://makerworld.com/en/models/1153207-piidrone-x-314-quad)
+
+---
+
 ## Source
 - [Quaternion (Wikipedia)](https://en.wikipedia.org/wiki/Quaternion)
 - [Smoothstep (Wikipedia)](https://en.wikipedia.org/wiki/Smoothstep)
 - [Ziegler–Nichols method (Wikipedia)](https://en.wikipedia.org/wiki/Ziegler%E2%80%93Nichols_method)
-- [PiiDrone X-314 Quad (Maker World)](https://makerworld.com/en/models/1153207-piidrone-x-314-quad)
 
 ---
