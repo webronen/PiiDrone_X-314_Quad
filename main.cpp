@@ -162,7 +162,7 @@ static inline void task_fcu_update(void)
 
   if (!auto_tune_complete)
   {
-    if (pid_thrust_ramp(true, 50.0f))
+    if (pid_thrust_ramp(PID_THRUST_RAMP_MAX, PID_THRUST_RAMP_S))
     {
       static float *const error_ptr[3] = {&error.x, &error.y, &error.z};
       const float current_error = *error_ptr[tuning_axis];
@@ -173,7 +173,7 @@ static inline void task_fcu_update(void)
       }
     }
   }
-  else if (pid_thrust_ramp(false, 50.0f))
+  else if (pid_thrust_ramp(-PID_THRUST_RAMP_MAX, PID_THRUST_RAMP_S))
   {
     pid_auto_tune_clear();
   }
@@ -359,21 +359,21 @@ static inline void handle_thrust_update(void)
   FCU_UPDATE_ACTIVE(fcu.status, (fcu.thrust > THRUST_MIN));
 }
 
-static inline bool pid_thrust_ramp(const bool to_hover, const float to_thrust)
+static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s)
 {
   static uint32_t start_time = 0;
 
   start_time = !start_time ? NRF_TIMER0->CC[0] : start_time;
 
   const uint32_t elapsed = (NRF_TIMER0->CC[0] - start_time);
-  float x = ((float)elapsed / S_TO_US(PID_THRUST_TO_HOVER_S));
+  float x = ((float)elapsed / S_TO_US(in_time_s));
   x = constrain(x, 0.0f, 1.0f);
 
-  const float y = to_hover
+  const float y = (to_thrust >= 0.0f)
                       ? (x * x * (3.0f - 2.0f * x))
                       : 1.0f - (x * x * (3.0f - 2.0f * x));
 
-  fcu.thrust = (uint16_t)constrain(y * to_thrust, THRUST_MIN, THRUST_HOVER);
+  fcu.thrust = (uint16_t)constrain(y * __builtin_fabsf(to_thrust), THRUST_MIN, THRUST_MAX);
 
   return (x >= 1.0f) ? !(start_time = 0) : false;
 }

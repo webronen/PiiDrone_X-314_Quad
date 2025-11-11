@@ -49,7 +49,8 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 #define SETPOINT_MIN -1.0f
 #define SETPOINT_MAX 1.0f
 
-#define PID_THRUST_TO_HOVER_S 5.0f
+#define PID_THRUST_RAMP_MAX 50.0f
+#define PID_THRUST_RAMP_S 5.0f
 #define PID_GAIN_MAX 100.0f
 #define PID_GAIN_MIN 0.0f
 #define PID_OUT_MAX ((MOTOR_MAX - THRUST_MAX) / 3.0f)
@@ -216,7 +217,7 @@ static inline void pid_auto_tune_clear(void);
 static inline void pid_calculate(const float sp, const float pv, const float Kp, const float Ki,
                                  const float Kd, float *_I, float *_D, float *_pv, float *out);
 static inline bool pid_auto_tune_step(const uint8_t axis, const float current_error);
-static inline bool pid_thrust_ramp(const bool to_hover, const float to_thrust);
+static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s);
 
 static inline void quaternion_multiply(DataQuaternion *result, const DataQuaternion *q1, const DataQuaternion *q2);
 static inline void quaternion_normalize(DataQuaternion *q);
