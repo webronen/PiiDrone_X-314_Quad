@@ -1,4 +1,4 @@
-# Relay Feedback Testing for PID Tuning on a Drone Test Bench Without Hover Thrust
+# PID Autotune via Relay Feedback on Drone Bench
 
 ## Abstract  
 This paper explains why hover thrust is not required when performing a Relay Feedback Test to determine the ultimate gain (`K_u`) and ultimate period (`T_u`) for Ziegler-Nichols PID tuning on a balanced drone test bench. It outlines the principles of the relay method, the mechanical isolation of rotational dynamics, and practical considerations for effective testing.
