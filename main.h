@@ -216,7 +216,7 @@ static inline void pid_auto_tune_clear(void);
 static inline void pid_calculate(const float sp, const float pv, const float Kp, const float Ki,
                                  const float Kd, float *_I, float *_D, float *_pv, float *out);
 static inline bool pid_auto_tune_step(const uint8_t axis, const float current_error);
-static inline bool pid_thrust_to_hover(void);
+static inline bool pid_thrust_ramp(const bool to_hover, const float to_thrust);
 
 static inline void quaternion_multiply(DataQuaternion *result, const DataQuaternion *q1, const DataQuaternion *q2);
 static inline void quaternion_normalize(DataQuaternion *q);

@@ -99,7 +99,7 @@ void loop(void)
   static uint32_t last_packet_us = loop_start_us;
   static uint32_t last_landing_us = loop_start_us;
 
-  // Update packet timeout to prevent packet loss landing during auto-tuning
+  // Update async packet timeout to prevent landing during auto-tuning
   if (!auto_tune_complete)
     last_packet_us = loop_start_us + HZ_TO_US(0.1f);
 
@@ -160,19 +160,22 @@ static inline void task_fcu_update(void)
   DataQuaternion error;
   quaternion_multiply(&error, &hover_quaternion, &conjugate);
 
-  if (!auto_tune_complete && !thrust_at_hover)
-    thrust_at_hover = pid_thrust_to_hover();
-
-  if (!auto_tune_complete && thrust_at_hover)
+  if (!auto_tune_complete)
   {
-    static float *const error_ptr[3] = {&error.x, &error.y, &error.z};
-    const float current_error = *error_ptr[tuning_axis];
-
-    if (pid_auto_tune_step(tuning_axis, current_error) && ++tuning_axis == 3)
+    if (pid_thrust_ramp(true, 50.0f))
     {
-      pid_auto_tune_clear();
-      pid_store_gains();
+      static float *const error_ptr[3] = {&error.x, &error.y, &error.z};
+      const float current_error = *error_ptr[tuning_axis];
+
+      if (pid_auto_tune_step(tuning_axis, current_error) && ++tuning_axis == 1)
+      {
+        pid_store_gains();
+      }
     }
+  }
+  else if (pid_thrust_ramp(false, 50.0f))
+  {
+    pid_auto_tune_clear();
   }
 
   pid_calculate(fcu.pid_setpoint[0], error.x, fcu.pid_gain[0][0], fcu.pid_gain[0][1], fcu.pid_gain[0][2],
@@ -356,17 +359,21 @@ static inline void handle_thrust_update(void)
   FCU_UPDATE_ACTIVE(fcu.status, (fcu.thrust > THRUST_MIN));
 }
 
-static inline bool pid_thrust_to_hover(void)
+static inline bool pid_thrust_ramp(const bool to_hover, const float to_thrust)
 {
   static uint32_t start_time = 0;
+
   start_time = !start_time ? NRF_TIMER0->CC[0] : start_time;
 
   const uint32_t elapsed = (NRF_TIMER0->CC[0] - start_time);
   float x = ((float)elapsed / S_TO_US(PID_THRUST_TO_HOVER_S));
   x = constrain(x, 0.0f, 1.0f);
-  const float y = (x * x * (3.0f - 2.0f * x));
 
-  fcu.thrust = (uint16_t)constrain(y * 50.0f, THRUST_MIN, THRUST_HOVER); // 50 is only for initial logic test to be safe
+  const float y = to_hover
+                      ? (x * x * (3.0f - 2.0f * x))
+                      : 1.0f - (x * x * (3.0f - 2.0f * x));
+
+  fcu.thrust = (uint16_t)constrain(y * to_thrust, THRUST_MIN, THRUST_HOVER);
 
   return (x >= 1.0f) ? !(start_time = 0) : false;
 }

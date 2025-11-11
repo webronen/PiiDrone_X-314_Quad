@@ -74,7 +74,7 @@ Automates the Ziegler-Nichols PID tuning method using relay feedback for embedde
 
 ### Features
 
-- **Smoothstep thrust ramp** for battery-friendly, gentle motor activation
+- **Smoothstep thrust ramp** up and down for battery-friendly motor transitions
 - **Single-phase PID tuning** via induced oscillation (relay/relay-feedback)
 - **0.5 Hz square wave excitation** with adaptive hysteresis for robust zero-crossing detection
 - **Sequential axis tuning:** roll → pitch → yaw, each with independent state
@@ -112,7 +112,7 @@ If oscillation fails (e.g., fewer than 6 zero-crossings or excessive gain), fall
 - **All PID states and setpoints are reset** when the FCU is inactive  
 - **Final motor outputs are always constrained** to physical limits  
 - **Failsafe and landing logic** activate on packet timeout or power warning  
-- **Auto-tune is aborted and state cleared** if thrust input is modified during ramp-up or tuning
+- **Auto-tune is aborted and state cleared** if thrust input is modified during thrust ramp or tuning
 
 ---
 
