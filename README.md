@@ -74,7 +74,7 @@ Automates the Ziegler-Nichols PID tuning method using relay feedback for embedde
 
 ### Features
 
-- **Smoothstep thrust ramp** up and down for battery-friendly motor transitions
+- **Smoothstep thrust ramp** up and down for battery-friendly motor transitions for balancing system
 - **Single-phase PID tuning** via induced oscillation (relay/relay-feedback)
 - **0.5 Hz square wave excitation** with adaptive hysteresis for robust zero-crossing detection
 - **Sequential axis tuning:** roll → pitch → yaw, each with independent state
