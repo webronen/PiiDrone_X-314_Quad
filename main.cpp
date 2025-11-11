@@ -169,13 +169,14 @@ static inline void task_fcu_update(void)
 
       if (pid_auto_tune_step(tuning_axis, current_error) && ++tuning_axis == 1)
       {
-        pid_store_gains();
+        // Do something when tuning is complete, before ramping down..
       }
     }
   }
   else if (pid_thrust_ramp(-PID_THRUST_RAMP_MAX, PID_THRUST_RAMP_S))
   {
     pid_auto_tune_clear();
+    // Do something when ramping down is complete, before returning to normal operation..
   }
 
   pid_calculate(fcu.pid_setpoint[0], error.x, fcu.pid_gain[0][0], fcu.pid_gain[0][1], fcu.pid_gain[0][2],
@@ -366,12 +367,12 @@ static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s)
   start_time = !start_time ? NRF_TIMER0->CC[0] : start_time;
 
   const uint32_t elapsed = (NRF_TIMER0->CC[0] - start_time);
-  float x = ((float)elapsed / S_TO_US(in_time_s));
+  float x = ((float)elapsed * S_TO_US_INV(in_time_s));
   x = constrain(x, 0.0f, 1.0f);
 
-  const float y = (to_thrust >= 0.0f)
-                      ? (x * x * (3.0f - 2.0f * x))
-                      : 1.0f - (x * x * (3.0f - 2.0f * x));
+  const float y = ((to_thrust >= 0.0f)
+                       ? (x * x * (3.0f - 2.0f * x))
+                       : 1.0f - (x * x * (3.0f - 2.0f * x)));
 
   fcu.thrust = (uint16_t)constrain(y * __builtin_fabsf(to_thrust), THRUST_MIN, THRUST_MAX);
 

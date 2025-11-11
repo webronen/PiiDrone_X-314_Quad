@@ -37,6 +37,7 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 
 #define HZ_TO_US(Hz) ((uint32_t)(1e6f / (Hz)))
 #define S_TO_US(s) ((uint32_t)((s) * 1e6f))
+#define S_TO_US_INV(s) (1e6f / ((float)(s) + __FLT_EPSILON__))
 
 #define VL53L4CX_I2C_SPEED 400000
 
