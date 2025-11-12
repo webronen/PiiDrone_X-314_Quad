@@ -174,11 +174,14 @@ static inline void task_fcu_update(void)
       auto_tune.is_running = false;
     }
   }
-  else if (!auto_tune.is_running && auto_tune.is_at_hover && pid_thrust_ramp(-PID_THRUST_RAMP_MAX, PID_THRUST_RAMP_S))
+  else if (!auto_tune.is_running && auto_tune.is_at_hover)
   {
-    pid_tune_stop();
-    pid_clear_state();
-    pid_store_gains();
+    if (pid_thrust_ramp(-PID_THRUST_RAMP_MAX, PID_THRUST_RAMP_S))
+    {
+      pid_tune_stop();
+      pid_clear_state();
+      pid_store_gains();
+    }
   }
 
   pid_calculate(fcu.pid_setpoint[0], error.x, fcu.pid_gain[0][0], fcu.pid_gain[0][1], fcu.pid_gain[0][2],
