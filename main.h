@@ -50,8 +50,6 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 #define SETPOINT_MIN -1.0f
 #define SETPOINT_MAX 1.0f
 
-#define PID_THRUST_RAMP_MAX 50.0f
-#define PID_THRUST_RAMP_S 5.0f
 #define PID_GAIN_MAX 100.0f
 #define PID_GAIN_MIN 0.0f
 #define PID_OUT_MAX ((MOTOR_MAX - THRUST_MAX) / 3.0f)
@@ -62,6 +60,8 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 #define PID_LOOP_PERIOD (1.0f / PID_LOOP_HZ)
 #define PID_ARRAY_SIZE 3
 #define PID_SETPOINT_HYSTERESIS (1.0f / 3.0f)
+#define PID_THRUST_RAMP_MAX PID_OUT_MAX
+#define PID_THRUST_RAMP_S 5.0f
 
 #define ENV_ALPHA 0.25f
 #define D_ALPHA 0.75f
