@@ -376,24 +376,28 @@ static inline void handle_thrust_update(void)
 static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s)
 {
   static uint32_t start_time = 0;
-  static bool ramp_up = true;
+  static float last_target = 0.0f;
 
-  const bool direction_changed = (to_thrust >= 0.0f) != ramp_up;
-  if (direction_changed || !start_time)
-    start_time = NRF_TIMER0->CC[0];
-  ramp_up = (to_thrust >= 0.0f);
+  NRF_TIMER0->TASKS_CAPTURE[0] = 1;
+  const uint32_t now = NRF_TIMER0->CC[0];
 
-  const uint32_t elapsed = (NRF_TIMER0->CC[0] - start_time);
+  if ((to_thrust != last_target) || !start_time)
+  {
+    start_time = now;
+    last_target = to_thrust;
+  }
+
+  const uint32_t elapsed = (now - start_time);
   float x = ((float)elapsed * S_TO_US_INV(in_time_s));
   x = constrain(x, 0.0f, 1.0f);
 
-  const float y = ramp_up
+  const float y = (to_thrust >= 0.0f)
                       ? (x * x * (3.0f - 2.0f * x))
                       : 1.0f - (x * x * (3.0f - 2.0f * x));
 
   fcu.thrust = (uint16_t)constrain(y * __builtin_fabsf(to_thrust), THRUST_MIN, THRUST_MAX);
 
-  return (x >= 1.0f) ? !(start_time = 0) : false;
+  return (x >= 1.0f) ? !(start_time = 0, last_target = 0.0f) : false;
 }
 
 static inline bool pid_tune_step(const uint8_t axis, const float err)
