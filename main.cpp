@@ -100,7 +100,7 @@ void loop(void)
   static uint32_t last_landing_us = loop_start_us;
 
   // Update async packet timeout to prevent landing during auto-tuning
-  if (!auto_tune_complete)
+  if (auto_tune.is_running)
     last_packet_us = loop_start_us + HZ_TO_US(0.1f);
 
   // Check if async timeouts occurred
@@ -160,23 +160,25 @@ static inline void task_fcu_update(void)
   DataQuaternion error;
   quaternion_multiply(&error, &hover_quaternion, &conjugate);
 
-  if (!auto_tune_complete)
+  if (auto_tune.is_running && !auto_tune.is_at_hover)
   {
-    if (pid_thrust_ramp(PID_THRUST_RAMP_MAX, PID_THRUST_RAMP_S))
-    {
-      static float *const error_ptr[3] = {&error.x, &error.y, &error.z};
-      const float current_error = *error_ptr[tuning_axis];
+    auto_tune.is_at_hover = pid_thrust_ramp(PID_THRUST_RAMP_MAX, PID_THRUST_RAMP_S);
+  }
+  else if (auto_tune.is_running && auto_tune.is_at_hover)
+  {
+    static float *const error_ptr[3] = {&error.x, &error.y, &error.z};
+    const float current_error = *error_ptr[auto_tune.tuning_axis];
 
-      if (pid_auto_tune_step(tuning_axis, current_error) && ++tuning_axis == 1)
-      {
-        // Do something when tuning is complete, before ramping down..
-      }
+    if (pid_tune_step(auto_tune.tuning_axis, current_error) && ++auto_tune.tuning_axis == 3)
+    {
+      auto_tune.is_running = false;
     }
   }
-  else if (pid_thrust_ramp(-PID_THRUST_RAMP_MAX, PID_THRUST_RAMP_S))
+  else if (!auto_tune.is_running && auto_tune.is_at_hover && pid_thrust_ramp(-PID_THRUST_RAMP_MAX, PID_THRUST_RAMP_S))
   {
-    pid_auto_tune_clear();
-    // Do something when ramping down is complete, before returning to normal operation..
+    pid_tune_stop();
+    pid_clear_state();
+    pid_store_gains();
   }
 
   pid_calculate(fcu.pid_setpoint[0], error.x, fcu.pid_gain[0][0], fcu.pid_gain[0][1], fcu.pid_gain[0][2],
@@ -192,11 +194,7 @@ static inline void task_fcu_update(void)
 static inline void task_esc_update(void)
 {
   if (!FCU_IS_ACTIVE(fcu.status))
-  {
-    fcu.thrust = 0;
-    memset(fcu.pid_setpoint, 0, sizeof(fcu.pid_setpoint));
-    memset(pid_state, 0, sizeof(pid_state));
-  }
+    pid_clear_state();
 
   const float m1 = fcu.thrust + pid_state[0].out - pid_state[1].out - pid_state[2].out;
   const float m2 = fcu.thrust - pid_state[0].out - pid_state[1].out + pid_state[2].out;
@@ -257,20 +255,31 @@ static inline void task_tel_update(void)
 static inline void task_pof_update(void)
 {
   fcu.battery = nicla::getCurrentBatteryVoltage();
+
   FCU_UPDATE_POFWARN(fcu.status, NRF_POWER->EVENTS_POFWARN);
   NRF_POWER->EVENTS_POFWARN = 0;
 }
 
-static inline void pid_auto_tune_clear(void)
+static inline void pid_tune_stop(void)
 {
-  auto_tune_complete = true;
-  thrust_at_hover = false;
-  tuning_axis = 0;
+  memset(&auto_tune, 0, sizeof(auto_tune));
+
+  FCU_CLEAR_AUTOTUNE(fcu.status);
 }
 
 static inline void pid_store_gains(void)
 {
   // TODO: Store PID gains to non-volatile memory
+}
+
+static inline void pid_clear_state(void)
+{
+  fcu.thrust = 0;
+
+  memset(fcu.pid_setpoint, 0, sizeof(fcu.pid_setpoint));
+  memset(pid_state, 0, sizeof(pid_state));
+
+  FCU_CLEAR_ACTIVE(fcu.status);
 }
 
 static inline void pid_calculate(const float sp, const float pv, const float Kp, const float Ki,
@@ -316,15 +325,13 @@ static inline void quaternion_normalize(DataQuaternion *q)
 
 static inline void handle_pid_tune(void)
 {
-  pid_auto_tune_clear();
-  auto_tune_complete = false;
-  fcu.thrust = 0;
+  pid_tune_stop();
+  pid_clear_state();
 
-  memset(fcu.pid_setpoint, 0, sizeof(fcu.pid_setpoint));
-  memset(pid_state, 0, sizeof(pid_state));
-  memset(fcu.pid_gain, 0, sizeof(fcu.pid_gain));
+  auto_tune.is_running = true;
 
   FCU_SET_ACTIVE(fcu.status);
+  FCU_SET_AUTOTUNE(fcu.status);
 }
 
 static inline void handle_pid_update(void)
@@ -353,8 +360,8 @@ static inline void handle_thrust_update(void)
   uint16_t thrust;
   memcpy(&thrust, (const void *)&received_packet.data[0], sizeof(thrust));
 
-  if (!auto_tune_complete)
-    pid_auto_tune_clear();
+  if (auto_tune.is_running)
+    pid_tune_stop();
 
   FCU_UPDATE_THRUST(fcu.status, fcu.thrust, thrust, THRUST_MIN, THRUST_MAX);
   FCU_UPDATE_ACTIVE(fcu.status, (fcu.thrust > THRUST_MIN));
@@ -379,7 +386,7 @@ static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s)
   return (x >= 1.0f) ? !(start_time = 0) : false;
 }
 
-static inline bool pid_auto_tune_step(const uint8_t axis, const float err)
+static inline bool pid_tune_step(const uint8_t axis, const float err)
 {
   static struct
   {

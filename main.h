@@ -80,6 +80,7 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 
 #define FCU_STATUS_ACTIVE (1U << 0)
 #define FCU_STATUS_POFWARN (1U << 1)
+#define FCU_STATUS_AUTOTUNE (1U << 2)
 
 #define FCU_IS_ACTIVE(status) (status & FCU_STATUS_ACTIVE)
 #define FCU_SET_ACTIVE(status) (status |= FCU_STATUS_ACTIVE)
@@ -90,6 +91,11 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 #define FCU_SET_POFWARN(status) (status |= FCU_STATUS_POFWARN)
 #define FCU_CLEAR_POFWARN(status) (status &= ~FCU_STATUS_POFWARN)
 #define FCU_UPDATE_POFWARN(status, cond) ((cond) ? FCU_SET_POFWARN(status) : FCU_CLEAR_POFWARN(status))
+
+#define FCU_IS_AUTOTUNE(status) (status & FCU_STATUS_AUTOTUNE)
+#define FCU_SET_AUTOTUNE(status) (status |= FCU_STATUS_AUTOTUNE)
+#define FCU_CLEAR_AUTOTUNE(status) (status &= ~FCU_STATUS_AUTOTUNE)
+#define FCU_UPDATE_AUTOTUNE(status, cond) ((cond) ? FCU_SET_AUTOTUNE(status) : FCU_CLEAR_AUTOTUNE(status))
 
 #define FCU_LANDING_STEP(thrust, threshold, step, status) \
   ((thrust) >= (threshold) ? ((thrust) -= (step)) : FCU_CLEAR_ACTIVE(status))
@@ -137,7 +143,7 @@ typedef struct __attribute__((packed, aligned(4)))
   float battery;                                  // Volts (V)
   uint16_t thrust;                                // PWM value (0-800)
   uint16_t distance;                              // millimeters (mm)
-  uint8_t status;                                 // bit 0: active, bit 1: pofwarn
+  uint8_t status;                                 // bit 0: FCU active, bit 1: POF warning, bit 2: Auto-Tune active
   uint8_t reserved[183];                          // padding to 252 bytes
 } Fcu;
 
@@ -177,14 +183,21 @@ typedef struct __attribute__((packed, aligned(4)))
 
 static_assert(sizeof(Task) == 16, "Task struct must be 16 bytes (4 words)");
 
+typedef struct __attribute__((packed, aligned(4)))
+{
+  bool is_running;
+  bool is_at_hover;
+  uint8_t tuning_axis;
+  uint8_t reserved[1];
+} AutoTuneState;
+
+static_assert(sizeof(AutoTuneState) == 4, "AutoTuneState struct must be 4 bytes (1 word)");
+
 static Fcu fcu = {0};
 static Esc esc = {0x8000, 0x8000, 0x8000, 0x8000};
 static volatile Rcu received_packet = {0};
 static Pid pid_state[3] = {0};
-
-static bool auto_tune_complete = true;
-static bool thrust_at_hover = false;
-static uint8_t tuning_axis = 0;
+static AutoTuneState auto_tune = {0};
 
 static inline void task_imu_update(void);
 static inline void task_fcu_update(void);
@@ -214,10 +227,11 @@ static void (*const handle_type[PACKET_TYPE_COUNT])(void) = {
 };
 
 static inline void pid_store_gains(void);
-static inline void pid_auto_tune_clear(void);
+static inline void pid_clear_state(void);
+static inline void pid_tune_stop(void);
 static inline void pid_calculate(const float sp, const float pv, const float Kp, const float Ki,
                                  const float Kd, float *_I, float *_D, float *_pv, float *out);
-static inline bool pid_auto_tune_step(const uint8_t axis, const float current_error);
+static inline bool pid_tune_step(const uint8_t axis, const float current_error);
 static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s);
 
 static inline void quaternion_multiply(DataQuaternion *result, const DataQuaternion *q1, const DataQuaternion *q2);
