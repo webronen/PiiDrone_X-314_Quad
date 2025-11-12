@@ -162,21 +162,21 @@ static inline void task_fcu_update(void)
 
   if (auto_tune.is_running && !auto_tune.is_at_hover)
   {
-    auto_tune.is_at_hover = pid_thrust_ramp(PID_THRUST_RAMP_MAX, PID_THRUST_RAMP_S);
+    auto_tune.is_at_hover = pid_thrust_ramp(THRUST_HOVER, PID_THRUST_RAMP_S);
   }
   else if (auto_tune.is_running && auto_tune.is_at_hover)
   {
     static float *const error_ptr[3] = {&error.x, &error.y, &error.z};
     const float current_error = *error_ptr[auto_tune.tuning_axis];
 
-    if (pid_tune_step(auto_tune.tuning_axis, current_error) && ++auto_tune.tuning_axis == 2)
+    if (pid_tune_step(auto_tune.tuning_axis, current_error) && ++auto_tune.tuning_axis == 3)
     {
       auto_tune.is_running = false;
     }
   }
   else if (!auto_tune.is_running && auto_tune.is_at_hover)
   {
-    if (pid_thrust_ramp(-PID_THRUST_RAMP_MAX, PID_THRUST_RAMP_S))
+    if (pid_thrust_ramp(-THRUST_HOVER, PID_THRUST_RAMP_S))
     {
       pid_tune_stop();
       pid_state_clear();
