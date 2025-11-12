@@ -169,7 +169,7 @@ static inline void task_fcu_update(void)
     static float *const error_ptr[3] = {&error.x, &error.y, &error.z};
     const float current_error = *error_ptr[auto_tune.tuning_axis];
 
-    if (pid_tune_step(auto_tune.tuning_axis, current_error) && ++auto_tune.tuning_axis == 1)
+    if (pid_tune_step(auto_tune.tuning_axis, current_error) && ++auto_tune.tuning_axis == 2)
     {
       auto_tune.is_running = false;
     }
