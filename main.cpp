@@ -169,7 +169,7 @@ static inline void task_fcu_update(void)
     static float *const error_ptr[3] = {&error.x, &error.y, &error.z};
     const float current_error = *error_ptr[auto_tune.tuning_axis];
 
-    if (pid_tune_step(auto_tune.tuning_axis, current_error) && ++auto_tune.tuning_axis == 3)
+    if (pid_tune_step(auto_tune.tuning_axis, current_error) && ++auto_tune.tuning_axis == 1)
     {
       auto_tune.is_running = false;
     }
@@ -179,7 +179,7 @@ static inline void task_fcu_update(void)
     if (pid_thrust_ramp(-PID_THRUST_RAMP_MAX, PID_THRUST_RAMP_S))
     {
       pid_tune_stop();
-      pid_clear_state();
+      pid_state_clear();
       pid_store_gains();
     }
   }
@@ -197,7 +197,7 @@ static inline void task_fcu_update(void)
 static inline void task_esc_update(void)
 {
   if (!FCU_IS_ACTIVE(fcu.status))
-    pid_clear_state();
+    pid_state_clear();
 
   const float m1 = fcu.thrust + pid_state[0].out - pid_state[1].out - pid_state[2].out;
   const float m2 = fcu.thrust - pid_state[0].out - pid_state[1].out + pid_state[2].out;
@@ -275,7 +275,7 @@ static inline void pid_store_gains(void)
   // TODO: Store PID gains to non-volatile memory
 }
 
-static inline void pid_clear_state(void)
+static inline void pid_state_clear(void)
 {
   fcu.thrust = 0;
 
@@ -329,7 +329,7 @@ static inline void quaternion_normalize(DataQuaternion *q)
 static inline void handle_pid_tune(void)
 {
   pid_tune_stop();
-  pid_clear_state();
+  pid_state_clear();
 
   auto_tune.is_running = true;
 
@@ -364,7 +364,10 @@ static inline void handle_thrust_update(void)
   memcpy(&thrust, (const void *)&received_packet.data[0], sizeof(thrust));
 
   if (auto_tune.is_running)
+  {
     pid_tune_stop();
+    pid_state_clear();
+  }
 
   FCU_UPDATE_THRUST(fcu.status, fcu.thrust, thrust, THRUST_MIN, THRUST_MAX);
   FCU_UPDATE_ACTIVE(fcu.status, (fcu.thrust > THRUST_MIN));
@@ -373,16 +376,20 @@ static inline void handle_thrust_update(void)
 static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s)
 {
   static uint32_t start_time = 0;
+  static bool ramp_up = true;
 
-  start_time = !start_time ? NRF_TIMER0->CC[0] : start_time;
+  const bool direction_changed = (to_thrust >= 0.0f) != ramp_up;
+  if (direction_changed || !start_time)
+    start_time = NRF_TIMER0->CC[0];
+  ramp_up = (to_thrust >= 0.0f);
 
   const uint32_t elapsed = (NRF_TIMER0->CC[0] - start_time);
   float x = ((float)elapsed * S_TO_US_INV(in_time_s));
   x = constrain(x, 0.0f, 1.0f);
 
-  const float y = ((to_thrust >= 0.0f)
-                       ? (x * x * (3.0f - 2.0f * x))
-                       : 1.0f - (x * x * (3.0f - 2.0f * x)));
+  const float y = ramp_up
+                      ? (x * x * (3.0f - 2.0f * x))
+                      : 1.0f - (x * x * (3.0f - 2.0f * x));
 
   fcu.thrust = (uint16_t)constrain(y * __builtin_fabsf(to_thrust), THRUST_MIN, THRUST_MAX);
 

@@ -227,7 +227,7 @@ static void (*const handle_type[PACKET_TYPE_COUNT])(void) = {
 };
 
 static inline void pid_store_gains(void);
-static inline void pid_clear_state(void);
+static inline void pid_state_clear(void);
 static inline void pid_tune_stop(void);
 static inline void pid_calculate(const float sp, const float pv, const float Kp, const float Ki,
                                  const float Kd, float *_I, float *_D, float *_pv, float *out);
