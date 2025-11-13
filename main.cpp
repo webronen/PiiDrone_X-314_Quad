@@ -377,11 +377,11 @@ static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s)
 {
   static uint32_t last_time_us = 0;
   last_time_us = !last_time_us ? NRF_TIMER0->CC[0] : last_time_us;
-  
+
   const uint32_t elapsed_time_us = (NRF_TIMER0->CC[0] - last_time_us);
   float x = ((float)elapsed_time_us * S_TO_US_INV(in_time_s));
   x = constrain(x, 0.0f, 1.0f);
-  
+
   const float y = (to_thrust >= 0.0f)
                       ? (x * x * (3.0f - 2.0f * x))
                       : 1.0f - (x * x * (3.0f - 2.0f * x));
@@ -405,7 +405,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
 
   if (!tune[axis].active)
   {
-    tune[axis].setpoint = 20.0f * DEG_TO_RAD;
+    tune[axis].setpoint = 10.0f * DEG_TO_RAD;
     tune[axis].last_change = now + HZ_TO_US(0.5f);
     tune[axis].last_adj = now + HZ_TO_US(2.0f);
     tune[axis].crosses = 0;
@@ -443,9 +443,9 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
       const float Ku = fcu.pid_gain[axis][0];
       const float Tu = (float)(now - tune[axis].first_cross) * 4e-7f;
 
-      fcu.pid_gain[axis][0] = constrain(0.6f * Ku, 0.1f, 8.0f);
-      fcu.pid_gain[axis][1] = constrain(1.2f * Ku * INV(Tu), 0.01f, 5.0f);
-      fcu.pid_gain[axis][2] = constrain(0.075f * Ku * Tu, 0.001f, 2.0f);
+      fcu.pid_gain[axis][0] = constrain(0.6f * Ku, PID_GAIN_MIN, PID_GAIN_MAX);
+      fcu.pid_gain[axis][1] = constrain(1.2f * Ku * INV(Tu), PID_GAIN_MIN, PID_GAIN_MAX);
+      fcu.pid_gain[axis][2] = constrain(0.075f * Ku * Tu, PID_GAIN_MIN, PID_GAIN_MAX);
 
       fcu.pid_setpoint[axis] = 0.0f;
       tune[axis].active = false;
