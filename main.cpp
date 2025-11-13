@@ -419,7 +419,6 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     tune[axis].first_cross = 0;
     tune[axis].active = true;
 
-    // Capture initial error bias
     tune[axis].error_bias = err;
 
     fcu.pid_setpoint[axis] = tune[axis].setpoint;
@@ -440,9 +439,12 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
 
   const float hysteresis = __builtin_fabsf(tune[axis].setpoint) * PID_AUTOTUNE_HYSTERESIS;
   const float corrected_err = err - tune[axis].error_bias;
-  const bool crossed_zero = (last_err[axis] > 0.0f) != (corrected_err > 0.0f);
 
-  if (crossed_zero && (__builtin_fabsf(corrected_err) > hysteresis))
+  const bool crossed_positive = (last_err[axis] <= hysteresis) && (corrected_err > hysteresis);
+  const bool crossed_negative = (last_err[axis] >= -hysteresis) && (corrected_err < -hysteresis);
+  const bool crossed_zero = crossed_positive || crossed_negative;
+
+  if (crossed_zero)
   {
     if (++tune[axis].crosses == 1)
     {
