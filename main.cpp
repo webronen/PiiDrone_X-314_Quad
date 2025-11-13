@@ -418,7 +418,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
 
   if (!tune[axis].active)
   {
-    tune[axis].setpoint = PID_AUTOTUNE_AMPLITUDE_DEG * DEG_TO_RAD;
+    tune[axis].setpoint = PID_AUTOTUNE_AMPLITUDE_RAD;
     tune[axis].last_change = now + HZ_TO_US(PID_AUTOTUNE_FREQUENCY);
     tune[axis].last_adj = tune[axis].last_change;
     tune[axis].crosses = 0;
