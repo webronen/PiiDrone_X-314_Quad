@@ -90,8 +90,11 @@ Automates the Ziegler-Nichols PID tuning method using relay feedback for embedde
 2. **Axis excitation** with 0.5 Hz square wave setpoint (relay method)
 3. **Gain scheduling:** P gain increases every 0.5s until oscillation is detected
 4. **Oscillation analysis:**
-   - 6 zero-crossings (2.5 periods) are measured
-   - `Tu = (now - first_cross) * 4e-7f` (for 2.5 periods, timer in microseconds)
+    - 6 zero-crossings (2.5 periods) are measured
+    - `Tu = (now - first_cross) * 4e-7f` (for 2.5 periods, timer in microseconds)
+       - Here, `4e-7f` means 0.0000004 (float). It converts the measured microseconds for 2.5 periods into the period Tu in seconds:
+          - `Tu = (elapsed_microseconds) × 1e-6 / 2.5 = (elapsed_microseconds) × 4e-7`.
+          - This gives the period of one oscillation in seconds from the time for 2.5 periods.
 5. **Gain calculation:**
    - `P = 0.6 × Ku` (constrained)
    - `I = 1.2 × Ku / Tu` (constrained)
