@@ -66,6 +66,7 @@
 
 ---
 
+
 ## Astrom-Hägglund Relay Auto-Tuning System
 
 ### Overview
@@ -74,36 +75,43 @@ Automates the Ziegler-Nichols PID tuning method using relay feedback for embedde
 
 ### Features
 
-- **Smoothstep thrust ramp** up and down for battery-friendly motor transitions to balance system
+- **Smoothstep thrust ramp** for battery-friendly, gentle motor activation
 - **Single-phase PID tuning** via induced oscillation (relay/relay-feedback)
-- **1 Hz square wave excitation** with adaptive hysteresis for robust zero-crossing detection
+- **0.5 Hz square wave excitation** with adaptive hysteresis for robust zero-crossing detection
 - **Sequential axis tuning:** roll → pitch → yaw, each with independent state
 - **Safety-constrained gain limits** and fallback to conservative defaults if oscillation fails
+- **Robust zero-crossing detection** with bias removal and hysteresis
+- **Timer overflow and division protection** for reliable operation
+- **Static state reset** for safe re-tuning or abort
 
 ### Tuning Process
 
-1. **Smoothstep thrust ramp** to hover
-2. **Axis excitation** with 1 Hz square wave setpoint
-3. **Gain scheduling** until sustained oscillation is detected
-4. **Oscillation analysis:** measure ultimate gain (Ku) and period (Tu)
+1. **Smoothstep thrust ramp** to hover using `pid_thrust_ramp()`
+2. **Axis excitation** with 0.5 Hz square wave setpoint (relay method)
+3. **Gain scheduling:** P gain increases every 0.5s until oscillation is detected
+4. **Oscillation analysis:**
+   - 6 zero-crossings (2.5 periods) are measured
+   - `Tu = (now - first_cross) * 4e-7f` (for 2.5 periods, timer in microseconds)
 5. **Gain calculation:**
-   - `P = 0.6 × Ku`
-   - `I = 1.2 × Ku / Tu`
-   - `D = 0.075 × Ku × Tu`
+   - `P = 0.6 × Ku` (constrained)
+   - `I = 1.2 × Ku / Tu` (constrained)
+   - `D = 0.075 × Ku × Tu` (constrained)
 6. **Repeat** for each axis (roll, pitch, yaw)
+7. **Ramp down thrust** after tuning
 
 ### Performance
 
 - ~8 seconds per axis (6 zero-crossings, 2.5 periods)
 - Adaptive noise rejection via hysteresis
+- Safe fallback and abort at any time
 
 ### Fallback Behavior
 
 If oscillation fails (e.g., fewer than 6 zero-crossings or excessive gain), fallback gains are applied:
 
-- `P = 2.0`
-- `I = 0.5`
-- `D = 0.1`
+- `P = 0.0`
+- `I = 0.0`
+- `D = 0.0`
 
 ---
 
