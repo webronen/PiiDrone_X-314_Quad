@@ -162,21 +162,21 @@ static inline void task_fcu_update(void)
 
   if (auto_tune.is_running && !auto_tune.is_at_hover)
   {
-    auto_tune.is_at_hover = pid_thrust_ramp(THRUST_HOVER, PID_THRUST_RAMP_S);
+    auto_tune.is_at_hover = pid_thrust_ramp(PID_THRUST_RAMP_MAX, PID_THRUST_RAMP_S);
   }
   else if (auto_tune.is_running && auto_tune.is_at_hover)
   {
     static float *const error_ptr[3] = {&error.x, &error.y, &error.z};
     const float current_error = *error_ptr[auto_tune.tuning_axis];
 
-    if (pid_tune_step(auto_tune.tuning_axis, current_error) && ++auto_tune.tuning_axis == 3)
+    if (pid_tune_step(auto_tune.tuning_axis, current_error) && ++auto_tune.tuning_axis == 2)
     {
       auto_tune.is_running = false;
     }
   }
   else if (!auto_tune.is_running && auto_tune.is_at_hover)
   {
-    if (pid_thrust_ramp(-THRUST_HOVER, PID_THRUST_RAMP_S))
+    if (pid_thrust_ramp(-PID_THRUST_RAMP_MAX, PID_THRUST_RAMP_S))
     {
       pid_tune_stop();
       pid_state_clear();
@@ -376,9 +376,14 @@ static inline void handle_thrust_update(void)
 static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s)
 {
   static uint32_t last_time_us = 0;
-  last_time_us = !last_time_us ? NRF_TIMER0->CC[0] : last_time_us;
 
-  const uint32_t elapsed_time_us = (NRF_TIMER0->CC[0] - last_time_us);
+  NRF_TIMER0->TASKS_CAPTURE[1] = 1;
+  const uint32_t current_time = NRF_TIMER0->CC[1];
+
+  if (!last_time_us)
+    last_time_us = current_time;
+
+  const uint32_t elapsed_time_us = (current_time - last_time_us);
   float x = ((float)elapsed_time_us * S_TO_US_INV(in_time_s));
   x = constrain(x, 0.0f, 1.0f);
 
@@ -387,6 +392,7 @@ static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s)
                       : 1.0f - (x * x * (3.0f - 2.0f * x));
 
   fcu.thrust = (uint16_t)constrain(y * __builtin_fabsf(to_thrust), THRUST_MIN, THRUST_MAX);
+
   return (x >= 1.0f) ? (last_time_us = 0, true) : false;
 }
 
@@ -405,9 +411,9 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
 
   if (!tune[axis].active)
   {
-    tune[axis].setpoint = 10.0f * DEG_TO_RAD;
-    tune[axis].last_change = now + HZ_TO_US(0.5f);
-    tune[axis].last_adj = now + HZ_TO_US(2.0f);
+    tune[axis].setpoint = PID_AUTOTUNE_AMPLITUDE * DEG_TO_RAD;
+    tune[axis].last_change = now + HZ_TO_US(PID_AUTOTUNE_FREQUENCY);
+    tune[axis].last_adj = now + HZ_TO_US(PID_AUTOTUNE_FREQUENCY);
     tune[axis].crosses = 0;
     tune[axis].first_cross = 0;
     tune[axis].active = true;
@@ -428,7 +434,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     tune[axis].last_change = now + HZ_TO_US(0.5f);
   }
 
-  const float hysteresis = __builtin_fabsf(tune[axis].setpoint) * PID_SETPOINT_HYSTERESIS;
+  const float hysteresis = __builtin_fabsf(tune[axis].setpoint) * PID_AUTOTUNE_HYSTERESIS;
   const bool crossed_zero = (last_err[axis] > 0.0f) != (err > 0.0f);
 
   if (crossed_zero && (__builtin_fabsf(err) > hysteresis))
@@ -438,7 +444,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
       tune[axis].first_cross = now;
     }
 
-    if (tune[axis].crosses >= 6)
+    if (tune[axis].crosses >= PID_AUTOTUNE_CROSSES)
     {
       const float Ku = fcu.pid_gain[axis][0];
       const float Tu = (float)(now - tune[axis].first_cross) * 4e-7f;
@@ -454,16 +460,16 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     }
   }
 
-  if ((tune[axis].crosses < 6) && (now >= tune[axis].last_adj))
+  if ((tune[axis].crosses < PID_AUTOTUNE_CROSSES) && (now >= tune[axis].last_adj))
   {
-    fcu.pid_gain[axis][0] += 0.1f;
-    tune[axis].last_adj = now + HZ_TO_US(2.0f);
+    fcu.pid_gain[axis][0] += PID_AUTOTUNE_INCREMENT;
+    tune[axis].last_adj = now + HZ_TO_US(PID_AUTOTUNE_FREQUENCY);
 
-    if (fcu.pid_gain[axis][0] > 8.0f)
+    if (fcu.pid_gain[axis][0] > PID_GAIN_MAX)
     {
-      fcu.pid_gain[axis][0] = 2.0f;
-      fcu.pid_gain[axis][1] = 0.5f;
-      fcu.pid_gain[axis][2] = 0.1f;
+      fcu.pid_gain[axis][0] = 0.0f;
+      fcu.pid_gain[axis][1] = 0.0f;
+      fcu.pid_gain[axis][2] = 0.0f;
       fcu.pid_setpoint[axis] = 0.0f;
       tune[axis].active = false;
       return true;
