@@ -418,7 +418,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
 
   if (!tune[axis].active)
   {
-    tune[axis].setpoint = PID_AUTOTUNE_AMPLITUDE * DEG_TO_RAD;
+    tune[axis].setpoint = PID_AUTOTUNE_AMPLITUDE_DEG * DEG_TO_RAD;
     tune[axis].last_change = now + HZ_TO_US(PID_AUTOTUNE_FREQUENCY);
     tune[axis].last_adj = tune[axis].last_change;
     tune[axis].crosses = 0;
@@ -442,11 +442,9 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     tune[axis].last_change = now + HZ_TO_US(PID_AUTOTUNE_FREQUENCY);
   }
 
-  const float hysteresis = __builtin_fabsf(tune[axis].setpoint) * PID_AUTOTUNE_HYSTERESIS;
   const float corrected_err = err - tune[axis].error_bias;
-
-  const bool crossed_zero = ((last_err[axis] <= hysteresis) && (corrected_err > hysteresis)) ||
-                            ((last_err[axis] >= -hysteresis) && (corrected_err < -hysteresis));
+  const bool crossed_zero = ((last_err[axis] <= PID_AUTOTUNE_HYSTERESIS_RAD) && (corrected_err > PID_AUTOTUNE_HYSTERESIS_RAD)) ||
+                            ((last_err[axis] >= -PID_AUTOTUNE_HYSTERESIS_RAD) && (corrected_err < -PID_AUTOTUNE_HYSTERESIS_RAD));
 
   if (crossed_zero)
   {
