@@ -403,6 +403,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     uint32_t first_cross, last_change, last_adj;
     uint8_t crosses;
     float setpoint;
+    float error_bias;
     bool active;
   } tune[3] = {0};
 
@@ -418,12 +419,15 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     tune[axis].first_cross = 0;
     tune[axis].active = true;
 
+    // Capture initial error bias
+    tune[axis].error_bias = err;
+
     fcu.pid_setpoint[axis] = tune[axis].setpoint;
     fcu.pid_gain[axis][0] = 0.0f;
     fcu.pid_gain[axis][1] = 0.0f;
     fcu.pid_gain[axis][2] = 0.0f;
 
-    last_err[axis] = err;
+    last_err[axis] = err - tune[axis].error_bias;
     return false;
   }
 
@@ -431,13 +435,14 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
   {
     tune[axis].setpoint = -tune[axis].setpoint;
     fcu.pid_setpoint[axis] = tune[axis].setpoint;
-    tune[axis].last_change = now + HZ_TO_US(0.5f);
+    tune[axis].last_change = now + HZ_TO_US(PID_AUTOTUNE_FREQUENCY);
   }
 
   const float hysteresis = __builtin_fabsf(tune[axis].setpoint) * PID_AUTOTUNE_HYSTERESIS;
-  const bool crossed_zero = (last_err[axis] > 0.0f) != (err > 0.0f);
+  const float corrected_err = err - tune[axis].error_bias;
+  const bool crossed_zero = (last_err[axis] > 0.0f) != (corrected_err > 0.0f);
 
-  if (crossed_zero && (__builtin_fabsf(err) > hysteresis))
+  if (crossed_zero && (__builtin_fabsf(corrected_err) > hysteresis))
   {
     if (++tune[axis].crosses == 1)
     {
@@ -455,7 +460,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
 
       fcu.pid_setpoint[axis] = 0.0f;
       tune[axis].active = false;
-      last_err[axis] = err;
+      last_err[axis] = corrected_err;
       return true;
     }
   }
@@ -476,6 +481,6 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     }
   }
 
-  last_err[axis] = err;
+  last_err[axis] = corrected_err;
   return false;
 }
