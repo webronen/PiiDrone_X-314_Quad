@@ -431,7 +431,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     fcu.pid_gain[axis][1] = 0.0f;
     fcu.pid_gain[axis][2] = 0.0f;
 
-    last_err[axis] = err - tune[axis].error_bias;
+    last_err[axis] = (err - tune[axis].error_bias) + __FLT_EPSILON__;
     return false;
   }
 
@@ -443,8 +443,8 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
   }
 
   const float corrected_err = err - tune[axis].error_bias;
-  const bool crossed_zero = ((last_err[axis] <= PID_AUTOTUNE_HYSTERESIS_RAD) && (corrected_err > PID_AUTOTUNE_HYSTERESIS_RAD)) ||
-                            ((last_err[axis] >= -PID_AUTOTUNE_HYSTERESIS_RAD) && (corrected_err < -PID_AUTOTUNE_HYSTERESIS_RAD));
+  const bool sign_changed = (last_err[axis] > 0.0f) != (corrected_err > 0.0f);
+  const bool crossed_zero = sign_changed && (__builtin_fabsf(corrected_err) > PID_AUTOTUNE_HYSTERESIS_RAD);
 
   if (crossed_zero)
   {
@@ -481,6 +481,6 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     }
   }
 
-  last_err[axis] = corrected_err;
+  last_err[axis] = corrected_err + __FLT_EPSILON__;
   return false;
 }

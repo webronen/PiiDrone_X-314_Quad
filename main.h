@@ -35,10 +35,10 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 #define MOTOR3_PIN 27
 #define MOTOR4_PIN 29
 
-#define HZ_TO_US(Hz) ((uint32_t)(1e6f / (Hz)))
-#define S_TO_US(s) ((uint32_t)((s) * 1e6f))
-#define S_TO_US_INV(s) (1e6f / ((float)(s) + __FLT_EPSILON__))
-#define INV(x) (1.0f / ((x) + __FLT_EPSILON__))
+#define INV(x) (1.0f / ((float)(x) + __FLT_EPSILON__))
+#define HZ_TO_US(Hz) ((uint32_t)(1e6f * INV(Hz)))
+#define S_TO_US(s) ((uint32_t)(((float)(s) + __FLT_EPSILON__) * 1e6f))
+#define S_TO_US_INV(s) (1e6f * INV(s))
 
 #define VL53L4CX_I2C_SPEED 400000
 
@@ -67,8 +67,8 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 #define PID_AUTOTUNE_FREQUENCY 1.0f
 #define PID_AUTOTUNE_INCREMENT 0.1f
 #define PID_AUTOTUNE_AMPLITUDE_DEG 10.0f
-#define PID_AUTOTUNE_AMPLITUDE_RAD (PID_AUTOTUNE_AMPLITUDE_DEG * DEG_TO_RAD)
 #define PID_AUTOTUNE_HYSTERESIS_DEG 0.5f
+#define PID_AUTOTUNE_AMPLITUDE_RAD (PID_AUTOTUNE_AMPLITUDE_DEG * DEG_TO_RAD)
 #define PID_AUTOTUNE_HYSTERESIS_RAD (PID_AUTOTUNE_HYSTERESIS_DEG * DEG_TO_RAD)
 
 #define ENV_ALPHA 0.25f
@@ -152,7 +152,7 @@ typedef struct __attribute__((packed, aligned(4)))
   uint16_t thrust;                                // PWM value (0-800)
   uint16_t distance;                              // millimeters (mm)
   uint8_t status;                                 // bit 0: FCU active, bit 1: POF warning, bit 2: Auto-Tune active
-  uint8_t reserved[183];                          // padding to 252 bytes
+  uint8_t reserved[183];                          // Padding to 252 bytes for RCU data, preserving 4-byte alignment
 } Fcu;
 
 static_assert(sizeof(Fcu) == 252, "Fcu struct must be 252 bytes (63 words)");
@@ -193,10 +193,10 @@ static_assert(sizeof(Task) == 16, "Task struct must be 16 bytes (4 words)");
 
 typedef struct __attribute__((packed, aligned(4)))
 {
-  bool is_running;
-  bool is_at_hover;
-  uint8_t tuning_axis;
-  uint8_t reserved[1];
+  bool is_running;     // Auto-Tune is active
+  bool is_at_hover;    // Currently at hover thrust
+  uint8_t tuning_axis; // 0: roll, 1: pitch, 2: yaw
+  uint8_t reserved[1]; // Padding to 4 bytes, preserving 4-byte alignment
 } AutoTuneState;
 
 static_assert(sizeof(AutoTuneState) == 4, "AutoTuneState struct must be 4 bytes (1 word)");
