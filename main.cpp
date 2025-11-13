@@ -461,7 +461,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
       fcu.pid_gain[axis][0] = constrain(0.6f * Ku, PID_GAIN_MIN, PID_GAIN_MAX);
       fcu.pid_gain[axis][1] = constrain(1.2f * Ku / Tu, PID_GAIN_MIN, PID_GAIN_MAX);
       fcu.pid_gain[axis][2] = constrain(0.075f * Ku * Tu, PID_GAIN_MIN, PID_GAIN_MAX);
-        
+
       fcu.pid_setpoint[axis] = 0.0f;
       tune[axis].active = false;
       last_err[axis] = corrected_err;
