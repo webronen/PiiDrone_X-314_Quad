@@ -454,12 +454,14 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     if (tune[axis].crosses >= PID_AUTOTUNE_CROSSES)
     {
       const float Ku = fcu.pid_gain[axis][0];
-      const float Tu = (float)(now - tune[axis].first_cross) * 4e-7f;
+      // Calculate oscillation period (Tu) from 6 zero-crossings (2.5 periods)
+      // Tu = (elapsed_microseconds) × 1e-6 / 2.5 = (elapsed_microseconds) × 4e-7
+      const float Tu = __builtin_fmaxf((float)(now - tune[axis].first_cross) * 4e-7f, __FLT_EPSILON__);
 
       fcu.pid_gain[axis][0] = constrain(0.6f * Ku, PID_GAIN_MIN, PID_GAIN_MAX);
-      fcu.pid_gain[axis][1] = constrain(1.2f * Ku * INV(Tu), PID_GAIN_MIN, PID_GAIN_MAX);
+      fcu.pid_gain[axis][1] = constrain(1.2f * Ku / Tu, PID_GAIN_MIN, PID_GAIN_MAX);
       fcu.pid_gain[axis][2] = constrain(0.075f * Ku * Tu, PID_GAIN_MIN, PID_GAIN_MAX);
-
+        
       fcu.pid_setpoint[axis] = 0.0f;
       tune[axis].active = false;
       last_err[axis] = corrected_err;
