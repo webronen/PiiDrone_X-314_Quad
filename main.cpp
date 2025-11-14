@@ -99,13 +99,13 @@ void loop(void)
   static uint32_t last_packet_us = loop_start_us;
   static uint32_t last_landing_us = loop_start_us;
 
-  // Update async packet timeout to prevent landing during auto-tuning
-  if (auto_tune.is_running)
-    last_packet_us = loop_start_us + HZ_TO_US(0.1f);
-
   // Check if async timeouts occurred
   const bool packet_timeout = loop_start_us >= last_packet_us;
   const bool landing_timeout = loop_start_us >= last_landing_us;
+
+  // Update async packet timeout to prevent landing during auto-tuning
+  if (auto_tune.is_running)
+    last_packet_us = loop_start_us + HZ_TO_US(0.1f);
 
   // Handle received radio packets before strict periodic tasks
   if (NRF_RADIO->EVENTS_CRCOK)
@@ -405,13 +405,11 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
 {
   static struct
   {
-    uint32_t first_cross, last_change, last_adj;
-    uint8_t crosses;
+    uint32_t last_change, last_adj, first_flip;
+    uint8_t flips;
     float setpoint;
     bool active;
   } tune[3] = {0};
-
-  static float last_err[3] = {0};
 
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
   const uint32_t now = NRF_TIMER0->CC[0];
@@ -421,8 +419,8 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     tune[axis].setpoint = PID_AUTOTUNE_AMPLITUDE_RAD;
     tune[axis].last_change = now + HZ_TO_US(PID_AUTOTUNE_RELAY_FREQUENCY);
     tune[axis].last_adj = now + HZ_TO_US(PID_AUTOTUNE_P_FREQUENCY);
-    tune[axis].crosses = 0;
-    tune[axis].first_cross = 0;
+    tune[axis].flips = 0;
+    tune[axis].first_flip = 0;
     tune[axis].active = true;
 
     fcu.pid_setpoint[axis] = tune[axis].setpoint;
@@ -430,7 +428,6 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     fcu.pid_gain[axis][1] = 0.0f;
     fcu.pid_gain[axis][2] = 0.0f;
 
-    last_err[axis] = err;
     return false;
   }
 
@@ -439,21 +436,14 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     tune[axis].setpoint = -tune[axis].setpoint;
     fcu.pid_setpoint[axis] = tune[axis].setpoint;
     tune[axis].last_change = now + HZ_TO_US(PID_AUTOTUNE_RELAY_FREQUENCY);
-  }
 
-  const bool crossed_zero = (last_err[axis] > 0.0f) != (err > 0.0f);
+    if (++tune[axis].flips == 1)
+      tune[axis].first_flip = now;
 
-  if (crossed_zero)
-  {
-    if (tune[axis].crosses == 0)
-      tune[axis].first_cross = now;
-
-    tune[axis].crosses++;
-
-    if (tune[axis].crosses >= PID_AUTOTUNE_CROSSES)
+    if (tune[axis].flips >= 16)
     {
       const float Ku = fcu.pid_gain[axis][0];
-      const float Tu = __builtin_fmaxf((float)(now - tune[axis].first_cross) * 4e-7f, __FLT_EPSILON__);
+      const float Tu = __builtin_fmaxf((float)(now - tune[axis].first_flip) * 6.25e-8f, __FLT_EPSILON__);
 
       fcu.pid_gain[axis][0] = constrain(0.6f * Ku, PID_GAIN_MIN, PID_GAIN_MAX);
       fcu.pid_gain[axis][1] = constrain(1.2f * Ku / Tu, PID_GAIN_MIN, PID_GAIN_MAX);
@@ -465,7 +455,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     }
   }
 
-  if (tune[axis].crosses < PID_AUTOTUNE_CROSSES && (now >= tune[axis].last_adj))
+  if (tune[axis].flips < 16 && (now >= tune[axis].last_adj))
   {
     fcu.pid_gain[axis][0] += PID_AUTOTUNE_INCREMENT;
     tune[axis].last_adj = now + HZ_TO_US(PID_AUTOTUNE_P_FREQUENCY);
@@ -479,6 +469,5 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     }
   }
 
-  last_err[axis] = err;
   return false;
 }
