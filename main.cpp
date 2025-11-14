@@ -174,7 +174,7 @@ static inline void task_fcu_update(void)
 
     if (pid_tune_step(auto_tune.tuning_axis, current_error))
     {
-      if (++auto_tune.tuning_axis == 2)
+      if (++auto_tune.tuning_axis == 1)
       {
         auto_tune.is_running = false;
       }
@@ -384,13 +384,12 @@ static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s)
   static uint32_t last_time_us = 0;
 
   NRF_TIMER0->TASKS_CAPTURE[1] = 1;
-  const uint32_t loop_time_us = NRF_TIMER0->CC[1];
 
   if (!last_time_us)
-    last_time_us = loop_time_us;
+    last_time_us = NRF_TIMER0->CC[1];
 
-  const uint32_t elapsed_time_us = (loop_time_us - last_time_us);
-  float x = ((float)elapsed_time_us * S_TO_US_INV(in_time_s));
+  const uint32_t elapsed_time_us = (NRF_TIMER0->CC[1] - last_time_us);
+  float x = (float)elapsed_time_us / (in_time_s * 1e6f);
   x = constrain(x, 0.0f, 1.0f);
 
   const float y = (to_thrust >= 0.0f)
@@ -409,29 +408,29 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     uint32_t first_cross, last_change, last_adj;
     uint8_t crosses;
     float setpoint;
-    float error_bias;
     bool active;
   } tune[3] = {0};
 
   static float last_err[3] = {0};
+
+  NRF_TIMER0->TASKS_CAPTURE[0] = 1;
   const uint32_t now = NRF_TIMER0->CC[0];
 
   if (!tune[axis].active)
   {
     tune[axis].setpoint = PID_AUTOTUNE_AMPLITUDE_RAD;
-    tune[axis].last_change = now + HZ_TO_US(PID_AUTOTUNE_FREQUENCY);
-    tune[axis].last_adj = tune[axis].last_change;
+    tune[axis].last_change = now + HZ_TO_US(PID_AUTOTUNE_RELAY_FREQUENCY);
+    tune[axis].last_adj = now + HZ_TO_US(PID_AUTOTUNE_P_FREQUENCY);
     tune[axis].crosses = 0;
     tune[axis].first_cross = 0;
     tune[axis].active = true;
-    tune[axis].error_bias = err;
 
     fcu.pid_setpoint[axis] = tune[axis].setpoint;
-    fcu.pid_gain[axis][0] = 0.0f;
+    fcu.pid_gain[axis][0] = PID_AUTOTUNE_INCREMENT;
     fcu.pid_gain[axis][1] = 0.0f;
     fcu.pid_gain[axis][2] = 0.0f;
 
-    last_err[axis] = (err - tune[axis].error_bias) + __FLT_EPSILON__;
+    last_err[axis] = err;
     return false;
   }
 
@@ -439,23 +438,21 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
   {
     tune[axis].setpoint = -tune[axis].setpoint;
     fcu.pid_setpoint[axis] = tune[axis].setpoint;
-    tune[axis].last_change = now + HZ_TO_US(PID_AUTOTUNE_FREQUENCY);
+    tune[axis].last_change = now + HZ_TO_US(PID_AUTOTUNE_RELAY_FREQUENCY);
   }
 
-  const float corrected_err = err - tune[axis].error_bias;
-  const bool sign_changed = (last_err[axis] > 0.0f) != (corrected_err > 0.0f);
-  const bool crossed_zero = sign_changed && (__builtin_fabsf(corrected_err) > PID_AUTOTUNE_HYSTERESIS_RAD);
+  const bool crossed_zero = (last_err[axis] > 0.0f) != (err > 0.0f);
 
   if (crossed_zero)
   {
-    if (++tune[axis].crosses == 1)
+    if (tune[axis].crosses == 0)
       tune[axis].first_cross = now;
+
+    tune[axis].crosses++;
 
     if (tune[axis].crosses >= PID_AUTOTUNE_CROSSES)
     {
       const float Ku = fcu.pid_gain[axis][0];
-      // Calculate oscillation period (Tu) from 6 zero-crossings (2.5 periods)
-      // Tu = (elapsed_microseconds) × 1e-6 / 2.5 = (elapsed_microseconds) × 4e-7
       const float Tu = __builtin_fmaxf((float)(now - tune[axis].first_cross) * 4e-7f, __FLT_EPSILON__);
 
       fcu.pid_gain[axis][0] = constrain(0.6f * Ku, PID_GAIN_MIN, PID_GAIN_MAX);
@@ -464,15 +461,14 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
 
       fcu.pid_setpoint[axis] = 0.0f;
       tune[axis].active = false;
-      last_err[axis] = corrected_err;
       return true;
     }
   }
 
-  if ((tune[axis].crosses < PID_AUTOTUNE_CROSSES) && (now >= tune[axis].last_adj))
+  if (tune[axis].crosses < PID_AUTOTUNE_CROSSES && (now >= tune[axis].last_adj))
   {
     fcu.pid_gain[axis][0] += PID_AUTOTUNE_INCREMENT;
-    tune[axis].last_adj = now + HZ_TO_US(PID_AUTOTUNE_FREQUENCY);
+    tune[axis].last_adj = now + HZ_TO_US(PID_AUTOTUNE_P_FREQUENCY);
 
     if (fcu.pid_gain[axis][0] > PID_GAIN_MAX)
     {
@@ -483,6 +479,6 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     }
   }
 
-  last_err[axis] = corrected_err + __FLT_EPSILON__;
+  last_err[axis] = err;
   return false;
 }
