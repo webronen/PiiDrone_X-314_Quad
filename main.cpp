@@ -399,7 +399,7 @@ static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s)
   return (x >= 1.0f) ? (last_time_us = 0, true) : false;
 }
 
-static inline bool pid_tune_step(const uint8_t axis, const float err)
+static inline bool pid_tune_step(uint8_t axis, float err)
 {
   if (axis >= 3)
     return false;
@@ -421,18 +421,17 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
 
   if (!tune[axis].active)
   {
-    // Initialize
     tune[axis].last_adj = now;
     tune[axis].last_change = now + HZ_TO_US(PID_AUTOTUNE_RELAY_FREQUENCY);
     tune[axis].stage = 0;
-    tune[axis].setpoint = PID_AUTOTUNE_AMPLITUDE_RAD * 0.3f;
-    tune[axis].best_P = TUNE_P_START;
+    tune[axis].setpoint = PID_AUTOTUNE_AMPLITUDE_RAD;
+    tune[axis].best_P = 0.0f;
     tune[axis].best_D = 0.0f;
     tune[axis].best_I = 0.0f;
     tune[axis].active = true;
 
     fcu.pid_setpoint[axis] = tune[axis].setpoint;
-    fcu.pid_gain[axis][0] = TUNE_P_START;
+    fcu.pid_gain[axis][0] = 0.0f;
     fcu.pid_gain[axis][1] = 0.0f;
     fcu.pid_gain[axis][2] = 0.0f;
 
@@ -451,16 +450,13 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     tune[axis].last_change = now + HZ_TO_US(PID_AUTOTUNE_RELAY_FREQUENCY);
   }
 
-  // RMS error collection for all stages
-  error_sum[axis] += err * err; // Square error for RMS calculation
+  error_sum[axis] += err * err;
   sample_count[axis]++;
 
   if (now - last_time[axis] > HZ_TO_US(TUNE_SAMPLE_TIME))
   {
-    // Calculate RMS error (root mean square)
     float rms_error = sqrtf(error_sum[axis] / sample_count[axis]);
 
-    // Track best RMS performance
     if (rms_error < best_rms[axis])
     {
       best_rms[axis] = rms_error;
@@ -478,10 +474,9 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
       }
     }
 
-    // Progress through PDI stages using RMS performance
     switch (tune[axis].stage)
     {
-    case 0: // P stage: minimize RMS error
+    case 0:
       fcu.pid_gain[axis][0] = fminf(fcu.pid_gain[axis][0] + TUNE_P_INCREMENT, TUNE_P_MAX);
       if (rms_error < TUNE_ERROR_P_GOAL || fcu.pid_gain[axis][0] >= TUNE_P_MAX)
       {
@@ -489,7 +484,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
         best_rms[axis] = __FLT_MAX__;
       }
       break;
-    case 1: // D stage: minimize RMS error with damping
+    case 1:
       fcu.pid_gain[axis][2] = fminf(fcu.pid_gain[axis][2] + TUNE_D_INCREMENT, TUNE_D_MAX);
       if (rms_error < TUNE_ERROR_D_GOAL || fcu.pid_gain[axis][2] >= TUNE_D_MAX)
       {
@@ -497,7 +492,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
         best_rms[axis] = __FLT_MAX__;
       }
       break;
-    case 2: // I stage: minimize RMS error with integral
+    case 2:
       fcu.pid_gain[axis][1] = fminf(fcu.pid_gain[axis][1] + TUNE_I_INCREMENT, TUNE_I_MAX);
       if (rms_error < TUNE_ERROR_I_GOAL || fcu.pid_gain[axis][1] >= TUNE_I_MAX)
       {
@@ -511,7 +506,6 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
       break;
     }
 
-    // Reset RMS calculation for next measurement period
     error_sum[axis] = 0.0f;
     sample_count[axis] = 0;
     last_time[axis] = now;

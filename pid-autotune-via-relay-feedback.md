@@ -12,9 +12,9 @@ Auto-tunes PID gains for roll, pitch, and yaw on a 70g quadcopter (nRF MCU). No 
 
 ### Stages and Parameters
 
-- **P stage:** Start at 3.0, increment by 0.5 up to 15.0. Advance if RMS < 0.05 or max.
-- **D stage:** Start at 0, increment by 0.2 up to 3.0. Advance if RMS < 0.03 or max.
-- **I stage:** Start at 0, increment by 0.1 up to 2.0. Finish if RMS < 0.02 or max.
+- **P stage:** Start at 0, increment by 0.5 up to 15.0. Advance if RMS < 0.12 or max.
+- **D stage:** Start at 0, increment by 0.2 up to 3.0. Advance if RMS < 0.08 or max.
+- **I stage:** Start at 0, increment by 0.1 up to 2.0. Finish if RMS < 0.06 or max.
 
 ### RMS Error Metric
 
