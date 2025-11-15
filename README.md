@@ -71,35 +71,33 @@
 
 ### Overview
 
-Automates practical PID tuning using relay feedback for embedded flight controllers.
+Automates PID tuning using relay feedback for embedded flight controllers. Three-stage process (P, D, I) with relay excitation and RMS-based error evaluation.
 
 ### Features
 
-- **Smoothstep thrust ramp** for gentle, battery-friendly motor activation
-- **Three-stage PID tuning** with relay excitation and staged gain adjustment
-- **Root Mean Square (RMS) error** measured at each step for robust, noise-tolerant evaluation
-- **Unified RMS metric:** Consistent squared error collection and RMS calculation across all P, D, and I stages
-- **Best-value tracking:** Each stage keeps the gain value with the lowest error
-- **Automatic stage transitions** when error goals are met or gain limits are reached
-- **Independent tuning for roll, pitch, and yaw**
-- **Safety-constrained gain limits** and robust fallback to safe defaults
-- **Timer overflow protection** and static state reset for reliable operation
-
+- Smoothstep thrust ramp for gentle, battery-friendly motor activation
+- Three-stage PID tuning with relay excitation and staged gain adjustment
+- Unified RMS error metric for all stages
+- Best-value tracking: each stage keeps the gain with the lowest RMS error
+- Automatic stage transitions when RMS goals are met or gain limits are reached
+- Independent tuning for roll, pitch, and yaw
+- Safety-constrained gain limits and robust fallback to safe defaults
+- Timer overflow protection and static state reset
 
 ### Tuning Process
 
-1. **Ramp up thrust smoothly** to reach hover.
-2. **Tune each axis in three stages using relay excitation:**
-    - **P gain:** 3.0 → 15.0 (step 0.5), keep value with lowest RMS (goal: 0.05)
-    - **D gain:** 0 → 3.0 (step 0.2), keep value with lowest RMS (goal: 0.03)
-    - **I gain:** 0 → 2.0 (step 0.1), keep value with lowest RMS (goal: 0.02)
-3. **At the end of each stage,** set the gain to the best value found (lowest error).
-4. **Repeat** for roll, pitch, and yaw axes.
-5. **Ramp down thrust smoothly** after tuning.
+1. Ramp up thrust smoothly to hover.
+2. Tune each axis in three stages using relay excitation:
+  - **P stage:** 0 → 15.0 (step 0.5), advance if RMS < 0.12 (~6.9°) or max.
+  - **D stage:** 0 → 3.0 (step 0.2), advance if RMS < 0.08 (~4.6°) or max.
+  - **I stage:** 0 → 2.0 (step 0.1), finish if RMS < 0.06 (~3.4°) or max.
+3. At the end of each stage, set the gain to the best value found (lowest RMS error).
+4. Repeat for roll, pitch, and yaw axes.
+5. Ramp down thrust smoothly after tuning.
 
 ### Performance
 
-- ~32 seconds per axis (24 relay flips across 3 stages)
+- ~32 seconds per axis (24 relay flips, 3 stages)
 - RMS-based gain selection for flyable results
 - No zero-crossing detection dependencies
 - Conservative I gain scaling for safety
@@ -114,11 +112,11 @@ If tuning exceeds maximum gain limits, fallback gains are applied:
 
 ### Key Improvements
 
-- **Unified RMS architecture:** Consistent RMS error metric for all PID stages
-- **Practical gains:** Finds minimum effective gains instead of theoretical oscillation points
-- **Robust operation:** No dependency on error sign or zero-crossing detection
-- **Flyable results:** Conservative gain selection suitable for immediate flight testing
-- **Staged approach:** Each PID term tuned with appropriate RMS performance metric
+- Unified RMS architecture: consistent RMS error metric for all PID stages
+- Practical gains: finds minimum effective gains instead of theoretical oscillation points
+- Robust operation: no dependency on error sign or zero-crossing detection
+- Flyable results: conservative gain selection suitable for immediate flight testing
+- Staged approach: each PID term tuned with appropriate RMS performance metric
 
 ---
 
