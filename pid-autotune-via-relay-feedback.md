@@ -25,7 +25,9 @@ Tuning proceeds in three sequential stages for each axis:
 All tuning stages use the same Root Mean Square (RMS) error metric to evaluate performance:
 
 
-RMS is calculated as: $\mathrm{RMS} = \sqrt{\frac{1}{N} \sum_{i=1}^N (e_i)^2}$
+RMS is calculated as:
+
+$\mathrm{RMS} = \sqrt{\frac{1}{N} \sum_{i=1}^N (e_i)^2}$
 
 where:
 - $e_i$ is the control error at sample $i$
