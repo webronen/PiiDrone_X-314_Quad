@@ -71,7 +71,7 @@
 
 ### Overview
 
-Automates PID tuning using relay feedback for embedded flight controllers. Three-stage process (P, D, I) with relay excitation and RMS-based error evaluation.
+Auto-tunes PID gains in three relay-excited stages (P, D, I) using RMSE.
 
 ### Features
 
