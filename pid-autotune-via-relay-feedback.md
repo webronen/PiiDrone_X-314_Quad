@@ -22,10 +22,7 @@ Tuning proceeds in three sequential stages for each axis:
 - **I gain:** Sweep from 0 to 2.0 (step 0.1). Same RMS process, finish if RMS < 0.02 or max I is reached.
 
 ### 3.3 Unified RMS Metric
-All tuning stages use the same Root Mean Square (RMS) error metric to evaluate performance:
-
-
-RMS is calculated as:
+All tuning stages use the same Root Mean Square (RMS) error metric to evaluate performance. RMS is calculated as:
 
 $\mathrm{RMS} = \sqrt{\frac{1}{N} \sum_{i=1}^N (e_i)^2}$
 
