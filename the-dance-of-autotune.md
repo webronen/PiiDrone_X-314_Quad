@@ -1,7 +1,10 @@
-# Autotunen tanssi *(Tekoäly-runo)*  
-**The Dance of Autotune** *(AI Poem)*
 
-**Suomeksi**  
+# Autotunen tanssi (AI Runo)
+
+---
+
+## Suome
+
 Ensin on hiljaisuus  
 Moottorit lepäävät, mutta jännite väreilee kuin hengitys ennen hyppyä  
 
@@ -18,11 +21,16 @@ Ja kun viritys on valmis
 moottorit laskevat kuin verhot esityksen päätteeksi  
 Ei romahdusta, ei kiirettä  
 Vain hallittu laskeutuminen  
-kuin hyvästit jotka tietävät: seuraava lento on jo tulossa  
+
+kuin hyvästit jotka tietävät: seuraava lento on jo tulossa
 
 ---
 
-**In English**  
+
+## In English
+
+### The Dance of Autotune (AI Poem)
+
 First, there is silence  
 The motors rest, but tension hums like breath before a leap  
 
