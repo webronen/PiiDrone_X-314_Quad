@@ -63,6 +63,10 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 #define PID_THRUST_RAMP_MAX PID_OUT_MAX
 #define PID_THRUST_RAMP_S 5.0f
 
+#define PID_AUTOTUNE_RELAY_FREQUENCY 0.5f // Relay switches every 2 seconds
+#define PID_AUTOTUNE_AMPLITUDE_DEG 30.0f  // Excitation amplitude
+#define PID_AUTOTUNE_AMPLITUDE_RAD (PID_AUTOTUNE_AMPLITUDE_DEG * DEG_TO_RAD)
+
 #define TUNE_SAMPLE_TIME 2.0f   // 2-second measurement intervals
 #define TUNE_P_START 3.0f       // Start with very low P
 #define TUNE_P_MAX 15.0f        // Maximum P gain
