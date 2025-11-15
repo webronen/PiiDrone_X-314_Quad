@@ -87,21 +87,20 @@ Automates practical PID tuning using relay feedback for embedded flight controll
 
 ### Tuning Process
 
-1. **Smoothstep thrust ramp** to hover using `pid_thrust_ramp()`
-2. **Three-stage axis tuning with relay excitation:**
-   - **Stage 1 – Find P:** Increase P gain (2.0 increments, up to 30.0 max) while minimizing total squared error (RMS). Best P is selected as the value with lowest error.
-   - **Stage 2 – Find D:** Increase D gain (1.0 increments, up to 15.0 max) while minimizing maximum error (overshoot). Best D is selected as the value with lowest overshoot.
-   - **Stage 3 – Find I:** Increase I gain (0.5 increments, up to 8.0 max) while minimizing steady-state error (sum of |error| during I stage). Best I is selected as the value with lowest steady-state error.
+1. **Ramp up thrust smoothly** to reach hover.
+2. **Tune each axis in three stages using relay excitation:**
+   - **Stage 1 – P gain:** Start at 3.0, increase by 0.5 up to 15.0. Select the value with the lowest total squared error (goal: 0.05).
+   - **Stage 2 – D gain:** Start at 0, increase by 0.2 up to 3.0. Select the value with the lowest maximum error (goal: 0.03).
+   - **Stage 3 – I gain:** Start at 0, increase by 0.1 up to 2.0. Select the value with the lowest steady-state error (goal: 0.02).
+   - Use a 2.0 second measurement interval for each stage.
 3. **Performance metrics:**
-   - **P stage:** Total squared error (lower = better response)
-   - **D stage:** Maximum error (lower = less overshoot)
-   - **I stage:** Steady-state error (lower = better drift correction)
-4. **Gain calculation:**
-   - `P = best_P` (from stage 1)
-   - `D = best_D` (from stage 2)
-   - `I = best_I` (from stage 3, clamped to [1.0, 6.0] for safety)
-5. **Repeat** for each axis (roll, pitch, yaw)
-6. **Ramp down thrust** after tuning
+   - **P stage:** Minimize total squared error (lower is better)
+   - **D stage:** Minimize maximum error (lower is better)
+   - **I stage:** Minimize steady-state error (lower is better)
+4. **Set gains:**
+   - Use the best P, D, and I values found in each stage.
+5. **Repeat** for roll, pitch, and yaw axes.
+6. **Ramp down thrust smoothly** after tuning.
 
 ### Performance
 
