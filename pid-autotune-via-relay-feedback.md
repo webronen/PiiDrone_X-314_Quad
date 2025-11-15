@@ -19,9 +19,7 @@ Auto-tunes PID gains for roll, pitch, and yaw on a 70g quadcopter (nRF MCU). No 
 ### RMS Error Metric
 
 All stages use the same RMS error:
-$$
-\mathrm{RMS} = \sqrt{\frac{1}{N} \sum_{i=1}^N (e_i)^2}
-$$
+$RMS = \sqrt{\frac{1}{N} \sum_{i=1}^N (e_i)^2}$
 where $e_i$ is the error at sample $i$, $N$ is the sample count.
 
 ### Implementation Notes
