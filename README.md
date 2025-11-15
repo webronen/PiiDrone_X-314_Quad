@@ -7,15 +7,15 @@
 ## Motor Layout (X Configuration)
 
 ```
-   Rear
-     |     |
+         Rear
+           |
      | --- | --- |
      | M4  | M3  |
      | --  | --  |
      | M2  | M1  |
      | --  | --  |
-     |     |
-   Front
+           |
+         Front
 ```
 - **M1:** Front-right (CCW)
 - **M2:** Front-left (CW)
@@ -89,9 +89,9 @@ Automates practical PID tuning using relay feedback for embedded flight controll
 
 1. **Ramp up thrust smoothly** to reach hover.
 2. **Tune each axis in three stages using relay excitation:**
-   - **Stage 1 – P gain:** Start at 3.0, increase by 0.5 up to 15.0. Select the value with the lowest total squared error (goal: 0.05).
-   - **Stage 2 – D gain:** Start at 0, increase by 0.2 up to 3.0. Select the value with the lowest maximum error (goal: 0.03).
-   - **Stage 3 – I gain:** Start at 0, increase by 0.1 up to 2.0. Select the value with the lowest steady-state error (goal: 0.02).
+      - **P gain:** 3.0 → 15.0 (step 0.5), minimize total squared error (goal: 0.05)
+      - **D gain:** 0 → 3.0 (step 0.2), minimize maximum error (goal: 0.03)
+      - **I gain:** 0 → 2.0 (step 0.1), minimize steady-state error (goal: 0.02)
    - Use a 2.0 second measurement interval for each stage.
 3. **Performance metrics:**
    - **P stage:** Minimize total squared error (lower is better)
