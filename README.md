@@ -8,13 +8,13 @@
 
 ```
    Rear
-     |
-| -- | -- |
-| M4 | M3 |
-| -- | -- |
-| M2 | M1 |
-| -- | -- |
-     |
+     |     |
+     | --- | --- |
+     | M4  | M3  |
+     | --  | --  |
+     | M2  | M1  |
+     | --  | --  |
+     |     |
    Front
 ```
 - **M1:** Front-right (CCW)
@@ -27,13 +27,13 @@
 ## Setpoint Response Table
 
 | Axis  | Setpoint Change | Sign | Expected Drone Response |
-|-------|-----------------|------|------------------------|
-| Roll  | Increase        | +    | Rolls right            |
-| Roll  | Decrease        | –    | Rolls left             |
-| Pitch | Increase        | +    | Pitches forward        |
-| Pitch | Decrease        | –    | Pitches backward       |
-| Yaw   | Increase        | +    | Yaws right (CW)        |
-| Yaw   | Decrease        | –    | Yaws left (CCW)        |
+| ----- | --------------- | ---- | ----------------------- |
+| Roll  | Increase        | +    | Rolls right             |
+| Roll  | Decrease        | –    | Rolls left              |
+| Pitch | Increase        | +    | Pitches forward         |
+| Pitch | Decrease        | –    | Pitches backward        |
+| Yaw   | Increase        | +    | Yaws right (CW)         |
+| Yaw   | Decrease        | –    | Yaws left (CCW)         |
 
 ---
 
@@ -71,50 +71,59 @@
 
 ### Overview
 
-Automates the Ziegler-Nichols PID tuning method using relay feedback for embedded flight controllers.
+Automates practical PID tuning using relay feedback for embedded flight controllers.
 
 ### Features
 
 - **Smoothstep thrust ramp** for battery-friendly, gentle motor activation
-- **Single-phase PID tuning** via induced oscillation (relay/relay-feedback)
-- **0.5 Hz square wave excitation** with adaptive hysteresis for robust zero-crossing detection
+- **Three-stage PID tuning** via relay excitation with performance-based gain selection
+- **0.5 Hz square wave excitation** for consistent system response
 - **Sequential axis tuning:** roll → pitch → yaw, each with independent state
-- **Safety-constrained gain limits** and fallback to conservative defaults if oscillation fails
-- **Robust zero-crossing detection** with bias removal and hysteresis
-- **Timer overflow and division protection** for reliable operation
+- **Safety-constrained gain limits** and fallback to conservative defaults
+- **Performance-based gain selection** using error metrics instead of oscillation detection
+- **Timer overflow protection** for reliable operation
 - **Static state reset** for safe re-tuning or abort
+
 
 ### Tuning Process
 
 1. **Smoothstep thrust ramp** to hover using `pid_thrust_ramp()`
-2. **Axis excitation** with 0.5 Hz square wave setpoint (relay method)
-3. **Gain scheduling:** P gain increases every 0.5s until oscillation is detected
-4. **Oscillation analysis:**
-    - 6 zero-crossings (2.5 periods) are measured
-    - `Tu = (now - first_cross) * 4e-7f` (for 2.5 periods, timer in microseconds)
-       - Here, `4e-7f` means 0.0000004 (float). It converts the measured microseconds for 2.5 periods into the period Tu in seconds:
-          - `Tu = (elapsed_microseconds) × 1e-6 / 2.5 = (elapsed_microseconds) × 4e-7`.
-          - This gives the period of one oscillation in seconds from the time for 2.5 periods.
-5. **Gain calculation:**
-   - `P = 0.6 × Ku` (constrained)
-   - `I = 1.2 × Ku / Tu` (constrained)
-   - `D = 0.075 × Ku × Tu` (constrained)
-6. **Repeat** for each axis (roll, pitch, yaw)
-7. **Ramp down thrust** after tuning
+2. **Three-stage axis tuning with relay excitation:**
+   - **Stage 1 – Find P:** Increase P gain (2.0 increments, up to 30.0 max) while minimizing total squared error (RMS). Best P is selected as the value with lowest error.
+   - **Stage 2 – Find D:** Increase D gain (1.0 increments, up to 15.0 max) while minimizing maximum error (overshoot). Best D is selected as the value with lowest overshoot.
+   - **Stage 3 – Find I:** Increase I gain (0.5 increments, up to 8.0 max) while minimizing steady-state error (sum of |error| during I stage). Best I is selected as the value with lowest steady-state error.
+3. **Performance metrics:**
+   - **P stage:** Total squared error (lower = better response)
+   - **D stage:** Maximum error (lower = less overshoot)
+   - **I stage:** Steady-state error (lower = better drift correction)
+4. **Gain calculation:**
+   - `P = best_P` (from stage 1)
+   - `D = best_D` (from stage 2)
+   - `I = best_I` (from stage 3, clamped to [1.0, 6.0] for safety)
+5. **Repeat** for each axis (roll, pitch, yaw)
+6. **Ramp down thrust** after tuning
 
 ### Performance
 
-- ~8 seconds per axis (6 zero-crossings, 2.5 periods)
-- Adaptive noise rejection via hysteresis
-- Safe fallback and abort at any time
+- ~32 seconds per axis (24 relay flips across 3 stages)
+- Performance-based gain selection for flyable results
+- No zero-crossing detection dependencies
+- Conservative I gain scaling for safety
 
 ### Fallback Behavior
 
-If oscillation fails (e.g., fewer than 6 zero-crossings or excessive gain), fallback gains are applied:
+If tuning exceeds maximum gain limits, fallback gains are applied:
 
 - `P = 0.0`
 - `I = 0.0`
 - `D = 0.0`
+
+### Key Improvements
+
+- **Practical gains:** Finds minimum effective gains instead of theoretical oscillation points
+- **Robust operation:** No dependency on error sign or zero-crossing detection
+- **Flyable results:** Conservative gain selection suitable for immediate flight testing
+- **Staged approach:** Each PID term tuned with appropriate performance metrics
 
 ---
 

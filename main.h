@@ -63,10 +63,16 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 #define PID_THRUST_RAMP_MAX PID_OUT_MAX
 #define PID_THRUST_RAMP_S 5.0f
 
-#define PID_AUTOTUNE_P_FREQUENCY 2.0f     // Increase P every 0.5s
-#define PID_AUTOTUNE_RELAY_FREQUENCY 0.5f // 2-second oscillation period
-#define PID_AUTOTUNE_INCREMENT 1.0f       // Aggressive P growth
+#define PID_AUTOTUNE_RELAY_FREQUENCY 0.5f // 2-second oscillation period  
 #define PID_AUTOTUNE_AMPLITUDE_DEG 30.0f  // Strong excitation
+#define TUNE_P_MAX 30.0f
+#define TUNE_D_MAX 15.0f
+#define TUNE_I_MAX 8.0f
+#define TUNE_P_INCREMENT 2.0f
+#define TUNE_D_INCREMENT 1.0f
+#define TUNE_I_INCREMENT 0.5f
+#define TUNE_FLIPS_STAGE 8
+#define TUNE_ADJ_INTERVAL 4.0f
 #define PID_AUTOTUNE_AMPLITUDE_RAD (PID_AUTOTUNE_AMPLITUDE_DEG * DEG_TO_RAD)
 
 #define ENV_ALPHA 0.25f
@@ -237,7 +243,7 @@ static inline void pid_state_clear(void);
 static inline void pid_tune_stop(void);
 static inline void pid_calculate(const float sp, const float pv, const float Kp, const float Ki,
                                  const float Kd, float *_I, float *_D, float *_pv, float *out);
-static inline bool pid_tune_step(const uint8_t axis, const float current_error);
+static inline bool pid_tune_step(const uint8_t axis, const float err);
 static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s);
 
 static inline void quaternion_multiply(DataQuaternion *result, const DataQuaternion *q1, const DataQuaternion *q2);
