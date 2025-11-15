@@ -147,5 +147,6 @@ This system enables **safe, hands-off PID tuning** for drones, delivering reliab
 - [Smoothstep – Wikipedia](https://en.wikipedia.org/wiki/Smoothstep)  
 - [PID Controller – Wikipedia](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller)  
 - [Relay Auto-Tuning (Åström–Hägglund) – Wikipedia](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller#Relay_(%C3%85str%C3%B6m%E2%80%93H%C3%A4gglund)_method)
+ - [Root Mean Square Deviation (RMSE) – Wikipedia](https://en.wikipedia.org/wiki/Root_mean_square_deviation)
 
 ---
