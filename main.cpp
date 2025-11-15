@@ -403,112 +403,90 @@ static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s)
 
 static inline bool pid_tune_step(uint8_t axis, float err)
 {
-  if (axis >= 3)
-    return false;
-
   static struct
   {
-    uint32_t last_change, last_adj;
-    uint8_t flips, stage;
-    float setpoint, best_P, best_D, best_I, error_sum, max_error, steady_error;
+    uint32_t last_adj;
+    uint8_t stage;
+    float best_P, best_D;
     bool active;
   } tune[3] = {0};
 
-  static float best_perf[3] = {__FLT_MAX__, __FLT_MAX__, __FLT_MAX__};
-  static float best_over[3] = {__FLT_MAX__, __FLT_MAX__, __FLT_MAX__};
-  static float best_steady[3] = {__FLT_MAX__, __FLT_MAX__, __FLT_MAX__};
+  static uint32_t last_time[3] = {0};
+  static float error_sum[3] = {0};
+  static uint16_t sample_count[3] = {0};
 
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
   uint32_t now = NRF_TIMER0->CC[0];
 
   if (!tune[axis].active)
   {
-    tune[axis].setpoint = PID_AUTOTUNE_AMPLITUDE_RAD;
-    tune[axis].last_change = now + HZ_TO_US(PID_AUTOTUNE_RELAY_FREQUENCY);
-    tune[axis].last_adj = now + HZ_TO_US(TUNE_ADJ_INTERVAL);
-    tune[axis].flips = 0;
+    tune[axis].last_adj = now;
     tune[axis].stage = 0;
-    tune[axis].best_P = 5.0f;
+    tune[axis].best_P = TUNE_P_START;
     tune[axis].best_D = 0.0f;
-    tune[axis].best_I = 0.0f;
-    tune[axis].error_sum = 0.0f;
-    tune[axis].max_error = 0.0f;
-    tune[axis].steady_error = 0.0f;
     tune[axis].active = true;
 
-    best_perf[axis] = __FLT_MAX__;
-    best_over[axis] = __FLT_MAX__;
-    best_steady[axis] = __FLT_MAX__;
-
-    fcu.pid_setpoint[axis] = tune[axis].setpoint;
+    fcu.pid_setpoint[axis] = 0.0f;
     fcu.pid_gain[axis][0] = tune[axis].best_P;
     fcu.pid_gain[axis][1] = 0.0f;
     fcu.pid_gain[axis][2] = 0.0f;
+
+    last_time[axis] = now;
+    error_sum[axis] = 0.0f;
+    sample_count[axis] = 0;
     return false;
   }
 
-  if (now >= tune[axis].last_change)
-  {
-    tune[axis].setpoint = -tune[axis].setpoint;
-    fcu.pid_setpoint[axis] = tune[axis].setpoint;
-    tune[axis].last_change = now + HZ_TO_US(PID_AUTOTUNE_RELAY_FREQUENCY);
-    tune[axis].flips++;
-    tune[axis].error_sum += err * err;
-    tune[axis].max_error = fmaxf(tune[axis].max_error, fabsf(err));
-    if (tune[axis].stage == 2)
-      tune[axis].steady_error += fabsf(err);
-  }
+  // Collect error samples
+  error_sum[axis] += fabsf(err);
+  sample_count[axis]++;
 
-  if (tune[axis].flips >= TUNE_FLIPS_STAGE && now >= tune[axis].last_adj)
+  if (now - last_time[axis] > HZ_TO_US(TUNE_SAMPLE_TIME))
   {
+    float avg_error = error_sum[axis] / sample_count[axis];
+
     switch (tune[axis].stage)
     {
-    case 0:
-      if (tune[axis].error_sum < best_perf[axis])
+    case 0: // P stage
+      if (avg_error < TUNE_ERROR_P_GOAL)
       {
-        best_perf[axis] = tune[axis].error_sum;
         tune[axis].best_P = fcu.pid_gain[axis][0];
-      }
-      fcu.pid_gain[axis][0] = fminf(fcu.pid_gain[axis][0] + TUNE_P_INCREMENT, TUNE_P_MAX);
-      if (fcu.pid_gain[axis][0] >= TUNE_P_MAX || tune[axis].flips >= 24)
-      {
-        fcu.pid_gain[axis][0] = tune[axis].best_P;
         tune[axis].stage = 1;
       }
-      break;
-    case 1:
-      if (tune[axis].max_error < best_over[axis])
+      else
       {
-        best_over[axis] = tune[axis].max_error;
-        tune[axis].best_D = fcu.pid_gain[axis][2];
+        fcu.pid_gain[axis][0] = fminf(fcu.pid_gain[axis][0] + TUNE_P_INCREMENT, TUNE_P_MAX);
       }
-      fcu.pid_gain[axis][2] = fminf(fcu.pid_gain[axis][2] + TUNE_D_INCREMENT, TUNE_D_MAX);
-      if (fcu.pid_gain[axis][2] >= TUNE_D_MAX || tune[axis].flips >= 16)
+      break;
+
+    case 1: // D stage
+      if (avg_error < TUNE_ERROR_D_GOAL)
       {
-        fcu.pid_gain[axis][2] = tune[axis].best_D;
+        tune[axis].best_D = fcu.pid_gain[axis][2];
         tune[axis].stage = 2;
       }
-      break;
-    case 2:
-      if (tune[axis].steady_error < best_steady[axis])
+      else
       {
-        best_steady[axis] = tune[axis].steady_error;
-        tune[axis].best_I = fcu.pid_gain[axis][1];
+        fcu.pid_gain[axis][2] = fminf(fcu.pid_gain[axis][2] + TUNE_D_INCREMENT, TUNE_D_MAX);
       }
+      break;
+
+    case 2: // I stage
       fcu.pid_gain[axis][1] = fminf(fcu.pid_gain[axis][1] + TUNE_I_INCREMENT, TUNE_I_MAX);
-      if (fcu.pid_gain[axis][1] >= TUNE_I_MAX || tune[axis].flips >= 12)
+      if (fcu.pid_gain[axis][1] >= TUNE_I_MAX || avg_error < TUNE_ERROR_I_GOAL)
       {
         fcu.pid_gain[axis][0] = tune[axis].best_P;
-        fcu.pid_gain[axis][1] = tune[axis].best_I;
         fcu.pid_gain[axis][2] = tune[axis].best_D;
-        fcu.pid_setpoint[axis] = 0.0f;
         tune[axis].active = false;
         return true;
       }
       break;
     }
-    tune[axis].error_sum = tune[axis].max_error = tune[axis].steady_error = tune[axis].flips = 0;
-    tune[axis].last_adj = now + HZ_TO_US(TUNE_ADJ_INTERVAL);
+
+    // Reset for next measurement
+    error_sum[axis] = 0.0f;
+    sample_count[axis] = 0;
+    last_time[axis] = now;
   }
 
   return false;

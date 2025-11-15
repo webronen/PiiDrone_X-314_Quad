@@ -63,17 +63,17 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 #define PID_THRUST_RAMP_MAX PID_OUT_MAX
 #define PID_THRUST_RAMP_S 5.0f
 
-#define PID_AUTOTUNE_RELAY_FREQUENCY 0.5f // 2-second oscillation period  
-#define PID_AUTOTUNE_AMPLITUDE_DEG 30.0f  // Strong excitation
-#define TUNE_P_MAX 30.0f
-#define TUNE_D_MAX 15.0f
-#define TUNE_I_MAX 8.0f
-#define TUNE_P_INCREMENT 2.0f
-#define TUNE_D_INCREMENT 1.0f
-#define TUNE_I_INCREMENT 0.5f
-#define TUNE_FLIPS_STAGE 8
-#define TUNE_ADJ_INTERVAL 4.0f
-#define PID_AUTOTUNE_AMPLITUDE_RAD (PID_AUTOTUNE_AMPLITUDE_DEG * DEG_TO_RAD)
+#define TUNE_SAMPLE_TIME 2.0f   // 2-second measurement intervals
+#define TUNE_P_START 3.0f       // Start with very low P
+#define TUNE_P_MAX 15.0f        // Maximum P gain
+#define TUNE_D_MAX 3.0f         // Maximum D gain
+#define TUNE_I_MAX 2.0f         // Maximum I gain
+#define TUNE_P_INCREMENT 0.5f   // Slow P growth
+#define TUNE_D_INCREMENT 0.2f   // Slow D growth
+#define TUNE_I_INCREMENT 0.1f   // Slow I growth
+#define TUNE_ERROR_P_GOAL 0.05f // P stage target error
+#define TUNE_ERROR_D_GOAL 0.03f // D stage target error
+#define TUNE_ERROR_I_GOAL 0.02f // I stage target error
 
 #define ENV_ALPHA 0.25f
 #define D_ALPHA 0.75f
