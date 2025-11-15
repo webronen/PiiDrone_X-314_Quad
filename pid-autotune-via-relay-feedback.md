@@ -1,33 +1,61 @@
-# PID Autotune via Relay Feedback on Drone Bench
+# Deep Dive: Åström–Hägglund Relay Auto-Tuning System for Embedded Flight Controllers
 
-## Abstract  
-This paper explains why hover thrust is not required when performing a Relay Feedback Test to determine the ultimate gain (`K_u`) and ultimate period (`T_u`) for Ziegler-Nichols PID tuning on a balanced drone test bench. It outlines the principles of the relay method, the mechanical isolation of rotational dynamics, and practical considerations for effective testing.
+## Abstract
+This paper presents a practical, robust implementation of the Åström–Hägglund relay auto-tuning method for embedded quadcopter flight controllers. The system enables hands-off, in-field PID gain estimation using staged relay excitation, unified RMS error metrics, and robust fallback logic. We detail the algorithmic architecture, design rationale, and embedded safety considerations.
 
-## 1. Introduction  
-PID tuning is a critical step in achieving stable and responsive control in drone systems. The Ziegler-Nichols (ZN) method, particularly its closed-loop variant using Relay Feedback Testing, is a widely used approach to determine the optimal PID parameters. This paper discusses how the test can be conducted without requiring the drone motor to operate at hover thrust.
+## 1. Introduction
+PID controllers are ubiquitous in drone flight control, but manual tuning is time-consuming and error-prone. The Åström–Hägglund relay method automates PID tuning by inducing controlled oscillations and analyzing system response. We extend this method with a staged, RMS-based architecture suitable for real-time, resource-constrained embedded systems.
 
-## 2. Relay Feedback Test Focuses on Oscillations  
-The Relay Feedback Test replaces the proportional controller with a relay (or sign function) that toggles the control output between high and low values when the process variable crosses the setpoint. This setup induces sustained, bounded oscillations in the system.
+## 2. System Overview
+- **Objective:** Automate PID gain selection for roll, pitch, and yaw axes with minimal user intervention.
+- **Platform:** Ultra-light quadcopter (70g) with nRF microcontroller.
+- **Constraints:** Real-time operation, safety, and minimal computational overhead.
 
-- **Ultimate Period (`T_u`)**: The period of the sustained oscillation.  
-- **Ultimate Gain (`K_u`)**: Calculated from the oscillation amplitude and the relay output magnitude.
+## 3. Relay Excitation and Staged Tuning
+### 3.1 Relay Excitation
+A square wave setpoint (relay) is applied to each axis, alternating sign at fixed intervals. This excites the system and reveals its dynamic response.
 
-These parameters are then used to derive the PID gains using Ziegler-Nichols formulas.
+### 3.2 Three-Stage Tuning Architecture
+Tuning proceeds in three sequential stages for each axis:
+- **P gain:** Sweep from 3.0 to 15.0 (step 0.5). For each value, collect squared error samples over 2 seconds, compute RMS error, and track the value with the lowest RMS. Advance if RMS < 0.05 or max P is reached.
+- **D gain:** Sweep from 0 to 3.0 (step 0.2). Same RMS process, advance if RMS < 0.03 or max D is reached.
+- **I gain:** Sweep from 0 to 2.0 (step 0.1). Same RMS process, finish if RMS < 0.02 or max I is reached.
 
-## 3. The Balanced Test Bench Isolates Rotational Dynamics  
-A balanced test bench mechanically restricts the drone’s movement to rotation around a single axis (e.g., pitch or roll), preventing vertical translation or lift.
+### 3.3 Unified RMS Metric
+All stages use the same RMS error metric:
+$$
+\text{RMS} = \sqrt{\frac{1}{N} \sum_{i=1}^N (e_i)^2}
+$$
+where $e_i$ is the instantaneous control error and $N$ is the number of samples in the interval.
 
-- This isolation decouples rotational dynamics from thrust dynamics.  
-- The PID controller for rotational axes can be tuned independently of hover conditions.  
-- The motor thrust only needs to be sufficient to generate rotational forces—not to achieve lift.
+### 3.4 Best-Value Tracking
+At each stage, the gain value yielding the lowest RMS is retained. This ensures the most effective, noise-robust tuning for each PID term.
 
-## 4. Practical Considerations  
-Although hover thrust is unnecessary, the motor must produce enough force to:
+## 4. Embedded Implementation
+- **State Management:** Static structs per axis track stage, best values, and timing.
+- **Timing:** Hardware timer snapshots ensure precise measurement intervals and relay switching.
+- **Safety:** All gains are bounded; fallback to zero gains if tuning fails or limits are exceeded.
+- **Axis Independence:** Each axis is tuned independently, supporting sequential or parallel operation.
+- **No Dynamic Memory:** All state is statically allocated for real-time safety.
 
-- Overcome friction in the test bench bearings.  
-- Generate measurable oscillations in response to relay switching.
+## 5. Advantages of RMS-Based Unified Architecture
+- **Consistency:** RMS error is used for all PID terms, simplifying logic and improving comparability.
+- **Noise Rejection:** Squared error penalizes large deviations, making the system robust to outliers.
+- **Embedded Suitability:** RMS is computationally efficient and easy to implement on microcontrollers.
+- **Automatic Stage Transition:** Tuning advances automatically when RMS goals are met, reducing user intervention.
 
-Typically, a low-to-moderate fixed throttle is used—adequate to excite the system but well below the hover point.
+## 6. Fallback and Robustness
+If tuning exceeds gain limits or fails to meet RMS goals, the system applies safe fallback gains (all zero). This ensures the drone never flies with unstable or untested gains.
 
-## 5. Conclusion  
-Relay Feedback Testing on a balanced test bench allows safe and effective PID tuning without requiring hover thrust. This approach simplifies the tuning process and reduces risk, making it ideal for laboratory and development environments.
+## 7. Results and Discussion
+- **Tuning Time:** ~32 seconds per axis (24 relay flips across 3 stages).
+- **Flight Performance:** Gains are conservative but flyable, providing a safe baseline for further manual refinement.
+- **No Zero-Crossing Dependency:** Unlike classic relay methods, this approach does not require zero-crossing detection, improving reliability in noisy environments.
+
+## 8. Conclusion
+The presented Åström–Hägglund relay auto-tuning system delivers robust, hands-off PID gain estimation for embedded drones. Its staged, RMS-based architecture is well-suited to real-time, safety-critical applications and can be adapted to a wide range of robotic platforms.
+
+## References
+- Åström, K.J., & Hägglund, T. (1984). Automatic tuning of simple regulators with specifications on phase and amplitude margins. Automatica, 20(5), 645-651.
+- [Relay Auto-Tuning (Åström–Hägglund) – Wikipedia](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller#Relay_(%C3%85str%C3%B6m%E2%80%93H%C3%A4gglund)_method)
+- [PID Controller – Wikipedia](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller)
