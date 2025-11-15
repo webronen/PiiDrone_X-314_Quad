@@ -1,9 +1,6 @@
+## Suomeksi
 
 # Autotunen tanssi (AI Runo)
-
----
-
-## Suome
 
 Ensin on hiljaisuus  
 Moottorit lepäävät, mutta jännite väreilee kuin hengitys ennen hyppyä  
@@ -25,7 +22,6 @@ Vain hallittu laskeutuminen
 kuin hyvästit jotka tietävät: seuraava lento on jo tulossa
 
 ---
-
 
 ## In English
 
