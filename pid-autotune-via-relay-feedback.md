@@ -22,11 +22,17 @@ Tuning proceeds in three sequential stages for each axis:
 - **I gain:** Sweep from 0 to 2.0 (step 0.1). Same RMS process, finish if RMS < 0.02 or max I is reached.
 
 ### 3.3 Unified RMS Metric
-All stages use the same RMS error metric:
-$$
-\text{RMS} = \sqrt{\frac{1}{N} \sum_{i=1}^N (e_i)^2}
-$$
-where $e_i$ is the instantaneous control error and $N$ is the number of samples in the interval.
+All tuning stages use the same Root Mean Square (RMS) error metric to evaluate performance:
+
+RMS is calculated as:
+
+`RMS = sqrt( (1/N) * sum_{i=1}^N (e_i)^2 )`
+
+where:
+- $e_i$ is the control error at sample $i$
+- $N$ is the total number of samples in the interval
+
+This unified approach ensures consistent, noise-robust evaluation for P, D, and I tuning.
 
 ### 3.4 Best-Value Tracking
 At each stage, the gain value yielding the lowest RMS is retained. This ensures the most effective, noise-robust tuning for each PID term.
@@ -56,6 +62,5 @@ If tuning exceeds gain limits or fails to meet RMS goals, the system applies saf
 The presented Åström–Hägglund relay auto-tuning system delivers robust, hands-off PID gain estimation for embedded drones. Its staged, RMS-based architecture is well-suited to real-time, safety-critical applications and can be adapted to a wide range of robotic platforms.
 
 ## References
-- Åström, K.J., & Hägglund, T. (1984). Automatic tuning of simple regulators with specifications on phase and amplitude margins. Automatica, 20(5), 645-651.
 - [Relay Auto-Tuning (Åström–Hägglund) – Wikipedia](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller#Relay_(%C3%85str%C3%B6m%E2%80%93H%C3%A4gglund)_method)
 - [PID Controller – Wikipedia](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller)
