@@ -77,9 +77,9 @@ Automates PID tuning using relay feedback for embedded flight controllers. Three
 
 - Smoothstep thrust ramp for gentle, battery-friendly motor activation
 - Three-stage PID tuning with relay excitation and staged gain adjustment
-- Unified RMS error metric for all stages
-- Best-value tracking: each stage keeps the gain with the lowest RMS error
-- Automatic stage transitions when RMS goals are met or gain limits are reached
+- Unified RMSE metric for all stages
+- Best-value tracking: each stage keeps the gain with the lowest RMSE
+- Automatic stage transitions when RMSE goals are met or gain limits are reached
 - Independent tuning for roll, pitch, and yaw
 - Safety-constrained gain limits and robust fallback to safe defaults
 - Timer overflow protection and static state reset
@@ -88,10 +88,10 @@ Automates PID tuning using relay feedback for embedded flight controllers. Three
 
 1. Ramp up thrust smoothly to hover.
 2. Tune each axis in three stages using relay excitation:
-  - **P stage:** 0 → 15.0 (step 0.5), advance if RMS < 0.12 (~6.9°) or max.
-  - **D stage:** 0 → 3.0 (step 0.2), advance if RMS < 0.08 (~4.6°) or max.
-  - **I stage:** 0 → 2.0 (step 0.1), finish if RMS < 0.06 (~3.4°) or max.
-3. At the end of each stage, set the gain to the best value found (lowest RMS error).
+  - **P stage:** 0 → 15.0 (step 0.5), advance if RMSE < 0.12 (~6.9°) or max.
+  - **D stage:** 0 → 3.0 (step 0.2), advance if RMSE < 0.08 (~4.6°) or max.
+  - **I stage:** 0 → 2.0 (step 0.1), finish if RMSE < 0.06 (~3.4°) or max.
+3. At the end of each stage, set the gain to the best value found (lowest RMSE).
 4. Repeat for roll, pitch, and yaw axes.
 5. Ramp down thrust smoothly after tuning.
 
@@ -112,7 +112,7 @@ If tuning exceeds maximum gain limits, fallback gains are applied:
 
 ### Key Improvements
 
-- Unified RMS architecture: consistent RMS error metric for all PID stages
+- Unified RMSE architecture: consistent RMSE metric for all PID stages
 - Practical gains: finds minimum effective gains instead of theoretical oscillation points
 - Robust operation: no dependency on error sign or zero-crossing detection
 - Flyable results: conservative gain selection suitable for immediate flight testing
