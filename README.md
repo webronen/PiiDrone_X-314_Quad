@@ -71,7 +71,7 @@
 
 ### Overview
 
-Automatically estimates safe, flyable PID gains in three relay-excited stages (P, D, I) using RMSE. Provides a robust starting point for manual tuning.
+Estimates safe, flyable PID gains for roll, pitch, and yaw. Provides a starting point for manual tuning with real-time safety limits.
 
 ### Features
 
