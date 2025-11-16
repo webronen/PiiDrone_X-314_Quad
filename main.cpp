@@ -455,7 +455,7 @@ static inline bool pid_tune_step(uint8_t axis, float err)
 
   if (now - last_time[axis] > HZ_TO_US(TUNE_SAMPLE_TIME))
   {
-    float rms_error = sqrtf(error_sum[axis] / sample_count[axis]);
+    float rms_error = __builtin_sqrtf(error_sum[axis] / sample_count[axis]);
 
     if (rms_error < best_rms[axis])
     {
@@ -477,7 +477,7 @@ static inline bool pid_tune_step(uint8_t axis, float err)
     switch (tune[axis].stage)
     {
     case 0:
-      fcu.pid_gain[axis][0] = fminf(fcu.pid_gain[axis][0] + TUNE_P_INCREMENT, TUNE_P_MAX);
+      fcu.pid_gain[axis][0] = __builtin_fminf(fcu.pid_gain[axis][0] + TUNE_P_INCREMENT, TUNE_P_MAX);
       if (rms_error < TUNE_ERROR_P_GOAL || fcu.pid_gain[axis][0] >= TUNE_P_MAX)
       {
         tune[axis].stage = 1;
@@ -485,7 +485,7 @@ static inline bool pid_tune_step(uint8_t axis, float err)
       }
       break;
     case 1:
-      fcu.pid_gain[axis][2] = fminf(fcu.pid_gain[axis][2] + TUNE_D_INCREMENT, TUNE_D_MAX);
+      fcu.pid_gain[axis][2] = __builtin_fminf(fcu.pid_gain[axis][2] + TUNE_D_INCREMENT, TUNE_D_MAX);
       if (rms_error < TUNE_ERROR_D_GOAL || fcu.pid_gain[axis][2] >= TUNE_D_MAX)
       {
         tune[axis].stage = 2;
@@ -493,7 +493,7 @@ static inline bool pid_tune_step(uint8_t axis, float err)
       }
       break;
     case 2:
-      fcu.pid_gain[axis][1] = fminf(fcu.pid_gain[axis][1] + TUNE_I_INCREMENT, TUNE_I_MAX);
+      fcu.pid_gain[axis][1] = __builtin_fminf(fcu.pid_gain[axis][1] + TUNE_I_INCREMENT, TUNE_I_MAX);
       if (rms_error < TUNE_ERROR_I_GOAL || fcu.pid_gain[axis][1] >= TUNE_I_MAX)
       {
         fcu.pid_gain[axis][0] = tune[axis].best_P;
