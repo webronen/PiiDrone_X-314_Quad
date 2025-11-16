@@ -71,7 +71,7 @@
 
 ### Overview
 
-Auto-tunes PID gains in three relay-excited stages (P, D, I) using RMSE.
+Automatically estimates safe, flyable PID gains in three relay-excited stages (P, D, I) using RMSE. Provides a robust starting point for manual tuning.
 
 ### Features
 
@@ -98,7 +98,7 @@ Auto-tunes PID gains in three relay-excited stages (P, D, I) using RMSE.
 ### Performance
 
 - ~32 seconds per axis (24 relay flips, 3 stages)
-- RMS-based gain selection for flyable results
+- RMSE-based gain selection for safe, flyable starting gains
 - No zero-crossing detection dependencies
 - Conservative I gain scaling for safety
 
@@ -115,7 +115,7 @@ If tuning exceeds maximum gain limits, fallback gains are applied:
 - Unified RMSE architecture: consistent RMSE metric for all PID stages
 - Practical gains: finds minimum effective gains instead of theoretical oscillation points
 - Robust operation: no dependency on error sign or zero-crossing detection
-- Flyable results: conservative gain selection suitable for immediate flight testing
+- Flyable starting point: conservative gain selection suitable for safe initial flight, not final tuning
 - Staged approach: each PID term tuned with appropriate RMS performance metric
 
 ---
@@ -131,7 +131,7 @@ If tuning exceeds maximum gain limits, fallback gains are applied:
 
 ## Summary
 
-This system enables **safe, hands-off PID tuning** for drones, delivering reliable initial gain estimates for stable flight. While further fine-tuning **is needed** for optimal performance, the auto-tune process provides a strong starting point for agile and balanced control. The control authority budget and safety features support robust flight dynamics for the PiiDrone X-314 Quad.
+This system enables **safe, hands-off PID gain estimation** for drones, delivering reliable initial gains for stable flight. Further manual tuning is recommended for optimal performance. The auto-tune process provides a robust starting point for agile and balanced control. The control authority budget and safety features support robust flight dynamics for the PiiDrone X-314 Quad.
 
 ---
 
