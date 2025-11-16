@@ -1,7 +1,8 @@
 # Åström–Hägglund Relay Auto-Tuning (Embedded)
 
 ## Overview
-Estimates safe, flyable PID gains for roll, pitch, and yaw. Provides a starting point for manual tuning with real-time safety limits.
+
+Generates safe, flyable PID gains for roll, pitch, and yaw axes using a balanced test bench setup. Relay excitation is applied to induce controlled oscillations, allowing precise measurement of system dynamics and minimizing root mean square error (RMSE). This method provides a reliable baseline for manual tuning, with real-time safety constraints in place to maintain stable flight behavior during initial testing.
 
 ## Tuning Algorithm
 
