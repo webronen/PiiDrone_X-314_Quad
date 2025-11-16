@@ -1,7 +1,7 @@
 # Åström–Hägglund Relay Auto-Tuning (Embedded)
 
 ## Overview
-Automatically estimates safe, flyable PID gains for roll, pitch, and yaw on a 70g quadcopter (nRF MCU). Provides a robust starting point for manual tuning. Designed for real-time, embedded use with safety limits.
+Estimates safe, flyable PID gains for roll, pitch, and yaw. Provides a starting point for manual tuning with real-time safety limits.
 
 ## Tuning Algorithm
 
