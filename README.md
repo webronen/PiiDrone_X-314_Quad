@@ -95,12 +95,14 @@ Generates safe, flyable PID gains for roll, pitch, and yaw axes using a balanced
 4. Repeat for roll, pitch, and yaw axes.
 5. Ramp down thrust smoothly after tuning.
 
-### Performance
+## Results
 
-- ~32 seconds per axis (24 relay flips, 3 stages)
-- RMSE-based gain selection for safe, flyable starting gains
-- No zero-crossing detection dependencies
-- Conservative I gain scaling for safety
+- Tuning time: ~8–32 seconds per axis (depends on system response).
+- Stage progression: Advances when either the RMSE target is met or the gain reaches its maximum (whichever comes first).
+- Gains: Performance-based selection for a safe, flyable starting point.
+- Robustness: RMSE-based approach is immune to noise and zero-crossing issues.
+- Early completion: Can finish in as few as 8 relay flips if performance targets are met quickly.
+- Actual behavior: The auto-tuner completes each stage when either the RMSE goal is reached or the gain limit is hit, ensuring safe termination regardless of system response.
 
 ### Fallback Behavior
 

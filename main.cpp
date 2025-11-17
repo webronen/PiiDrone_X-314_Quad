@@ -399,11 +399,8 @@ static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s)
   return (x >= 1.0f) ? (start_time_us = 0, true) : false;
 }
 
-static inline bool pid_tune_step(uint8_t axis, float err)
+static inline bool pid_tune_step(const uint8_t axis, const float err)
 {
-  if (axis >= 3)
-    return false;
-
   static struct
   {
     uint32_t last_change, last_adj;
