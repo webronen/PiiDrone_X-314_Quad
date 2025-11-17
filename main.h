@@ -64,12 +64,12 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 #define TUNE_THRUST_MAX PID_OUT_MAX
 #define TUNE_RAMP_S 5.0f
 #define TUNE_RELAY_DEG 15.0f
+#define TUNE_RELAY_RAD (TUNE_RELAY_DEG * DEG_TO_RAD)
 #define TUNE_RELAY_HZ 0.5f
 #define TUNE_SAMPLE_HZ 4.0f
 #define TUNE_P_INCREMENT 2.0f
 #define TUNE_D_INCREMENT 1.0f
 #define TUNE_I_INCREMENT 0.01f
-#define TUNE_RELAY_RAD (TUNE_RELAY_DEG * DEG_TO_RAD)
 
 #define ENV_ALPHA 0.25f
 #define D_ALPHA 0.75f

@@ -336,6 +336,7 @@ static inline void handle_pid_tune(void)
 {
   pid_tune_stop();
   pid_state_clear();
+  memset(fcu.pid_gain, 0, sizeof(fcu.pid_gain));
 
   auto_tune.is_running = true;
 
@@ -401,69 +402,67 @@ static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s)
 
 static inline bool pid_tune_step(const uint8_t axis, const float err)
 {
-  static uint32_t last_change[3] = {0}, last_eval[3] = {0};
-  static float error_sum[3] = {0}, best_error[3] = {__FLT_MAX__}, best_gain[3] = {0};
-  static uint16_t sample_count[3] = {0}, stage[3] = {0};
-  static bool active[3] = {0};
-  static float setpoint[3] = {TUNE_RELAY_RAD, TUNE_RELAY_RAD, TUNE_RELAY_RAD};
+  static uint32_t last[3] = {0}; // Combined last_change + last_eval
+  static float sum[3] = {0}, best[3] = {__FLT_MAX__}, gain[3] = {0};
+  static uint16_t cnt[3] = {0}, stg[3] = {0};
+  static bool act[3] = {0};
+  static float sp[3] = {TUNE_RELAY_RAD}; // setpoint
 
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
   const uint32_t now = NRF_TIMER0->CC[0];
 
-  if (!active[axis])
+  if (!act[axis])
   {
-    active[axis] = true;
-    fcu.pid_setpoint[axis] = setpoint[axis];
+    act[axis] = true;
+    fcu.pid_setpoint[axis] = sp[axis];
     return false;
   }
 
-  // Relay setpoint change
-  if (now - last_change[axis] >= HZ_TO_US(TUNE_RELAY_HZ))
+  // Relay at 2Hz
+  if (now - last[axis] >= HZ_TO_US(TUNE_RELAY_HZ))
   {
-    setpoint[axis] = -setpoint[axis];
-    fcu.pid_setpoint[axis] = setpoint[axis];
-    last_change[axis] = now;
+    sp[axis] = -sp[axis];
+    fcu.pid_setpoint[axis] = sp[axis];
+    last[axis] = now;
   }
 
-  // Accumulate squared error
-  error_sum[axis] += err * err;
-  sample_count[axis]++;
+  // RMSE accumulation
+  sum[axis] += err * err;
+  cnt[axis]++;
 
-  if (now - last_eval[axis] >= HZ_TO_US(TUNE_SAMPLE_HZ))
+  // Evaluation at 4Hz
+  if (now - last[axis] >= HZ_TO_US(TUNE_SAMPLE_HZ))
   {
-    const float rms = sqrtf(error_sum[axis] / sample_count[axis]);
-    const uint8_t idx[] = {0, 2, 1}; // P, D, I
-    const float inc[] = {TUNE_P_INCREMENT, TUNE_D_INCREMENT, TUNE_I_INCREMENT};
+    const float rms = __builtin_sqrtf(sum[axis] / cnt[axis]);
+    const uint8_t i = (uint8_t[]){0, 2, 1}[stg[axis]]; // P, D, I indices
+    const float inc = (float[]){TUNE_P_INCREMENT, TUNE_D_INCREMENT, TUNE_I_INCREMENT}[stg[axis]];
 
-    const uint8_t i = idx[stage[axis]];
-
-    // Check for best gain
-    if (rms < best_error[axis])
+    // Track best gain
+    if (rms < best[axis])
     {
-      best_error[axis] = rms;
-      best_gain[axis] = fcu.pid_gain[axis][i];
+      best[axis] = rms;
+      gain[axis] = fcu.pid_gain[axis][i];
     }
 
-    // Increase gain
-    fcu.pid_gain[axis][i] += inc[stage[axis]];
-    
-    // Check for error increase to move to next stage
-    if (rms > best_error[axis] * 1.2f)
-    {
-      fcu.pid_gain[axis][i] = best_gain[axis];
+    fcu.pid_gain[axis][i] += inc;
 
-      if (stage[axis]++ >= 2)
+    // Stop when error increases 20%
+    if (rms > best[axis] * 1.2f)
+    {
+      fcu.pid_gain[axis][i] = gain[axis];
+
+      if (stg[axis]++ >= 2)
       {
         fcu.pid_setpoint[axis] = 0;
-        active[axis] = false;
+        act[axis] = false;
         return true;
       }
-      best_error[axis] = __FLT_MAX__;
+      best[axis] = __FLT_MAX__;
     }
 
-    error_sum[axis] = 0;
-    sample_count[axis] = 0;
-    last_eval[axis] = now;
+    sum[axis] = 0;
+    cnt[axis] = 0;
+    last[axis] = now;
   }
 
   return false;
