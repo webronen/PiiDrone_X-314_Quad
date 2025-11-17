@@ -336,7 +336,6 @@ static inline void handle_pid_tune(void)
 {
   pid_tune_stop();
   pid_state_clear();
-  memset(fcu.pid_gain, 0, sizeof(fcu.pid_gain));
 
   auto_tune.is_running = true;
 
@@ -402,11 +401,14 @@ static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s)
 
 static inline bool pid_tune_step(const uint8_t axis, const float err)
 {
-  static uint32_t last[3] = {0}; // Combined last_change + last_eval
+  static uint32_t last[3] = {0};
   static float sum[3] = {0}, best[3] = {__FLT_MAX__}, gain[3] = {0};
   static uint16_t cnt[3] = {0}, stg[3] = {0};
   static bool act[3] = {0};
-  static float sp[3] = {TUNE_RELAY_RAD}; // setpoint
+  static float sp[3] = {TUNE_RELAY_RAD};
+
+  static const uint8_t idx[] = {0, 2, 1}; // P, D, I indices
+  static const float inc[] = {TUNE_P_INCREMENT, TUNE_D_INCREMENT, TUNE_I_INCREMENT};
 
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
   const uint32_t now = NRF_TIMER0->CC[0];
@@ -433,9 +435,9 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
   // Evaluation at 4Hz
   if (now - last[axis] >= HZ_TO_US(TUNE_SAMPLE_HZ))
   {
-    const float rms = __builtin_sqrtf(sum[axis] / cnt[axis]);
-    const uint8_t i = (uint8_t[]){0, 2, 1}[stg[axis]]; // P, D, I indices
-    const float inc = (float[]){TUNE_P_INCREMENT, TUNE_D_INCREMENT, TUNE_I_INCREMENT}[stg[axis]];
+    const float rms = sqrtf(sum[axis] / cnt[axis]);
+    const uint8_t i = idx[stg[axis]];
+    const float increment = inc[stg[axis]];
 
     // Track best gain
     if (rms < best[axis])
@@ -444,7 +446,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
       gain[axis] = fcu.pid_gain[axis][i];
     }
 
-    fcu.pid_gain[axis][i] += inc;
+    fcu.pid_gain[axis][i] += increment;
 
     // Stop when error increases 20%
     if (rms > best[axis] * 1.2f)
