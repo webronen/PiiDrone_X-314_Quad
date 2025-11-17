@@ -84,15 +84,16 @@ TrueMin RMSE Relay Autotune for roll, pitch, and yaw using a balanced test bench
 
 ### Tuning Process
 
-1. Start from zero gains
-2. For each axis, tune in 3 stages (P, D, I):
+1. Ramp up thrust to hover
+2. Start from zero gains
+3. For each axis, tune in 3 stages (P, D, I):
    - Increment gain in constant steps (see code)
    - At each gain, evaluate RMSE every 0.05s (20Hz)
    - Track the absolute minimum RMSE and best gain
    - Stop the stage when RMSE increases by 20% after the minimum
    - Set gain to the best (minimum RMSE) found
-3. Repeat for roll, pitch, and yaw
-4. Ramp down thrust after tuning
+4. Repeat for roll, pitch, and yaw
+5. Ramp down thrust after tuning
 
 ### RMS Error Metric
 
