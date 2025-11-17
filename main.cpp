@@ -382,10 +382,9 @@ static inline void handle_thrust_update(void)
 static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s)
 {
   static uint32_t start_time_us = 0;
-  NRF_TIMER0->TASKS_CAPTURE[0] = 1;
 
-  if (!start_time_us)
-    start_time_us = NRF_TIMER0->CC[0];
+  NRF_TIMER0->TASKS_CAPTURE[0] = 1;
+  start_time_us = !start_time_us ? NRF_TIMER0->CC[0] : start_time_us;
 
   const uint32_t elapsed_time_us = (NRF_TIMER0->CC[0] - start_time_us);
   float x = (float)elapsed_time_us / (in_time_s * 1e6f);
