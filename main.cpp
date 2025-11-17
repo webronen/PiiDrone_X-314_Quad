@@ -174,7 +174,7 @@ static inline void task_fcu_update(void)
 
     if (pid_tune_step(auto_tune.tuning_axis, current_error))
     {
-      if (++auto_tune.tuning_axis == 1)
+      if (++auto_tune.tuning_axis == 2)
       {
         auto_tune.is_running = false;
       }
