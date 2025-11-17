@@ -424,7 +424,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     last_change[axis] = now;
   }
 
-  // Pure RMSE - no MAE
+  // Pure RMSE
   error_sum[axis] += err * err;
   sample_count[axis]++;
 
