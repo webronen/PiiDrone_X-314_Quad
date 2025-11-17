@@ -70,38 +70,36 @@
 
 ### Overview
 
-Generates safe, flyable PID gains for roll, pitch, and yaw axes using a balanced test bench setup. Relay excitation is applied to induce controlled oscillations, allowing precise measurement of system dynamics and minimizing root mean square error (RMSE). This method provides a reliable baseline for manual tuning, with real-time safety constraints in place to maintain stable flight behavior during initial testing.
+Automatically finds safe, flyable PID gains for roll, pitch, and yaw using a balanced test bench. Relay excitation creates controlled oscillations, enabling precise measurement of system response and minimizing RMSE. The result is a reliable starting point for manual tuning, with real-time safety limits for stable initial tests.
 
 ### Features
 
-- Smoothstep thrust ramp for gentle, battery-friendly motor activation
-- Three-stage PID tuning with relay excitation and staged gain adjustment
+- Smoothstep thrust ramp for gentle motor activation
+- Three-stage PID tuning with relay excitation
 - Unified RMSE metric for all stages
-- Best-value tracking: each stage keeps the gain with the lowest RMSE
-- Automatic stage transitions when RMSE goals are met or gain limits are reached
+- Tracks best gain (lowest RMSE) per stage
+- Automatic stage transitions: ends when RMSE target or gain limit is reached
 - Independent tuning for roll, pitch, and yaw
-- Safety-constrained gain limits and robust fallback to safe defaults
-- Timer overflow protection and static state reset
+- Safety-constrained gain limits and fallback to safe defaults
 
 ### Tuning Process
 
-1. Ramp up thrust smoothly to hover.
-2. Tune each axis in three stages using relay excitation:
-  - **P stage:** 0 → 15.0 (step 0.5), advance if RMSE < 0.12 (~6.9°) or max.
-  - **D stage:** 0 → 3.0 (step 0.2), advance if RMSE < 0.08 (~4.6°) or max.
-  - **I stage:** 0 → 2.0 (step 0.1), finish if RMSE < 0.06 (~3.4°) or max.
-3. At the end of each stage, set the gain to the best value found (lowest RMSE).
-4. Repeat for roll, pitch, and yaw axes.
-5. Ramp down thrust smoothly after tuning.
+1. Ramp up thrust to hover
+2. Tune each axis in 3 stages using relay excitation:
+   - **P:** 0 → 15.0 (step 0.5), next if RMSE < 0.12 (~6.9°) or max
+   - **D:** 0 → 3.0 (step 0.2), next if RMSE < 0.08 (~4.6°) or max
+   - **I:** 0 → 2.0 (step 0.1), done if RMSE < 0.06 (~3.4°) or max
+3. At each stage, set gain to best (lowest RMSE)
+4. Repeat for roll, pitch, and yaw
+5. Ramp down thrust after tuning
 
 ## Results
 
-- Tuning time: ~8–32 seconds per axis (depends on system response).
-- Stage progression: Ends when RMSE target or gain limit is reached.
-- Gains: Performance-based selection for a safe, flyable starting point.
-- Robustness: RMSE-based approach is immune to noise and zero-crossing issues.
-- Early completion: Can finish in as few as 8 relay flips if performance targets are met quickly.
-- Actual: Each stage ends when RMSE goal or gain limit is reached.
+- Tuning time: ~8–32 seconds per axis (depends on system response)
+- Stage ends when RMSE target or gain limit is reached
+- Gains: Safe, flyable starting point
+- Robust: Immune to noise and zero-crossing issues
+- Can finish in as few as 8 relay flips if targets are met quickly
 
 ### Fallback Behavior
 
