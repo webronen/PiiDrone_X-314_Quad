@@ -50,7 +50,6 @@ Ultra-light, agile, and stable. 70g including LiPo.
 
 - Altitude budget: 90g (450 units = hover + 20g margin)
 - Stabilization budget: 70g (350 units = 100% mass)
-- Mixing margin: 350 units (MOTOR_MAX – THRUST_MAX)
 
 ### Performance & Safety
 
@@ -72,7 +71,7 @@ Inspired by the Åström–Hägglund relay auto-tuning method.
 
 ### Overview
 
-TrueMin RMSE Relay Autotune for roll, pitch, and yaw on a balanced test bench. Uses the Åström–Hägglund relay method with 2Hz relay excitation for system identification. Tracks absolute minimum RMSE for each stage. Stops tuning when RMSE increases by 20% after the minimum. Gain growth is limited only by the RMSE-based stopping rule; no hard-coded maximum.
+TrueMin RMSE Relay Autotune for roll, pitch, and yaw on a balanced test bench. Uses the Åström–Hägglund relay method with 2Hz relay excitation for system identification. Tracks absolute minimum RMSE for each stage. Stops tuning when RMSE increases by 20% after the minimum. Gain growth is limited only by the RMSE-based stopping rule.
 
 ### Features
 
@@ -138,10 +137,9 @@ Enables safe, hands-off PID gain estimation for drones. Delivers reliable initia
 ---
 
 ## References
-- [Relay Auto-Tuning (Åström–Hägglund) – Wikipedia](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller#Relay_(%C3%85str%C3%B6m%E2%80%93H%C3%A4gglund)_method)
-- [PID Controller – Wikipedia](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller)
-- [Root Mean Square Deviation (RMSE) – Wikipedia](https://en.wikipedia.org/wiki/Root_mean_square_deviation)
-- [Smoothstep – Wikipedia](https://en.wikipedia.org/wiki/Smoothstep)
-- [Quaternion – Wikipedia](https://en.wikipedia.org/wiki/Quaternion)
+- [PID controller](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller)
+- [Åström–Hägglund relay method](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller#Relay_(%C3%85str%C3%B6m%E2%80%93H%C3%A4gglund)_method)
+- [Smoothstep](https://en.wikipedia.org/wiki/Smoothstep)
+- [Root mean square deviation (RMSE)](https://en.wikipedia.org/wiki/Root_mean_square_deviation)
 
 ---
