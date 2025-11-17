@@ -417,7 +417,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     return false;
   }
 
-  // Relay at 2Hz
+  // Relay setpoint change
   if (now - last_change[axis] >= HZ_TO_US(TUNE_RELAY_HZ))
   {
     setpoint[axis] = -setpoint[axis];
@@ -425,7 +425,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     last_change[axis] = now;
   }
 
-  // Pure RMSE
+  // Accumulate squared error
   error_sum[axis] += err * err;
   sample_count[axis]++;
 
@@ -437,17 +437,17 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
 
     const uint8_t i = idx[stage[axis]];
 
-    // Track best RMSE
+    // Check for best gain
     if (rms < best_error[axis])
     {
       best_error[axis] = rms;
       best_gain[axis] = fcu.pid_gain[axis][i];
     }
 
-    // Always increment
+    // Increase gain
     fcu.pid_gain[axis][i] += inc[stage[axis]];
-
-    // Stop when RMSE starts getting worse (20% worse than best)
+    
+    // Check for error increase to move to next stage
     if (rms > best_error[axis] * 1.2f)
     {
       fcu.pid_gain[axis][i] = best_gain[axis];
