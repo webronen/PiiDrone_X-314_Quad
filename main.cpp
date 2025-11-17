@@ -405,7 +405,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
   static float error_sum[3] = {0}, best_error[3] = {__FLT_MAX__}, best_gain[3] = {0};
   static uint16_t sample_count[3] = {0}, stage[3] = {0};
   static bool active[3] = {0};
-  static float setpoint[3] = {TUNE_RELAY_RAD};
+  static float setpoint[3] = {TUNE_RELAY_RAD, TUNE_RELAY_RAD, TUNE_RELAY_RAD};
 
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
   const uint32_t now = NRF_TIMER0->CC[0];
@@ -418,7 +418,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
   }
 
   // Relay at 2Hz
-  if (now - last_change[axis] >= 250000)
+  if (now - last_change[axis] >= HZ_TO_US(TUNE_RELAY_HZ))
   {
     setpoint[axis] = -setpoint[axis];
     fcu.pid_setpoint[axis] = setpoint[axis];
@@ -429,12 +429,11 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
   error_sum[axis] += err * err;
   sample_count[axis]++;
 
-  if (now - last_eval[axis] >= 50000)
+  if (now - last_eval[axis] >= HZ_TO_US(TUNE_SAMPLE_HZ))
   {
     const float rms = sqrtf(error_sum[axis] / sample_count[axis]);
     const uint8_t idx[] = {0, 2, 1}; // P, D, I
-    const float goals[] = {TUNE_P_GOAL, TUNE_D_GOAL, TUNE_I_GOAL};
-    const float inc[] = {TUNE_P_INC, TUNE_D_INC, TUNE_I_INC};
+    const float inc[] = {TUNE_P_INCREMENT, TUNE_D_INCREMENT, TUNE_I_INCREMENT};
 
     const uint8_t i = idx[stage[axis]];
 
@@ -448,7 +447,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     // Always increment
     fcu.pid_gain[axis][i] += inc[stage[axis]];
 
-    // Stop when RMSE starts getting worse
+    // Stop when RMSE starts getting worse (20% worse than best)
     if (rms > best_error[axis] * 1.2f)
     {
       fcu.pid_gain[axis][i] = best_gain[axis];
