@@ -93,6 +93,14 @@ Automatically finds safe, flyable PID gains for roll, pitch, and yaw using a bal
 4. Repeat for roll, pitch, and yaw
 5. Ramp down thrust after tuning
 
+### RMS Error Metric
+
+All stages use:
+
+$RMSE = \sqrt{\frac{1}{N} \sum_{i=1}^N (e_i)^2}$
+
+where $e_i$ is the error at sample $i$, $N$ is the sample count.
+
 ## Results
 
 - Tuning time: ~8–32 seconds per axis (depends on system response)
