@@ -435,7 +435,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
   // Evaluation at 4Hz
   if (now - last[axis] >= HZ_TO_US(TUNE_SAMPLE_HZ))
   {
-    const float rms = sqrtf(sum[axis] / cnt[axis]);
+    const float rms = __builtin_sqrtf(sum[axis] / cnt[axis]);
     const uint8_t i = idx[stg[axis]];
     const float increment = inc[stg[axis]];
 
