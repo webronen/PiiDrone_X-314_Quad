@@ -1,6 +1,6 @@
 # PiiDrone X-314 Quad
 
-Ultra-light, agile, and stable. 70g including LiPo.
+Ultra-light, agile, stable. 70g including LiPo.
 
 ---
 
@@ -26,14 +26,14 @@ Ultra-light, agile, and stable. 70g including LiPo.
 
 ## Setpoint Response Table
 
-| Axis  | Setpoint Change | Sign | Response         |
-|-------|-----------------|------|------------------|
-| Roll  | Increase        | +    | Rolls right      |
-| Roll  | Decrease        | –    | Rolls left       |
-| Pitch | Increase        | +    | Pitches forward  |
-| Pitch | Decrease        | –    | Pitches backward |
-| Yaw   | Increase        | +    | Yaws right (CW)  |
-| Yaw   | Decrease        | –    | Yaws left (CCW)  |
+| Axis  | Setpoint Change | Sign | Response        |
+|-------|-----------------|------|-----------------|
+| Roll  | Increase        | +    | Roll right      |
+| Roll  | Decrease        | –    | Roll left       |
+| Pitch | Increase        | +    | Pitch forward   |
+| Pitch | Decrease        | –    | Pitch backward  |
+| Yaw   | Increase        | +    | Yaw right (CW)  |
+| Yaw   | Decrease        | –    | Yaw left (CCW)  |
 
 ---
 
@@ -53,7 +53,7 @@ Ultra-light, agile, and stable. 70g including LiPo.
 
 ### Performance & Safety
 
-- 1.0g lateral acceleration for strong rejection
+- 1.0g lateral acceleration (strong rejection)
 - PID output: ±116.67 units/axis (prevents saturation)
 - Integral clamp: ±58.33 units (50% of PID limit)
 
@@ -61,7 +61,7 @@ Ultra-light, agile, and stable. 70g including LiPo.
 
 - Mass-equivalent stabilization budget (exceeds typical)
 - Conservative thrust allocation (robust in turbulence)
-- Balanced control (agility without saturation)
+- Balanced control (agility, no saturation)
 
 ---
 
@@ -71,15 +71,15 @@ Inspired by the Åström–Hägglund relay auto-tuning method.
 
 ### Overview
 
-TrueMin RMSE Relay Autotune for roll, pitch, and yaw on a balanced test bench. Uses the Åström–Hägglund relay method with 2Hz relay excitation for system identification. Tracks absolute minimum RMSE for each stage. Stops tuning when RMSE increases by 20% after the minimum. Gain growth is limited only by the RMSE-based stopping rule.
+Auto-tunes roll, pitch, and yaw using 2Hz relay excitation and pure RMSE. Finds the true minimum for each stage and stops when RMSE rises by 20%. No hard-coded gain limits.
 
 ### Features
 
 - Smooth thrust ramp to hover
 - 3-stage tuning (P → D → I) with 2Hz relay (square wave setpoint)
-- Tracks absolute minimum RMSE per stage
-- Always selects the true minimum (best gain tracking)
-- Stops when RMSE increases by 20% after minimum
+- Track absolute minimum RMSE per stage
+- Select true minimum (best gain tracking)
+- Stop when RMSE increases by 20% after minimum
 - Constant gain increments (see code)
 - 20Hz RMSE evaluation (fast, robust)
 
@@ -88,12 +88,12 @@ TrueMin RMSE Relay Autotune for roll, pitch, and yaw on a balanced test bench. U
 1. Ramp up thrust to hover (smoothstep)
 2. Zero all gains
 3. For each axis, tune in 3 stages (P, D, I):
-   - Relay: setpoint alternates at 2Hz (square wave)
-   - At each gain, accumulate squared error
-   - Every 0.05s (20Hz): compute RMSE, increment gain
-   - Track absolute minimum RMSE and best gain
-   - Stop when RMSE increases by 20% after minimum
-   - Set gain to best (minimum RMSE)
+  - Alternate setpoint at 2Hz (relay, square wave)
+  - Accumulate squared error at each gain
+  - Every 0.05s (20Hz): compute RMSE, increment gain
+  - Track absolute minimum RMSE and best gain
+  - Stop when RMSE increases by 20% after minimum
+  - Set gain to best (minimum RMSE)
 4. Repeat for roll, pitch, yaw
 5. Ramp down thrust to zero (smoothstep)
 
@@ -117,16 +117,16 @@ where $e_i$ is the error at sample $i$, $N$ is the sample count.
 
 ## Safety & Robustness
 
-- All PID states and setpoints reset when FCU inactive
-- Motor outputs always constrained to physical limits
-- Failsafe/landing logic on packet timeout or power warning
-- Auto-tune aborts and state clears if thrust input changes during ramp/tune
+- Reset all PID states and setpoints when FCU inactive
+- Constrain motor outputs to physical limits
+- Activate failsafe/landing on packet timeout or power warning
+- Abort auto-tune and clear state if thrust input changes during ramp/tune
 
 ---
 
 ## Summary
 
-Enables safe, hands-off PID gain estimation for drones. Delivers reliable initial gains for stable flight. Further manual tuning is recommended for best performance. Auto-tune provides a robust starting point for agile, balanced control. Control authority budget and safety features support robust flight dynamics for the PiiDrone X-314 Quad.
+Enable safe, hands-off PID tuning for drones. Deliver reliable initial gains for stable flight. Recommend further manual tuning for best performance. Provide robust starting point for agile, balanced control. Control authority budget and safety features support robust flight dynamics for the PiiDrone X-314 Quad.
 
 ---
 
