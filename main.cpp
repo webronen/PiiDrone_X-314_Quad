@@ -382,12 +382,12 @@ static inline void handle_thrust_update(void)
 static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s)
 {
   static uint32_t start_time_us = 0;
-  NRF_TIMER0->TASKS_CAPTURE[1] = 1;
+  NRF_TIMER0->TASKS_CAPTURE[0] = 1;
 
   if (!start_time_us)
-    start_time_us = NRF_TIMER0->CC[1];
+    start_time_us = NRF_TIMER0->CC[0];
 
-  const uint32_t elapsed_time_us = (NRF_TIMER0->CC[1] - start_time_us);
+  const uint32_t elapsed_time_us = (NRF_TIMER0->CC[0] - start_time_us);
   float x = (float)elapsed_time_us / (in_time_s * 1e6f);
   x = constrain(x, 0.0f, 1.0f);
 
@@ -410,11 +410,12 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
   } tune[3] = {0};
 
   static uint32_t last_time[3] = {0};
-  static float error_sum[3] = {0}, best_rms[3] = {__FLT_MAX__, __FLT_MAX__, __FLT_MAX__};
+  static float error_sum[3] = {0};
+  static float best_rms[3] = {__FLT_MAX__, __FLT_MAX__, __FLT_MAX__};
   static uint16_t sample_count[3] = {0};
 
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
-  uint32_t now = NRF_TIMER0->CC[0];
+  const uint32_t now = NRF_TIMER0->CC[0];
 
   if (!tune[axis].active)
   {
@@ -439,7 +440,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     return false;
   }
 
-  // Relay excitation
+  // Relay control (Async)
   if (now >= tune[axis].last_change)
   {
     tune[axis].setpoint = -tune[axis].setpoint;
@@ -447,12 +448,14 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     tune[axis].last_change = now + HZ_TO_US(PID_AUTOTUNE_RELAY_FREQUENCY);
   }
 
-  // Square the error and accumulate for RMSE calculation
+  // Accumulate squared error
   error_sum[axis] += err * err;
   sample_count[axis]++;
 
-  if (now - last_time[axis] > HZ_TO_US(TUNE_SAMPLE_TIME))
+  // Tuning step (Sync)
+  if (now > last_time[axis])
   {
+    last_time[axis] += HZ_TO_US(TUNE_SAMPLE_TIME);
     // Calculate RMSE for this tuning step
     float rms_error = __builtin_sqrtf(error_sum[axis] / sample_count[axis]);
 
