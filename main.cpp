@@ -382,7 +382,6 @@ static inline void handle_thrust_update(void)
 static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s)
 {
   static uint32_t start_time_us = 0;
-
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
 
   if (!start_time_us)
@@ -441,7 +440,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     return false;
   }
 
-  // Relay control (Async) - runs every loop iteration
+  // Relay control (Async)
   if (now >= tune[axis].last_change)
   {
     tune[axis].setpoint = -tune[axis].setpoint;
@@ -449,20 +448,16 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     tune[axis].last_change = now + HZ_TO_US(TUNE_RELAY_FREQUENCY);
   }
 
-  // Accumulate squared error - runs every loop iteration
+  // Accumulate squared error
   error_sum[axis] += err * err;
   sample_count[axis]++;
 
-  // Tuning step (Sync) - runs only at sample frequency
-  if (now >= last_time[axis])
+  // Tuning step (Sync)
+  if (now - last_time[axis] >= HZ_TO_US(TUNE_SAMPLE_FREQUENCY))
   {
-    // Schedule next sample time FIRST
-    last_time[axis] += HZ_TO_US(TUNE_SAMPLE_FREQUENCY);
-
-    // Calculate RMSE for this tuning step using accumulated samples
+    // Calculate RMSE for this tuning step
     float rms_error = __builtin_sqrtf(error_sum[axis] / sample_count[axis]);
 
-    // Update best gains if RMSE improved
     if (rms_error < best_rms[axis])
     {
       best_rms[axis] = rms_error;
@@ -480,7 +475,6 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
       }
     }
 
-    // Stage-specific tuning logic
     switch (tune[axis].stage)
     {
     case 0:
@@ -503,7 +497,6 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
       fcu.pid_gain[axis][1] = __builtin_fminf(fcu.pid_gain[axis][1] + TUNE_I_INCREMENT, TUNE_I_MAX);
       if (rms_error < TUNE_ERROR_I_GOAL || fcu.pid_gain[axis][1] >= TUNE_I_MAX)
       {
-        // Tuning complete - apply best found gains
         fcu.pid_gain[axis][0] = tune[axis].best_P;
         fcu.pid_gain[axis][1] = tune[axis].best_I;
         fcu.pid_gain[axis][2] = tune[axis].best_D;
@@ -514,9 +507,10 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
       break;
     }
 
-    // Reset accumulators for next sample period
+    // Reset accumulators and update timing
     error_sum[axis] = 0.0f;
     sample_count[axis] = 0;
+    last_time[axis] = now;
   }
 
   return false;

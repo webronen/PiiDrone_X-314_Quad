@@ -65,7 +65,7 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 #define TUNE_RAMP_S 5.0f            // seconds to full thrust ramp
 #define TUNE_RELAY_FREQUENCY 0.5f   // 0.5 Hz = 2-second period relay oscillation
 #define TUNE_AMPLITUDE_DEG 25.0f    // 25° excitation amplitude (conservative)
-#define TUNE_SAMPLE_FREQUENCY 2.0f  // 2 Hz = 500ms sampling (4 samples per half-cycle)
+#define TUNE_SAMPLE_FREQUENCY 2.0f  // 2 Hz = 500ms sampling (2 samples per half-cycle)
 #define TUNE_P_MAX 8.0f             // Maximum proportional gain
 #define TUNE_D_MAX 1.5f             // Maximum derivative gain (prevents noise)
 #define TUNE_I_MAX 2.0f             // Maximum integral gain
