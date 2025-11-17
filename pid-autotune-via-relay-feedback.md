@@ -19,7 +19,6 @@ Generates safe, flyable PID gains for roll, pitch, and yaw axes using a balanced
 
 ### RMS Error Metric
 
-
 All stages use the same RMSE:
 
 $RMSE = \sqrt{\frac{1}{N} \sum_{i=1}^N (e_i)^2}$
@@ -33,7 +32,6 @@ where $e_i$ is the error at sample $i$, $N$ is the sample count.
 - Gains are bounded; fallback to zero if tuning fails or limits are hit.
 - Each axis is tuned independently.
 - No dynamic memory allocation.
-
 
 ## Results
 
