@@ -398,6 +398,7 @@ static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s)
   fcu.thrust = (uint16_t)constrain(y * __builtin_fabsf(to_thrust), THRUST_MIN, THRUST_MAX);
   return (x >= 1.0f) ? (start_time_us = 0, true) : false;
 }
+
 static inline bool pid_tune_step(const uint8_t axis, const float err)
 {
   static uint32_t last_change[3] = {0}, last_eval[3] = {0};

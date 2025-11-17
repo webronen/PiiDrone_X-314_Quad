@@ -1,21 +1,21 @@
 # PiiDrone X-314 Quad
 
-**Ultra-light, agile, and stable powerhouse (70g including LiPo)**
+Ultra-light, agile, and stable. 70g including LiPo.
 
 ---
 
 ## Motor Layout (X Configuration)
 
 ```
-               Rear
-                 |
-           | --- | --- |
-           | M4  | M3  |
-           | --  | --  |
-           | M2  | M1  |
-           | --  | --  |
-                 |
-               Front
+    Rear
+      |
+ |----|----|
+ | M4 | M3 |
+ |----|----|
+ | M2 | M1 |
+ |----|----|
+      |
+    Front
 ```
 - **M1:** Front-right (CCW)
 - **M2:** Front-left (CW)
@@ -26,14 +26,14 @@
 
 ## Setpoint Response Table
 
-| Axis  | Setpoint Change | Sign | Expected Drone Response |
-| ----- | --------------- | ---- | ----------------------- |
-| Roll  | Increase        | +    | Rolls right             |
-| Roll  | Decrease        | –    | Rolls left              |
-| Pitch | Increase        | +    | Pitches forward         |
-| Pitch | Decrease        | –    | Pitches backward        |
-| Yaw   | Increase        | +    | Yaws right (CW)         |
-| Yaw   | Decrease        | –    | Yaws left (CCW)         |
+| Axis  | Setpoint Change | Sign | Response         |
+|-------|-----------------|------|------------------|
+| Roll  | Increase        | +    | Rolls right      |
+| Roll  | Decrease        | –    | Rolls left       |
+| Pitch | Increase        | +    | Pitches forward  |
+| Pitch | Decrease        | –    | Pitches backward |
+| Yaw   | Increase        | +    | Yaws right (CW)  |
+| Yaw   | Decrease        | –    | Yaws left (CCW)  |
 
 ---
 
@@ -41,62 +41,62 @@
 
 ### Physical Capabilities
 
-- **Total thrust capacity:** 160g (800 units) across 4 motors  
-- **Drone mass:** 70g → Hover thrust: 70g (350 units)  
-- **Maximum lateral acceleration:** 1.0g available  
-- **Thrust-to-weight ratio:** 2.28:1
+- Total thrust: 160g (800 units) across 4 motors
+- Mass: 70g (hover thrust: 350 units)
+- Max lateral acceleration: 1.0g
+- Thrust-to-weight: 2.28:1
 
 ### Authority Allocation
 
-- **Altitude control budget:** 90g total (450 units = hover + 20g margin)  
-- **Stabilization control budget:** 70g (350 units = 100% of drone mass)  
-- **Mixing margin:** 350 units (MOTOR_MAX – THRUST_MAX = 800 – 450)
+- Altitude budget: 90g (450 units = hover + 20g margin)
+- Stabilization budget: 70g (350 units = 100% mass)
+- Mixing margin: 350 units (MOTOR_MAX – THRUST_MAX)
 
 ### Performance & Safety
 
-- **1.0g lateral acceleration** enables aggressive disturbance rejection  
-- **PID output limits:** ±116.67 units/axis ensures worst-case (450 + 3×117 = 801) remains within motor saturation  
-- **Integral clamp:** ±58.33 units (50% of PID limit) prevents windup from consuming control authority
+- 1.0g lateral acceleration for strong rejection
+- PID output: ±116.67 units/axis (prevents saturation)
+- Integral clamp: ±58.33 units (50% of PID limit)
 
 ### Design Advantage
 
-- **Mass-equivalent stabilization budget** exceeds typical commercial allocations  
-- **Conservative thrust allocation** ensures robust performance in turbulence  
-- **Balanced control strategy** maximizes agility without risking motor saturation
+- Mass-equivalent stabilization budget (exceeds typical)
+- Conservative thrust allocation (robust in turbulence)
+- Balanced control (agility without saturation)
 
 ---
 
 ## TrueMin RMSE Relay Autotune
 
-Inspired by the Åström–Hägglund Relay Auto-Tuning Method
+Inspired by the Åström–Hägglund relay auto-tuning method.
 
 ### Overview
 
-TrueMin RMSE Relay Autotune for roll, pitch, and yaw using a balanced test bench. Based on the Åström–Hägglund relay method, with 2Hz relay excitation to induce controlled oscillations for system identification. Pure RMSE metric tracks the absolute minimum error for each stage. Tuning stops automatically when performance degrades by 20% after the minimum. All gains are safety-bounded.
+TrueMin RMSE Relay Autotune for roll, pitch, and yaw on a balanced test bench. Uses the Åström–Hägglund relay method with 2Hz relay excitation for system identification. Tracks absolute minimum RMSE for each stage. Stops tuning when RMSE increases by 20% after the minimum. Gain growth is limited only by the RMSE-based stopping rule; no hard-coded maximum.
 
 ### Features
 
-- Smooth thrust ramp to hover before tuning
-- 3-stage tuning (P → D → I) with 2Hz relay excitation (square wave setpoint)
-- Pure RMSE metric: tracks absolute minimum error for each stage
-- Best gain tracking: always selects the true minimum, not just "good enough"
-- Smart stopping: stops when RMSE increases by 20% after the minimum
-- Constant gain increments per stage (see code for values)
-- 20Hz RMSE evaluation for fast, robust detection
+- Smooth thrust ramp to hover
+- 3-stage tuning (P → D → I) with 2Hz relay (square wave setpoint)
+- Tracks absolute minimum RMSE per stage
+- Always selects the true minimum (best gain tracking)
+- Stops when RMSE increases by 20% after minimum
+- Constant gain increments (see code)
+- 20Hz RMSE evaluation (fast, robust)
 
 ### Tuning Process
 
-1. Ramp up thrust to hover (smoothstep ramp)
-2. Start from zero gains
+1. Ramp up thrust to hover (smoothstep)
+2. Zero all gains
 3. For each axis, tune in 3 stages (P, D, I):
-  - Relay excitation: setpoint alternates at 2Hz (square wave)
-  - At each gain, accumulate squared error for RMSE
-  - Every 0.05s (20Hz), compute RMSE and increment gain by constant step
-  - Track the absolute minimum RMSE and best gain
-  - Stop the stage when RMSE increases by 20% after the minimum
-  - Set gain to the best (minimum RMSE) found
-4. Repeat for roll, pitch, and yaw
-5. Ramp down thrust after tuning
+   - Relay: setpoint alternates at 2Hz (square wave)
+   - At each gain, accumulate squared error
+   - Every 0.05s (20Hz): compute RMSE, increment gain
+   - Track absolute minimum RMSE and best gain
+   - Stop when RMSE increases by 20% after minimum
+   - Set gain to best (minimum RMSE)
+4. Repeat for roll, pitch, yaw
+5. Ramp down thrust to zero (smoothstep)
 
 ### RMS Error Metric
 
@@ -108,26 +108,26 @@ where $e_i$ is the error at sample $i$, $N$ is the sample count.
 
 ## Results
 
-- Tuning time: ~8–32 seconds per axis (depends on system response)
-- Each stage stops when RMSE increases by 20% after the minimum
-- Gains: Optimal, safe, and flyable
-- Finds true minimum, not just first acceptable gain
+- Tuning: ~8–32s per axis (depends on response)
+- Each stage stops when RMSE increases by 20% after minimum
+- Gains: optimal, safe, flyable
+- Finds true minimum, not just first acceptable
 - Minimal code, robust to non-monotonic response
 
 ---
 
 ## Safety & Robustness
 
-- All PID states and setpoints are reset when the FCU is inactive
-- Final motor outputs are always constrained to physical limits
-- Failsafe and landing logic activate on packet timeout or power warning
-- Auto-tune is aborted and state cleared if thrust input is modified during ramp or tuning
+- All PID states and setpoints reset when FCU inactive
+- Motor outputs always constrained to physical limits
+- Failsafe/landing logic on packet timeout or power warning
+- Auto-tune aborts and state clears if thrust input changes during ramp/tune
 
 ---
 
 ## Summary
 
-This system enables **safe, hands-off PID gain estimation** for drones, delivering reliable initial gains for stable flight. Further manual tuning is recommended for optimal performance. The auto-tune process provides a robust starting point for agile and balanced control. The control authority budget and safety features support robust flight dynamics for the PiiDrone X-314 Quad.
+Enables safe, hands-off PID gain estimation for drones. Delivers reliable initial gains for stable flight. Further manual tuning is recommended for best performance. Auto-tune provides a robust starting point for agile, balanced control. Control authority budget and safety features support robust flight dynamics for the PiiDrone X-314 Quad.
 
 ---
 
