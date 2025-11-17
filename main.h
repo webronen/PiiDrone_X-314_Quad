@@ -60,39 +60,22 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 #define PID_LOOP_HZ 211.0f
 #define PID_LOOP_PERIOD (1.0f / PID_LOOP_HZ)
 #define PID_ARRAY_SIZE 3
-#define PID_THRUST_RAMP_MAX PID_OUT_MAX
-#define PID_THRUST_RAMP_S 5.0f
 
-/* PID Auto-Tuning Parameters for 70g 4-5" Drones */
-
-// Relay excitation parameters
-#define TUNE_RELAY_FREQUENCY 0.5f // 0.5 Hz = 2-second period relay oscillation
-#define TUNE_AMPLITUDE_DEG 25.0f  // 25° excitation amplitude (conservative)
-#define TUNE_SAMPLE_TIME 4.0f     // 4 Hz = 250ms sampling (8 samples per half-cycle)
+#define TUNE_THRUST_MAX PID_OUT_MAX // maximum thrust during tuning
+#define TUNE_RAMP_S 5.0f            // seconds to full thrust ramp
+#define TUNE_RELAY_FREQUENCY 0.5f   // 0.5 Hz = 2-second period relay oscillation
+#define TUNE_AMPLITUDE_DEG 25.0f    // 25° excitation amplitude (conservative)
+#define TUNE_SAMPLE_FREQUENCY 2.0f  // 2 Hz = 500ms sampling (4 samples per half-cycle)
+#define TUNE_P_MAX 8.0f             // Maximum proportional gain
+#define TUNE_D_MAX 1.5f             // Maximum derivative gain (prevents noise)
+#define TUNE_I_MAX 2.0f             // Maximum integral gain
+#define TUNE_P_INCREMENT 0.3f       // Slow P gain growth
+#define TUNE_D_INCREMENT 0.1f       // Conservative D gain steps
+#define TUNE_I_INCREMENT 0.05f      // Very slow I gain refinement
+#define TUNE_ERROR_P_GOAL 0.15f     // P-stage target: ~8.6° RMSE
+#define TUNE_ERROR_D_GOAL 0.10f     // D-stage target: ~5.7° RMSE
+#define TUNE_ERROR_I_GOAL 0.08f     // I-stage target: ~4.6° RMSE
 #define TUNE_AMPLITUDE_RAD (TUNE_AMPLITUDE_DEG * DEG_TO_RAD)
-
-// Maximum gain limits (conservative for safety)
-#define TUNE_P_MAX 8.0f // Maximum proportional gain
-#define TUNE_D_MAX 1.5f // Maximum derivative gain (prevents noise)
-#define TUNE_I_MAX 2.0f // Maximum integral gain
-
-// Gain increment steps (slow for stability)
-#define TUNE_P_INCREMENT 0.3f  // Slow P gain growth
-#define TUNE_D_INCREMENT 0.1f  // Conservative D gain steps
-#define TUNE_I_INCREMENT 0.05f // Very slow I gain refinement
-
-// Error targets (root mean square error in radians)
-#define TUNE_ERROR_P_GOAL 0.15f // P-stage target: ~8.6° RMSE
-#define TUNE_ERROR_D_GOAL 0.10f // D-stage target: ~5.7° RMSE
-#define TUNE_ERROR_I_GOAL 0.08f // I-stage target: ~4.6° RMSE
-
-/* Expected Tuning Results:
- * 4" Builds: P=5-7, D=1.0-1.4, I=0.3-0.6
- * 5" Builds: P=4-6, D=0.8-1.2, I=0.2-0.4
- *
- * Characteristics: Smooth, predictable, noise-free tuning
- * Suitable for: Freestyle, cinematic, and beginner builds
- */
 
 #define ENV_ALPHA 0.25f
 #define D_ALPHA 0.75f
