@@ -384,7 +384,7 @@ static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s)
   static uint32_t start_time_us = 0;
 
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
-  start_time_us = !start_time_us ? NRF_TIMER0->CC[0] : start_time_us;
+  start_time_us = start_time_us ? start_time_us : NRF_TIMER0->CC[0];
 
   const uint32_t elapsed_time_us = (NRF_TIMER0->CC[0] - start_time_us);
   float x = (float)elapsed_time_us / (in_time_s * 1e6f);
@@ -419,9 +419,9 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
   if (!tune[axis].active)
   {
     tune[axis].last_adj = now;
-    tune[axis].last_change = now + HZ_TO_US(PID_AUTOTUNE_RELAY_FREQUENCY);
+    tune[axis].last_change = now + HZ_TO_US(TUNE_RELAY_FREQUENCY);
     tune[axis].stage = 0;
-    tune[axis].setpoint = PID_AUTOTUNE_AMPLITUDE_RAD;
+    tune[axis].setpoint = TUNE_AMPLITUDE_RAD;
     tune[axis].best_P = 0.0f;
     tune[axis].best_D = 0.0f;
     tune[axis].best_I = 0.0f;
@@ -444,7 +444,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
   {
     tune[axis].setpoint = -tune[axis].setpoint;
     fcu.pid_setpoint[axis] = tune[axis].setpoint;
-    tune[axis].last_change = now + HZ_TO_US(PID_AUTOTUNE_RELAY_FREQUENCY);
+    tune[axis].last_change = now + HZ_TO_US(TUNE_RELAY_FREQUENCY);
   }
 
   // Accumulate squared error
