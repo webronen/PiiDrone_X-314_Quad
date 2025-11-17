@@ -110,14 +110,6 @@ where $e_i$ is the error at sample $i$, $N$ is the sample count.
 - Finds true minimum, not just first acceptable gain
 - Minimal code, robust to non-monotonic response
 
-### Fallback Behavior
-
-If tuning exceeds maximum gain limits, fallback gains are applied:
-
-- `P = 0.0`
-- `I = 0.0`
-- `D = 0.0`
-
 ---
 
 ## Safety & Robustness
