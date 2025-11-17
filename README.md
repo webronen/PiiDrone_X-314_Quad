@@ -66,7 +66,6 @@
 
 ---
 
-
 ## Astrom-Hägglund Relay Auto-Tuning System
 
 ### Overview
@@ -98,11 +97,11 @@ Generates safe, flyable PID gains for roll, pitch, and yaw axes using a balanced
 ## Results
 
 - Tuning time: ~8–32 seconds per axis (depends on system response).
-- Stage progression: Advances when either the RMSE target is met or the gain reaches its maximum (whichever comes first).
+- Stage progression: Ends when RMSE target or gain limit is reached.
 - Gains: Performance-based selection for a safe, flyable starting point.
 - Robustness: RMSE-based approach is immune to noise and zero-crossing issues.
 - Early completion: Can finish in as few as 8 relay flips if performance targets are met quickly.
-- Actual behavior: The auto-tuner completes each stage when either the RMSE goal is reached or the gain limit is hit, ensuring safe termination regardless of system response.
+- Actual: Each stage ends when RMSE goal or gain limit is reached.
 
 ### Fallback Behavior
 
@@ -111,14 +110,6 @@ If tuning exceeds maximum gain limits, fallback gains are applied:
 - `P = 0.0`
 - `I = 0.0`
 - `D = 0.0`
-
-### Key Improvements
-
-- Unified RMSE architecture: consistent RMSE metric for all PID stages
-- Practical gains: finds minimum effective gains instead of theoretical oscillation points
-- Robust operation: no dependency on error sign or zero-crossing detection
-- Flyable starting point: conservative gain selection suitable for safe initial flight, not final tuning
-- Staged approach: each PID term tuned with appropriate RMS performance metric
 
 ---
 

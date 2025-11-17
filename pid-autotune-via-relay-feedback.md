@@ -38,11 +38,11 @@ where $e_i$ is the error at sample $i$, $N$ is the sample count.
 ## Results
 
 - Tuning time: ~8–32 seconds per axis (depends on system response).
-- Stage progression: Advances when either the RMSE target is met or the gain reaches its maximum (whichever comes first).
+- Stage progression: Ends when RMSE target or gain limit is reached.
 - Gains: Performance-based selection for a safe, flyable starting point.
 - Robustness: RMSE-based approach is immune to noise and zero-crossing issues.
 - Early completion: Can finish in as few as 8 relay flips if performance targets are met quickly.
-- Actual behavior: The auto-tuner completes each stage when either the RMSE goal is reached or the gain limit is hit, ensuring safe termination regardless of system response.
+- Actual: Each stage ends when RMSE goal or gain limit is reached.
 
 ## References
 
