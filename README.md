@@ -66,54 +66,49 @@
 
 ---
 
-## Astrom-Hägglund Relay Auto-Tuning System
+## TrueMin RMSE Relay Autotune
+Inspired by the Åström–Hägglund Relay Auto-Tuning Method
 
 ### Overview
 
-Production-ready PID autotune for roll, pitch, and yaw using a balanced test bench. Relay excitation (2Hz) induces controlled oscillations for system identification. Hybrid error metric (80% RMSE + 20% MAE) ensures both statistical rigor and robust, stable decisions. Finds the true minimum error, not just "good enough." All gains and decisions are safety-bounded.
+TrueMin RMSE Relay Autotune for roll, pitch, and yaw using a balanced test bench. Based on the Åström–Hägglund relay method, with 2Hz relay excitation to induce controlled oscillations for system identification. Pure RMSE metric tracks the absolute minimum error for each stage. Tuning stops automatically when performance degrades by 20% after the minimum. All gains are safety-bounded.
 
 ### Features
 
 - 3-stage tuning (P → D → I) with relay excitation at 2Hz
-- Hybrid error metric: 80% RMSE + 20% MAE for balanced performance
-- Best gain tracking: finds true minimum error, not just first acceptable
-- Safety limits: maximum gain boundaries for all terms
-- Quality checking: requires 20 iterations before completion
+- Pure RMSE metric: finds absolute minimum error for each stage
+- Best gain tracking: always selects the true minimum, not just "good enough"
+- Smart stopping: stops when RMSE increases by 20% after the minimum
+- Gain limits: maximum boundaries for all terms
 - 20Hz evaluation: optimal for aircraft dynamics
 
 ### Tuning Process
 
-1. Start from zero gains (pure system identification)
-2. For each axis, tune in 3 stages:
-  - **P:** 0 → 120.0 (step 2.0), next if RMSE < 0.15 (~8.6°) or max
-  - **D:** 0 → 60.0 (step 1.0), next if RMSE < 0.10 (~5.7°) or max
-  - **I:** 0 → 0.3 (step 0.01), done if RMSE < 0.05 (~2.9°) or max
-3. At each gain, evaluate hybrid error (80% RMSE + 20% MAE) over 20 iterations at 20Hz
-4. Track and set the best gain (lowest hybrid error) for each stage
-5. Repeat for roll, pitch, and yaw
-6. Ramp down thrust after tuning
+1. Start from zero gains
+2. For each axis, tune in 3 stages (P, D, I):
+   - Increment gain in constant steps (see code)
+   - At each gain, evaluate RMSE every 0.05s (20Hz)
+   - Track the absolute minimum RMSE and best gain
+   - Stop the stage when RMSE increases by 20% after the minimum
+   - Set gain to the best (minimum RMSE) found
+3. Repeat for roll, pitch, and yaw
+4. Ramp down thrust after tuning
 
 ### RMS Error Metric
 
-Hybrid error metric:
-
-$\text{Hybrid} = 0.8 \times RMSE + 0.2 \times MAE$
+All decisions use:
 
 $RMSE = \sqrt{\frac{1}{N} \sum_{i=1}^N (e_i)^2}$
-
-$MAE = \frac{1}{N} \sum_{i=1}^N |e_i|$
 
 where $e_i$ is the error at sample $i$, $N$ is the sample count.
 
 ## Results
 
 - Tuning time: ~8–32 seconds per axis (depends on system response)
-- Stage ends when RMSE target or gain limit is reached
-- Gains: Safe, flyable starting point
-- Hybrid metric: balances oscillation detection with noise robustness
+- Each stage stops when RMSE increases by 20% after the minimum
+- Gains: Optimal, safe, and flyable
 - Finds true minimum, not just first acceptable gain
-- Robust: Immune to noise and zero-crossing issues
-- Can finish in as few as 8 relay flips if targets are met quickly
+- Minimal code, robust to non-monotonic response
 
 ### Fallback Behavior
 
@@ -150,7 +145,6 @@ This system enables **safe, hands-off PID gain estimation** for drones, deliveri
 - [Relay Auto-Tuning (Åström–Hägglund) – Wikipedia](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller#Relay_(%C3%85str%C3%B6m%E2%80%93H%C3%A4gglund)_method)
 - [PID Controller – Wikipedia](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller)
 - [Root Mean Square Deviation (RMSE) – Wikipedia](https://en.wikipedia.org/wiki/Root_mean_square_deviation)
-- [Mean Absolute Error (MAE) – Wikipedia](https://en.wikipedia.org/wiki/Mean_absolute_error)
 - [Smoothstep – Wikipedia](https://en.wikipedia.org/wiki/Smoothstep)
 - [Quaternion – Wikipedia](https://en.wikipedia.org/wiki/Quaternion)
 

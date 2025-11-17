@@ -61,22 +61,25 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 #define PID_LOOP_PERIOD (1.0f / PID_LOOP_HZ)
 #define PID_ARRAY_SIZE 3
 
+// Auto-Tune parameters
 #define TUNE_THRUST_MAX PID_OUT_MAX
 #define TUNE_RAMP_S 5.0f
-#define TUNE_RELAY_HZ 2.0f
+// Relay tuning parameters
 #define TUNE_RELAY_DEG 15.0f
 #define TUNE_RELAY_RAD (TUNE_RELAY_DEG * DEG_TO_RAD)
-#define TUNE_SAMPLE_HZ 20.0f
+#define TUNE_RELAY_HZ 2.0f   // 2Hz relay switching
+#define TUNE_SAMPLE_HZ 20.0f // 20Hz evaluation rate
+// Gain limits and increments
 #define TUNE_P_MAX 120.0f
 #define TUNE_D_MAX 60.0f
 #define TUNE_I_MAX 0.3f
 #define TUNE_P_INC 2.0f
 #define TUNE_D_INC 1.0f
 #define TUNE_I_INC 0.01f
-// 3:2:1 ratio for PID gains
-#define TUNE_P_GOAL 0.15f // ~8.6 degrees
-#define TUNE_D_GOAL 0.10f // ~5.7 degrees
-#define TUNE_I_GOAL 0.05f // ~2.9 degrees
+// 3:2:1 performance goals (radians)
+#define TUNE_P_GOAL 0.15f
+#define TUNE_D_GOAL 0.10f
+#define TUNE_I_GOAL 0.05f
 
 #define ENV_ALPHA 0.25f
 #define D_ALPHA 0.75f
