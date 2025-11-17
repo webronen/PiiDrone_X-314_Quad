@@ -447,11 +447,13 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     tune[axis].last_change = now + HZ_TO_US(PID_AUTOTUNE_RELAY_FREQUENCY);
   }
 
+  // Square the error and accumulate for RMSE calculation
   error_sum[axis] += err * err;
   sample_count[axis]++;
 
   if (now - last_time[axis] > HZ_TO_US(TUNE_SAMPLE_TIME))
   {
+    // Calculate RMSE for this tuning step
     float rms_error = __builtin_sqrtf(error_sum[axis] / sample_count[axis]);
 
     if (rms_error < best_rms[axis])
