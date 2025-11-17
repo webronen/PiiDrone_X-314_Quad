@@ -197,15 +197,15 @@ typedef struct __attribute__((packed, aligned(4)))
   bool is_at_hover;    // Currently at hover thrust
   uint8_t tuning_axis; // 0: roll, 1: pitch, 2: yaw
   uint8_t reserved[1]; // Padding to 4 bytes, preserving 4-byte alignment
-} AutoTuneState;
+} Tune;
 
-static_assert(sizeof(AutoTuneState) == 4, "AutoTuneState struct must be 4 bytes (1 word)");
+static_assert(sizeof(Tune) == 4, "Tune struct must be 4 bytes (1 word)");
 
 static Fcu fcu = {0};
 static Esc esc = {0x8000, 0x8000, 0x8000, 0x8000};
 static volatile Rcu received_packet = {0};
 static Pid pid_state[3] = {0};
-static AutoTuneState auto_tune = {0};
+static Tune auto_tune = {0};
 
 static inline void task_imu_update(void);
 static inline void task_fcu_update(void);
