@@ -43,6 +43,7 @@ And when tuning is complete
 the motors descend like curtains after a performance  
 No collapse, no rush  
 Just a controlled landing  
+
 like farewells that know: the next flight is already on its way
 
 ---
