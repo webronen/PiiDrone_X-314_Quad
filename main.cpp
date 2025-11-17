@@ -381,13 +381,13 @@ static inline void handle_thrust_update(void)
 
 static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s)
 {
-  static uint32_t last_time_us = 0;
+  static uint32_t start_time_us = 0;
   NRF_TIMER0->TASKS_CAPTURE[1] = 1;
 
-  if (!last_time_us)
-    last_time_us = NRF_TIMER0->CC[1];
+  if (!start_time_us)
+    start_time_us = NRF_TIMER0->CC[1];
 
-  const uint32_t elapsed_time_us = (NRF_TIMER0->CC[1] - last_time_us);
+  const uint32_t elapsed_time_us = (NRF_TIMER0->CC[1] - start_time_us);
   float x = (float)elapsed_time_us / (in_time_s * 1e6f);
   x = constrain(x, 0.0f, 1.0f);
 
@@ -396,7 +396,7 @@ static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s)
                       : 1.0f - (x * x * (3.0f - 2.0f * x));
 
   fcu.thrust = (uint16_t)constrain(y * __builtin_fabsf(to_thrust), THRUST_MIN, THRUST_MAX);
-  return (x >= 1.0f) ? (last_time_us = 0, true) : false;
+  return (x >= 1.0f) ? (start_time_us = 0, true) : false;
 }
 
 static inline bool pid_tune_step(uint8_t axis, float err)
