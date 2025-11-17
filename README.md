@@ -70,34 +70,38 @@
 
 ### Overview
 
-Automatically finds safe, flyable PID gains for roll, pitch, and yaw using a balanced test bench. Relay excitation creates controlled oscillations, enabling precise measurement of system response and minimizing RMSE. The result is a reliable starting point for manual tuning, with real-time safety limits for stable initial tests.
+Production-ready PID autotune for roll, pitch, and yaw using a balanced test bench. Relay excitation (2Hz) induces controlled oscillations for system identification. Hybrid error metric (80% RMSE + 20% MAE) ensures both statistical rigor and robust, stable decisions. Finds the true minimum error, not just "good enough." All gains and decisions are safety-bounded.
 
 ### Features
 
-- Smoothstep thrust ramp for gentle motor activation
-- Three-stage PID tuning with relay excitation
-- Unified RMSE metric for all stages
-- Tracks best gain (lowest RMSE) per stage
-- Automatic stage transitions: ends when RMSE target or gain limit is reached
-- Independent tuning for roll, pitch, and yaw
-- Safety-constrained gain limits and fallback to safe defaults
+- 3-stage tuning (P → D → I) with relay excitation at 2Hz
+- Hybrid error metric: 80% RMSE + 20% MAE for balanced performance
+- Best gain tracking: finds true minimum error, not just first acceptable
+- Safety limits: maximum gain boundaries for all terms
+- Quality checking: requires 20 iterations before completion
+- 20Hz evaluation: optimal for aircraft dynamics
 
 ### Tuning Process
 
-1. Ramp up thrust to hover
-2. Tune each axis in 3 stages using relay excitation:
-   - **P:** 0 → 15.0 (step 0.5), next if RMSE < 0.12 (~6.9°) or max
-   - **D:** 0 → 3.0 (step 0.2), next if RMSE < 0.08 (~4.6°) or max
-   - **I:** 0 → 2.0 (step 0.1), done if RMSE < 0.06 (~3.4°) or max
-3. At each stage, set gain to best (lowest RMSE)
-4. Repeat for roll, pitch, and yaw
-5. Ramp down thrust after tuning
+1. Start from zero gains (pure system identification)
+2. For each axis, tune in 3 stages:
+  - **P:** 0 → 120.0 (step 2.0), next if RMSE < 0.15 (~8.6°) or max
+  - **D:** 0 → 60.0 (step 1.0), next if RMSE < 0.10 (~5.7°) or max
+  - **I:** 0 → 0.3 (step 0.01), done if RMSE < 0.05 (~2.9°) or max
+3. At each gain, evaluate hybrid error (80% RMSE + 20% MAE) over 20 iterations at 20Hz
+4. Track and set the best gain (lowest hybrid error) for each stage
+5. Repeat for roll, pitch, and yaw
+6. Ramp down thrust after tuning
 
 ### RMS Error Metric
 
-All stages use:
+Hybrid error metric:
+
+$\text{Hybrid} = 0.8 \times RMSE + 0.2 \times MAE$
 
 $RMSE = \sqrt{\frac{1}{N} \sum_{i=1}^N (e_i)^2}$
+
+$MAE = \frac{1}{N} \sum_{i=1}^N |e_i|$
 
 where $e_i$ is the error at sample $i$, $N$ is the sample count.
 
@@ -106,6 +110,8 @@ where $e_i$ is the error at sample $i$, $N$ is the sample count.
 - Tuning time: ~8–32 seconds per axis (depends on system response)
 - Stage ends when RMSE target or gain limit is reached
 - Gains: Safe, flyable starting point
+- Hybrid metric: balances oscillation detection with noise robustness
+- Finds true minimum, not just first acceptable gain
 - Robust: Immune to noise and zero-crossing issues
 - Can finish in as few as 8 relay flips if targets are met quickly
 
@@ -121,10 +127,10 @@ If tuning exceeds maximum gain limits, fallback gains are applied:
 
 ## Safety & Robustness
 
-- **All PID states and setpoints are reset** when the FCU is inactive  
-- **Final motor outputs are always constrained** to physical limits  
-- **Failsafe and landing logic** activate on packet timeout or power warning  
-- **Auto-tune is aborted and state cleared** if thrust input is modified during thrust ramp or tuning
+- All PID states and setpoints are reset when the FCU is inactive
+- Final motor outputs are always constrained to physical limits
+- Failsafe and landing logic activate on packet timeout or power warning
+- Auto-tune is aborted and state cleared if thrust input is modified during ramp or tuning
 
 ---
 
@@ -141,10 +147,10 @@ This system enables **safe, hands-off PID gain estimation** for drones, deliveri
 ---
 
 ## References
-
 - [Relay Auto-Tuning (Åström–Hägglund) – Wikipedia](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller#Relay_(%C3%85str%C3%B6m%E2%80%93H%C3%A4gglund)_method)
 - [PID Controller – Wikipedia](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller)
 - [Root Mean Square Deviation (RMSE) – Wikipedia](https://en.wikipedia.org/wiki/Root_mean_square_deviation)
+- [Mean Absolute Error (MAE) – Wikipedia](https://en.wikipedia.org/wiki/Mean_absolute_error)
 - [Smoothstep – Wikipedia](https://en.wikipedia.org/wiki/Smoothstep)
 - [Quaternion – Wikipedia](https://en.wikipedia.org/wiki/Quaternion)
 

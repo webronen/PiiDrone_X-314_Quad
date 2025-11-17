@@ -61,21 +61,22 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 #define PID_LOOP_PERIOD (1.0f / PID_LOOP_HZ)
 #define PID_ARRAY_SIZE 3
 
-#define TUNE_THRUST_MAX PID_OUT_MAX // maximum thrust during tuning
-#define TUNE_RAMP_S 5.0f            // seconds to full thrust ramp
-#define TUNE_RELAY_FREQUENCY 0.5f   // 0.5 Hz = 2-second period relay oscillation
-#define TUNE_AMPLITUDE_DEG 25.0f    // 25° excitation amplitude (conservative)
-#define TUNE_SAMPLE_FREQUENCY 2.0f  // 2 Hz = 500ms sampling (2 samples per half-cycle)
-#define TUNE_P_MAX 8.0f             // Maximum proportional gain
-#define TUNE_D_MAX 1.5f             // Maximum derivative gain (prevents noise)
-#define TUNE_I_MAX 2.0f             // Maximum integral gain
-#define TUNE_P_INCREMENT 0.3f       // Slow P gain growth
-#define TUNE_D_INCREMENT 0.1f       // Conservative D gain steps
-#define TUNE_I_INCREMENT 0.05f      // Very slow I gain refinement
-#define TUNE_ERROR_P_GOAL 0.15f     // P-stage target: ~8.6° RMSE
-#define TUNE_ERROR_D_GOAL 0.10f     // D-stage target: ~5.7° RMSE
-#define TUNE_ERROR_I_GOAL 0.08f     // I-stage target: ~4.6° RMSE
-#define TUNE_AMPLITUDE_RAD (TUNE_AMPLITUDE_DEG * DEG_TO_RAD)
+#define TUNE_THRUST_MAX PID_OUT_MAX
+#define TUNE_RAMP_S 5.0f
+#define TUNE_RELAY_HZ 2.0f
+#define TUNE_RELAY_DEG 15.0f
+#define TUNE_RELAY_RAD (TUNE_RELAY_DEG * DEG_TO_RAD)
+#define TUNE_SAMPLE_HZ 20.0f
+#define TUNE_P_MAX 120.0f
+#define TUNE_D_MAX 60.0f
+#define TUNE_I_MAX 0.3f
+#define TUNE_P_INC 2.0f
+#define TUNE_D_INC 1.0f
+#define TUNE_I_INC 0.01f
+// 3:2:1 ratio for PID gains
+#define TUNE_P_GOAL 0.15f // ~8.6 degrees
+#define TUNE_D_GOAL 0.10f // ~5.7 degrees
+#define TUNE_I_GOAL 0.05f // ~2.9 degrees
 
 #define ENV_ALPHA 0.25f
 #define D_ALPHA 0.75f
