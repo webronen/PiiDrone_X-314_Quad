@@ -137,6 +137,7 @@ Enables safe, hands-off PID tuning for drones. Delivers reliable initial gains f
 - [Smoothstep](https://en.wikipedia.org/wiki/Smoothstep)
 - [Åström–Hägglund relay method](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller#Relay_(%C3%85str%C3%B6m%E2%80%93H%C3%A4gglund)_method)
 - [Root mean square deviation (RMSE)](https://en.wikipedia.org/wiki/Root_mean_square_deviation)
-- [Machine learning](https://en.wikipedia.org/wiki/Machine_learning)
+- [Reinforcement learning (RL)](https://en.wikipedia.org/wiki/Reinforcement_learning)
+- [Machine learning (ML)](https://en.wikipedia.org/wiki/Machine_learning)
 
 ---
