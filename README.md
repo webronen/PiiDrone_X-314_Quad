@@ -65,38 +65,40 @@ Ultra-light, agile, stable. 70g including LiPo.
 
 ---
 
-## PiiTune Deep RMSE 
+## PiiTune Deep RMSE - PID Training System
 
-Inspired by the Åström–Hägglund relay auto-tuning method.
+Inspired by the Åström–Hägglund relay auto-tuning method and modern machine learning.
 
-### Overview
+### Final Summary
 
-Automatically tunes roll, pitch, and yaw using 0.5 Hz relay excitation and pure RMSE evaluation. Searches for the true minimum at each stage and applies early stopping when RMSE increases by 20% (with patience over 3 samples). Gain limits are not fixed, allowing full adaptation to system dynamics.
+**What It Is:**
+- PID Training System: Learns optimal gains through system interaction
+- Deep RMSE Optimization: High-frequency error analysis drives learning
+- Reinforcement Learning: Environment interaction with performance-based updates
+- Adaptive Control: Discovers system-specific optimal parameters
 
-### Features
+### Key Features
 
-- Smooth thrust ramp to hover (5s)
-- 3-stage tuning (P → D → I) with 0.5Hz relay (15° amplitude)
-- Track absolute minimum RMSE per stage
-- Select true minimum (best gain tracking)
-- Stop when RMSE increases by 20% after minimum (with 3-sample patience)
-- Constant gain increments: P +2.0, D +1.0, I +0.01 per step
-- RMSE evaluation every 0.25s (4Hz, matches code)
-- All tuning within safe thrust limits
+- Learns optimal PID gains through relay excitation
+- Trains using RMSE as performance metric
+- Prevents overfitting with 20% tolerance and patience
+- Finds global optimum through multi-stage exploration (P → D → I)
+- Adapts to specific drone dynamics
 
-### Tuning Process
+### Training Process
 
-1. Ramp up thrust to hover (smoothstep, 5s)
-2. Zero all gains
-3. For each axis, tune in 3 stages (P, D, I):
-    - Alternate setpoint at 0.5Hz (relay, 15° amplitude)
-    - Accumulate squared error at each gain
-    - Every 0.25s (4Hz): compute RMSE, increment gain
-    - Track absolute minimum RMSE and best gain
-    - Stop when RMSE increases by 20% after minimum (3-sample patience)
-    - Set gain to best (minimum RMSE)
-4. Repeat for roll, pitch, yaw
-5. Ramp down thrust to zero (smoothstep)
+1. System excitation via relay oscillations (0.5Hz, 15° amplitude)
+2. Performance measurement through deep RMSE analysis (4Hz)
+3. Parameter updates based on performance feedback
+4. Multi-stage learning (P → D → I)
+5. Validation through overfitting prevention (20% tolerance, 3-sample patience)
+
+### Technical Foundation
+
+- Reinforcement Learning: Environment + Agent + Reward system
+- Online Learning: Real-time parameter updates
+- Gradient-Free Optimization: Robust to non-convex landscapes
+- System Identification: Learns drone dynamics through interaction
 
 ### RMSE Error Metric
 
@@ -134,8 +136,9 @@ Enables safe, hands-off PID tuning for drones. Delivers reliable initial gains f
 ## References
 
 - [PID controller](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller)
-- [Åström–Hägglund relay method](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller#Relay_(%C3%85str%C3%B6m%E2%80%93H%C3%A4gglund)_method)
 - [Smoothstep](https://en.wikipedia.org/wiki/Smoothstep)
+- [Åström–Hägglund relay method](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller#Relay_(%C3%85str%C3%B6m%E2%80%93H%C3%A4gglund)_method)
 - [Root mean square deviation (RMSE)](https://en.wikipedia.org/wiki/Root_mean_square_deviation)
+- [Machine learning](https://en.wikipedia.org/wiki/Machine_learning)
 
 ---
