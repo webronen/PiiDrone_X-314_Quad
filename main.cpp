@@ -379,6 +379,26 @@ static inline void handle_thrust_update(void)
   FCU_UPDATE_ACTIVE(fcu.status, (fcu.thrust > THRUST_MIN));
 }
 
+static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s)
+{
+  static uint32_t start_time_us = 0;
+  NRF_TIMER0->TASKS_CAPTURE[0] = 1;
+
+  if (!start_time_us)
+    start_time_us = NRF_TIMER0->CC[0];
+
+  const uint32_t elapsed_time_us = (NRF_TIMER0->CC[0] - start_time_us);
+  float x = (float)elapsed_time_us / (in_time_s * 1e6f);
+  x = constrain(x, 0.0f, 1.0f);
+
+  const float y = (to_thrust >= 0.0f)
+                      ? (x * x * (3.0f - 2.0f * x))
+                      : 1.0f - (x * x * (3.0f - 2.0f * x));
+
+  fcu.thrust = (uint16_t)constrain(y * __builtin_fabsf(to_thrust), THRUST_MIN, THRUST_MAX);
+  return (x >= 1.0f) ? (start_time_us = 0, true) : false;
+}
+
 static inline bool pid_tune_step(const uint8_t axis, const float error)
 {
   // Per-axis training state
