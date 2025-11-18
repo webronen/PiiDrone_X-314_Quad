@@ -195,19 +195,35 @@ static_assert(sizeof(Task) == 16, "Task struct must be 16 bytes (4 words)");
 
 typedef struct __attribute__((packed, aligned(4)))
 {
-  bool is_running;     // Auto-Tune is active
-  bool is_at_hover;    // Currently at hover thrust
-  uint8_t tuning_axis; // 0: roll, 1: pitch, 2: yaw
-  uint8_t reserved[1]; // Padding to 4 bytes, preserving 4-byte alignment
-} Tune;
+  bool is_running;     // Is autotune in progress
+  bool is_at_hover;    // Has the drone reached stable hover
+  uint8_t tuning_axis; // Current axis being tuned (0=roll, 1=pitch, 2=yaw)
+  uint8_t padding[1];  // Padding for 4-byte alignment
+} TuneGlobalState;
 
-static_assert(sizeof(Tune) == 4, "Tune struct must be 4 bytes (1 word)");
+static_assert(sizeof(TuneGlobalState) == 4, "TuneGlobal State struct must be 4 bytes (1 words)");
+
+typedef struct __attribute__((packed, aligned(4)))
+{
+  uint32_t last_evaluation_time; // Last evaluation timestamp
+  float squared_error_sum;       // Sum of squared errors
+  float best_rmse_achieved;      // Best RMSE found
+  float best_gain_found;         // Best gain found
+  uint16_t sample_count;         // Number of samples
+  uint16_t training_stage;       // Stage: 0=P, 1=D, 2=I
+  bool is_active;                // Axis tuning active
+  float relay_setpoint;          // Relay setpoint value
+  uint8_t patience_counter;      // Patience counter for early stopping
+  uint8_t padding[3];            // Padding for 4-byte alignment
+} TuneAxisState;
+
+static_assert(sizeof(TuneAxisState) == 32, "TuneAxis State struct must be 32 bytes (8 words)");
 
 static Fcu fcu = {0};
 static Esc esc = {0x8000, 0x8000, 0x8000, 0x8000};
 static volatile Rcu received_packet = {0};
 static Pid pid_state[3] = {0};
-static Tune auto_tune = {0};
+static TuneGlobalState tune_state = {0};
 
 static inline void task_imu_update(void);
 static inline void task_fcu_update(void);

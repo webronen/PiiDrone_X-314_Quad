@@ -104,7 +104,7 @@ void loop(void)
   const bool landing_timeout = loop_start_us >= last_landing_us;
 
   // Update async packet timeout to prevent landing during auto-tuning
-  if (auto_tune.is_running)
+  if (tune_state.is_running)
     last_packet_us = loop_start_us + HZ_TO_US(0.1f);
 
   // Handle received radio packets before strict periodic tasks
@@ -160,27 +160,27 @@ static inline void task_fcu_update(void)
   DataQuaternion error;
   quaternion_multiply(&error, &hover_quaternion, &conjugate);
 
-  if (auto_tune.is_running && !auto_tune.is_at_hover)
+  if (tune_state.is_running && !tune_state.is_at_hover)
   {
     if (pid_thrust_ramp(TUNE_THRUST_MAX, TUNE_RAMP_S))
     {
-      auto_tune.is_at_hover = true;
+      tune_state.is_at_hover = true;
     }
   }
-  else if (auto_tune.is_running && auto_tune.is_at_hover)
+  else if (tune_state.is_running && tune_state.is_at_hover)
   {
     static float *const error_ptr[3] = {&error.x, &error.y, &error.z};
-    const float current_error = *error_ptr[auto_tune.tuning_axis];
+    const float current_error = *error_ptr[tune_state.tuning_axis];
 
-    if (pid_tune_step(auto_tune.tuning_axis, current_error))
+    if (pid_tune_step(tune_state.tuning_axis, current_error))
     {
-      if (++auto_tune.tuning_axis == 2)
+      if (++tune_state.tuning_axis == 2)
       {
-        auto_tune.is_running = false;
+        tune_state.is_running = false;
       }
     }
   }
-  else if (!auto_tune.is_running && auto_tune.is_at_hover)
+  else if (!tune_state.is_running && tune_state.is_at_hover)
   {
     if (pid_thrust_ramp(-TUNE_THRUST_MAX, TUNE_RAMP_S))
     {
@@ -271,7 +271,7 @@ static inline void task_pof_update(void)
 
 static inline void pid_tune_stop(void)
 {
-  memset(&auto_tune, 0, sizeof(auto_tune));
+  // No need to memset global state, handled by static members
 
   FCU_CLEAR_AUTOTUNE(fcu.status);
 }
@@ -337,7 +337,7 @@ static inline void handle_pid_tune(void)
   pid_tune_stop();
   pid_state_clear();
 
-  auto_tune.is_running = true;
+  tune_state.is_running = true;
 
   FCU_SET_ACTIVE(fcu.status);
   FCU_SET_AUTOTUNE(fcu.status);
@@ -369,7 +369,7 @@ static inline void handle_thrust_update(void)
   uint16_t thrust;
   memcpy(&thrust, (const void *)&received_packet.data[0], sizeof(thrust));
 
-  if (auto_tune.is_running)
+  if (tune_state.is_running)
   {
     pid_tune_stop();
     pid_state_clear();
@@ -401,16 +401,10 @@ static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s)
 
 static inline bool pid_tune_step(const uint8_t axis, const float error)
 {
-  // Per-axis training state
-  static uint32_t last_evaluation_time[3] = {0};
-  static float squared_error_sum[3] = {0};
-  static float best_rmse_achieved[3] = {__FLT_MAX__, __FLT_MAX__, __FLT_MAX__};
-  static float best_gain_found[3] = {0};
-  static uint16_t sample_count[3] = {0};
-  static uint16_t training_stage[3] = {0}; // 0=P, 1=D, 2=I
-  static bool is_axis_active[3] = {0};
-  static float relay_setpoint[3] = {TUNE_RELAY_RADIANS};
-  static uint8_t patience_counter[3] = {0}; // Early stopping patience
+  static TuneAxisState axis_state[3] = {
+      {0, 0, __FLT_MAX__, 0, 0, 0, false, TUNE_RELAY_RADIANS, 0},
+      {0, 0, __FLT_MAX__, 0, 0, 0, false, TUNE_RELAY_RADIANS, 0},
+      {0, 0, __FLT_MAX__, 0, 0, 0, false, TUNE_RELAY_RADIANS, 0}};
 
   // Stage configuration - maps training stages to PID gains and increments
   static const uint8_t stage_to_gain_index[] = {0, 2, 1}; // P, D, I indices
@@ -423,82 +417,82 @@ static inline bool pid_tune_step(const uint8_t axis, const float error)
   const uint32_t current_time = NRF_TIMER0->CC[0];
 
   // Initialize training for this axis
-  if (!is_axis_active[axis])
+  if (!axis_state[axis].is_active)
   {
-    is_axis_active[axis] = true;
-    fcu.pid_setpoint[axis] = relay_setpoint[axis];
-    patience_counter[axis] = 0; // Reset early stopping patience
+    axis_state[axis].is_active = true;
+    fcu.pid_setpoint[axis] = axis_state[axis].relay_setpoint;
+    axis_state[axis].patience_counter = 0; // Reset early stopping patience
     return false;
   }
 
   // Relay excitation: alternate setpoint to excite system dynamics
-  if (current_time - last_evaluation_time[axis] >= HZ_TO_US(TUNE_RELAY_HERTZ))
+  if (current_time - axis_state[axis].last_evaluation_time >= HZ_TO_US(TUNE_RELAY_HERTZ))
   {
-    relay_setpoint[axis] = -relay_setpoint[axis]; // Flip excitation direction
-    fcu.pid_setpoint[axis] = relay_setpoint[axis];
-    last_evaluation_time[axis] = current_time;
+    axis_state[axis].relay_setpoint = -axis_state[axis].relay_setpoint; // Flip excitation direction
+    fcu.pid_setpoint[axis] = axis_state[axis].relay_setpoint;
+    axis_state[axis].last_evaluation_time = current_time;
   }
 
   // Accumulate squared error for RMSE calculation
-  squared_error_sum[axis] += error * error;
-  sample_count[axis]++;
+  axis_state[axis].squared_error_sum += error * error;
+  axis_state[axis].sample_count++;
 
   // RMSE evaluation and gradient-free optimization step
-  if (current_time - last_evaluation_time[axis] >= HZ_TO_US(TUNE_SAMPLE_HERTZ))
+  if (current_time - axis_state[axis].last_evaluation_time >= HZ_TO_US(TUNE_SAMPLE_HERTZ))
   {
     // Compute Root Mean Square Error (performance metric)
-    const float current_rmse = sqrtf(squared_error_sum[axis] / sample_count[axis]);
+    const float current_rmse = sqrtf(axis_state[axis].squared_error_sum / axis_state[axis].sample_count);
 
     // Get current training stage configuration
-    const uint8_t gain_index = stage_to_gain_index[training_stage[axis]];
-    const float gain_step_size = stage_gain_increment[training_stage[axis]];
+    const uint8_t gain_index = stage_to_gain_index[axis_state[axis].training_stage];
+    const float gain_step_size = stage_gain_increment[axis_state[axis].training_stage];
 
     // Track best performance (global minimum search)
-    if (current_rmse < best_rmse_achieved[axis])
+    if (current_rmse < axis_state[axis].best_rmse_achieved)
     {
-      best_rmse_achieved[axis] = current_rmse;
-      best_gain_found[axis] = fcu.pid_gain[axis][gain_index];
-      patience_counter[axis] = 0; // Reset patience on performance improvement
+      axis_state[axis].best_rmse_achieved = current_rmse;
+      axis_state[axis].best_gain_found = fcu.pid_gain[axis][gain_index];
+      axis_state[axis].patience_counter = 0; // Reset patience on performance improvement
     }
 
     // Gradient-free optimization: increment current gain
     fcu.pid_gain[axis][gain_index] += gain_step_size;
 
     // Early stopping with patience: prevent overfitting and find global optimum
-    if (current_rmse > best_rmse_achieved[axis] * TUNE_OVERFIT_TOLERANCE)
+    if (current_rmse > axis_state[axis].best_rmse_achieved * TUNE_OVERFIT_TOLERANCE)
     {
-      patience_counter[axis]++; // Count consecutive performance degradations
+      axis_state[axis].patience_counter++; // Count consecutive performance degradations
 
       // Stop training only after patience threshold is reached
-      if (patience_counter[axis] >= TUNE_PATIENCE_SAMPLES)
+      if (axis_state[axis].patience_counter >= TUNE_PATIENCE_SAMPLES)
       {
         // Revert to best-found gain (model checkpoint)
-        fcu.pid_gain[axis][gain_index] = best_gain_found[axis];
+        fcu.pid_gain[axis][gain_index] = axis_state[axis].best_gain_found;
 
         // Progress to next training stage (P → D → I)
-        if (training_stage[axis]++ >= 2)
+        if (axis_state[axis].training_stage++ >= 2)
         {
           // All stages complete for this axis
           fcu.pid_setpoint[axis] = 0; // Reset to hover
-          is_axis_active[axis] = false;
+          axis_state[axis].is_active = false;
           return true; // Training complete for this axis
         }
 
         // Reset for next stage
-        best_rmse_achieved[axis] = __FLT_MAX__;
-        patience_counter[axis] = 0;
+        axis_state[axis].best_rmse_achieved = __FLT_MAX__;
+        axis_state[axis].patience_counter = 0;
       }
     }
     else
     {
       // Reset patience counter if performance recovers (local minimum escape)
-      patience_counter[axis] = 0;
+      axis_state[axis].patience_counter = 0;
     }
 
     // Reset accumulators for next evaluation period
-    squared_error_sum[axis] = 0;
-    sample_count[axis] = 0;
-    last_evaluation_time[axis] = current_time;
+    axis_state[axis].squared_error_sum = 0;
+    axis_state[axis].sample_count = 0;
+    axis_state[axis].last_evaluation_time = current_time;
   }
 
   // Training still in progress
