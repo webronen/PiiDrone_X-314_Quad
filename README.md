@@ -69,8 +69,6 @@ Ultra-light, agile, stable. 70g including LiPo.
 
 Inspired by the Åström–Hägglund relay auto-tuning method and modern machine learning.
 
-### Final Summary
-
 **What It Is:**
 - PID Training System: Learns optimal gains through system interaction
 - Deep RMSE Optimization: High-frequency error analysis drives learning
