@@ -379,93 +379,107 @@ static inline void handle_thrust_update(void)
   FCU_UPDATE_ACTIVE(fcu.status, (fcu.thrust > THRUST_MIN));
 }
 
-static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s)
+static inline bool pid_tune_step(const uint8_t axis, const float error)
 {
-  static uint32_t start_time_us = 0;
-  NRF_TIMER0->TASKS_CAPTURE[0] = 1;
+  // Per-axis training state
+  static uint32_t last_evaluation_time[3] = {0};
+  static float squared_error_sum[3] = {0};
+  static float best_rmse_achieved[3] = {__FLT_MAX__, __FLT_MAX__, __FLT_MAX__};
+  static float best_gain_found[3] = {0};
+  static uint16_t sample_count[3] = {0};
+  static uint16_t training_stage[3] = {0}; // 0=P, 1=D, 2=I
+  static bool is_axis_active[3] = {0};
+  static float relay_setpoint[3] = {TUNE_RELAY_RADIANS};
+  static uint8_t patience_counter[3] = {0}; // Early stopping patience
 
-  if (!start_time_us)
-    start_time_us = NRF_TIMER0->CC[0];
-
-  const uint32_t elapsed_time_us = (NRF_TIMER0->CC[0] - start_time_us);
-  float x = (float)elapsed_time_us / (in_time_s * 1e6f);
-  x = constrain(x, 0.0f, 1.0f);
-
-  const float y = (to_thrust >= 0.0f)
-                      ? (x * x * (3.0f - 2.0f * x))
-                      : 1.0f - (x * x * (3.0f - 2.0f * x));
-
-  fcu.thrust = (uint16_t)constrain(y * __builtin_fabsf(to_thrust), THRUST_MIN, THRUST_MAX);
-  return (x >= 1.0f) ? (start_time_us = 0, true) : false;
-}
-
-static inline bool pid_tune_step(const uint8_t axis, const float err)
-{
-  static uint32_t last[3] = {0};
-  static float sum[3] = {0}, best[3] = {__FLT_MAX__}, gain[3] = {0};
-  static uint16_t cnt[3] = {0}, stg[3] = {0};
-  static bool act[3] = {0};
-  static float sp[3] = {TUNE_RELAY_RAD};
-
-  static const uint8_t idx[] = {0, 2, 1}; // P, D, I indices
-  static const float inc[] = {TUNE_P_INCREMENT, TUNE_D_INCREMENT, TUNE_I_INCREMENT};
+  // Stage configuration - maps training stages to PID gains and increments
+  static const uint8_t stage_to_gain_index[] = {0, 2, 1}; // P, D, I indices
+  static const float stage_gain_increment[] = {
+      TUNE_P_GAIN_INCREMENT,
+      TUNE_D_GAIN_INCREMENT,
+      TUNE_I_GAIN_INCREMENT};
 
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
-  const uint32_t now = NRF_TIMER0->CC[0];
+  const uint32_t current_time = NRF_TIMER0->CC[0];
 
-  if (!act[axis])
+  // Initialize training for this axis
+  if (!is_axis_active[axis])
   {
-    act[axis] = true;
-    fcu.pid_setpoint[axis] = sp[axis];
+    is_axis_active[axis] = true;
+    fcu.pid_setpoint[axis] = relay_setpoint[axis];
+    patience_counter[axis] = 0; // Reset early stopping patience
     return false;
   }
 
-  // Relay at 2Hz
-  if (now - last[axis] >= HZ_TO_US(TUNE_RELAY_HZ))
+  // Relay excitation: alternate setpoint to excite system dynamics
+  if (current_time - last_evaluation_time[axis] >= HZ_TO_US(TUNE_RELAY_HERTZ))
   {
-    sp[axis] = -sp[axis];
-    fcu.pid_setpoint[axis] = sp[axis];
-    last[axis] = now;
+    relay_setpoint[axis] = -relay_setpoint[axis]; // Flip excitation direction
+    fcu.pid_setpoint[axis] = relay_setpoint[axis];
+    last_evaluation_time[axis] = current_time;
   }
 
-  // RMSE accumulation
-  sum[axis] += err * err;
-  cnt[axis]++;
+  // Accumulate squared error for RMSE calculation
+  squared_error_sum[axis] += error * error;
+  sample_count[axis]++;
 
-  // Evaluation at 4Hz
-  if (now - last[axis] >= HZ_TO_US(TUNE_SAMPLE_HZ))
+  // RMSE evaluation and gradient-free optimization step
+  if (current_time - last_evaluation_time[axis] >= HZ_TO_US(TUNE_SAMPLE_HERTZ))
   {
-    const float rms = __builtin_sqrtf(sum[axis] / cnt[axis]);
-    const uint8_t i = idx[stg[axis]];
-    const float increment = inc[stg[axis]];
+    // Compute Root Mean Square Error (performance metric)
+    const float current_rmse = sqrtf(squared_error_sum[axis] / sample_count[axis]);
 
-    // Track best gain
-    if (rms < best[axis])
+    // Get current training stage configuration
+    const uint8_t gain_index = stage_to_gain_index[training_stage[axis]];
+    const float gain_step_size = stage_gain_increment[training_stage[axis]];
+
+    // Track best performance (global minimum search)
+    if (current_rmse < best_rmse_achieved[axis])
     {
-      best[axis] = rms;
-      gain[axis] = fcu.pid_gain[axis][i];
+      best_rmse_achieved[axis] = current_rmse;
+      best_gain_found[axis] = fcu.pid_gain[axis][gain_index];
+      patience_counter[axis] = 0; // Reset patience on performance improvement
     }
 
-    fcu.pid_gain[axis][i] += increment;
+    // Gradient-free optimization: increment current gain
+    fcu.pid_gain[axis][gain_index] += gain_step_size;
 
-    // Stop when error increases 20%
-    if (rms > best[axis] * 1.2f)
+    // Early stopping with patience: prevent overfitting and find global optimum
+    if (current_rmse > best_rmse_achieved[axis] * TUNE_OVERFIT_TOLERANCE)
     {
-      fcu.pid_gain[axis][i] = gain[axis];
+      patience_counter[axis]++; // Count consecutive performance degradations
 
-      if (stg[axis]++ >= 2)
+      // Stop training only after patience threshold is reached
+      if (patience_counter[axis] >= TUNE_PATIENCE_SAMPLES)
       {
-        fcu.pid_setpoint[axis] = 0;
-        act[axis] = false;
-        return true;
+        // Revert to best-found gain (model checkpoint)
+        fcu.pid_gain[axis][gain_index] = best_gain_found[axis];
+
+        // Progress to next training stage (P → D → I)
+        if (training_stage[axis]++ >= 2)
+        {
+          // All stages complete for this axis
+          fcu.pid_setpoint[axis] = 0; // Reset to hover
+          is_axis_active[axis] = false;
+          return true; // Training complete for this axis
+        }
+
+        // Reset for next stage
+        best_rmse_achieved[axis] = __FLT_MAX__;
+        patience_counter[axis] = 0;
       }
-      best[axis] = __FLT_MAX__;
+    }
+    else
+    {
+      // Reset patience counter if performance recovers (local minimum escape)
+      patience_counter[axis] = 0;
     }
 
-    sum[axis] = 0;
-    cnt[axis] = 0;
-    last[axis] = now;
+    // Reset accumulators for next evaluation period
+    squared_error_sum[axis] = 0;
+    sample_count[axis] = 0;
+    last_evaluation_time[axis] = current_time;
   }
 
-  return false;
+  return false; // Training still in progress
 }

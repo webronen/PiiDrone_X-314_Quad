@@ -71,33 +71,34 @@ Inspired by the Åström–Hägglund relay auto-tuning method.
 
 ### Overview
 
-Auto-tunes roll, pitch, and yaw using 2Hz relay excitation and pure RMSE. Finds the true minimum for each stage and stops when RMSE rises by 20%. No hard-coded gain limits.
+Auto-tunes roll, pitch, and yaw using 0.5Hz relay excitation and pure RMSE. Finds the true minimum for each stage and stops when RMSE rises by 20% (with patience for 3 samples). No hard-coded gain limits.
 
 ### Features
 
-- Smooth thrust ramp to hover
-- 3-stage tuning (P → D → I) with 2Hz relay (square wave setpoint)
+- Smooth thrust ramp to hover (5s)
+- 3-stage tuning (P → D → I) with 0.5Hz relay (15° amplitude)
 - Track absolute minimum RMSE per stage
 - Select true minimum (best gain tracking)
-- Stop when RMSE increases by 20% after minimum
-- Constant gain increments (see code)
-- 20Hz RMSE evaluation (fast, robust)
+- Stop when RMSE increases by 20% after minimum (with 3-sample patience)
+- Constant gain increments: P +2.0, D +1.0, I +0.01 per step
+- RMSE evaluation every 0.25s (4Hz, matches code)
+- All tuning within safe thrust limits
 
 ### Tuning Process
 
-1. Ramp up thrust to hover (smoothstep)
+1. Ramp up thrust to hover (smoothstep, 5s)
 2. Zero all gains
 3. For each axis, tune in 3 stages (P, D, I):
-  - Alternate setpoint at 2Hz (relay, square wave)
-  - Accumulate squared error at each gain
-  - Every 0.05s (20Hz): compute RMSE, increment gain
-  - Track absolute minimum RMSE and best gain
-  - Stop when RMSE increases by 20% after minimum
-  - Set gain to best (minimum RMSE)
+    - Alternate setpoint at 0.5Hz (relay, 15° amplitude)
+    - Accumulate squared error at each gain
+    - Every 0.25s (4Hz): compute RMSE, increment gain
+    - Track absolute minimum RMSE and best gain
+    - Stop when RMSE increases by 20% after minimum (3-sample patience)
+    - Set gain to best (minimum RMSE)
 4. Repeat for roll, pitch, yaw
 5. Ramp down thrust to zero (smoothstep)
 
-### RMS Error Metric
+### RMSE Error Metric
 
 All decisions use:
 
@@ -108,7 +109,7 @@ where $e_i$ is the error at sample $i$, $N$ is the sample count.
 ## Results
 
 - Tuning: ~8–32s per axis (depends on response)
-- Each stage stops when RMSE increases by 20% after minimum
+- Each stage stops when RMSE increases by 20% after minimum (with patience)
 - Gains: optimal, safe, flyable
 - Finds true minimum, not just first acceptable
 - Minimal code, robust to non-monotonic response
@@ -126,13 +127,7 @@ where $e_i$ is the error at sample $i$, $N$ is the sample count.
 
 ## Summary
 
-Enable safe, hands-off PID tuning for drones. Deliver reliable initial gains for stable flight. Recommend further manual tuning for best performance. Provide robust starting point for agile, balanced control. Control authority budget and safety features support robust flight dynamics for the PiiDrone X-314 Quad.
-
----
-
-## 3D Model
-
-- [PiiDrone X-314 Quad (Maker World)](https://makerworld.com/en/models/1153207-piidrone-x-314-quad)
+Enables safe, hands-off PID tuning for drones. Delivers reliable initial gains for stable flight. Further manual tuning is recommended for best performance. Provides a robust starting point for agile, balanced control. Control authority budget and safety features support robust flight dynamics for the PiiDrone X-314 Quad.
 
 ---
 
