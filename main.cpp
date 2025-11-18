@@ -441,7 +441,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float error)
   if (current_time - axis_state[axis].last_evaluation_time >= HZ_TO_US(TUNE_SAMPLE_HERTZ))
   {
     // Compute Root Mean Square Error (performance metric)
-    const float current_rmse = sqrtf(axis_state[axis].squared_error_sum / axis_state[axis].sample_count);
+    const float current_rmse = __builtin_sqrtf(axis_state[axis].squared_error_sum / axis_state[axis].sample_count);
 
     // Get current training stage configuration
     const uint8_t gain_index = stage_to_gain_index[axis_state[axis].training_stage];
