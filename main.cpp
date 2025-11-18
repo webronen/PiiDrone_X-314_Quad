@@ -271,7 +271,7 @@ static inline void task_pof_update(void)
 
 static inline void pid_tune_stop(void)
 {
-  // No need to memset global state, handled by static members
+  memset(&tune_state, 0, sizeof(tune_state));
 
   FCU_CLEAR_AUTOTUNE(fcu.status);
 }
