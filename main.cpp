@@ -481,5 +481,6 @@ static inline bool pid_tune_step(const uint8_t axis, const float error)
     last_evaluation_time[axis] = current_time;
   }
 
-  return false; // Training still in progress
+  // Training still in progress
+  return false;
 }
