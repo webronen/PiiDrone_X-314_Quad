@@ -65,13 +65,13 @@ Ultra-light, agile, stable. 70g including LiPo.
 
 ---
 
-## TrueMin RMSE Relay Autotune
+## PiiTune Deep RMSE 
 
 Inspired by the Åström–Hägglund relay auto-tuning method.
 
 ### Overview
 
-Auto-tunes roll, pitch, and yaw using 0.5Hz relay excitation and pure RMSE. Finds the true minimum for each stage and stops when RMSE rises by 20% (with patience for 3 samples). No hard-coded gain limits.
+Automatically tunes roll, pitch, and yaw using 0.5 Hz relay excitation and pure RMSE evaluation. Searches for the true minimum at each stage and applies early stopping when RMSE increases by 20% (with patience over 3 samples). Gain limits are not fixed, allowing full adaptation to system dynamics.
 
 ### Features
 
