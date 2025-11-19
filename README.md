@@ -45,6 +45,7 @@ M4: Rear-left (CCW)
 - Integral clamp: ±58.33 units (50% of PID limit)
 
 ## PiiTune Deep RMSE - PID Auto-Tune System
+Inspired by Åström–Hägglund relay method
 
 ### Overview
 Fully-automated, per-axis PID gain tuning using relay feedback, RMSE error metric, and robust overfitting/stability validation.
@@ -89,9 +90,9 @@ Fully-automated, per-axis PID gain tuning using relay feedback, RMSE error metri
 Enables safe, hands-off PID tuning. Delivers reliable axis-specific gains for stable flight. Control authority budget supports robust flight dynamics for the PiiDrone X-314 Quad.
 
 ## References
-- [PID controller](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller)
-- [Åström–Hägglund relay method](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller#Relay_(%C3%85str%C3%B6m%E2%80%93H%C3%A9gglund)_method)
-- [Root mean square deviation (RMSE)](https://en.wikipedia.org/wiki/Root_mean_square_deviation)
-- [Reinforcement learning](https://en.wikipedia.org/wiki/Reinforcement_learning)
-- [Machine learning](https://en.wikipedia.org/wiki/Machine_learning)
-- [Smoothstep](https://en.wikipedia.org/wiki/Smoothstep)
+* [PID controller](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller)
+* [Åström–Hägglund relay method](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller#Relay_(%C3%85str%C3%B6m%E2%80%93H%C3%A9gglund)_method)
+* [Root mean square deviation (RMSE)](https://en.wikipedia.org/wiki/Root_mean_square_deviation)
+* [Reinforcement learning](https://en.wikipedia.org/wiki/Reinforcement_learning)
+* [Machine learning](https://en.wikipedia.org/wiki/Machine_learning)
+* [Smoothstep](https://en.wikipedia.org/wiki/Smoothstep)
