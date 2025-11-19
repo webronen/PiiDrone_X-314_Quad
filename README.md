@@ -3,133 +3,90 @@
 
 Ultra-light, agile, and stable. 70g including LiPo.
 
----
-
 ## Motor Layout (X Configuration)
 
 ```
-    Rear
-      |
+      Rear
+        |
  |----|----|
  | M4 | M3 |
  |----|----|
  | M2 | M1 |
  |----|----|
-      |
-    Front
+        |
+      Front
 ```
 
-- **M1:** Front-right (CCW)
-- **M2:** Front-left (CW)
-- **M3:** Rear-right (CW)
-- **M4:** Rear-left (CCW)
+M1: Front-right (CCW)
+M2: Front-left (CW)
+M3: Rear-right (CW)
+M4: Rear-left (CCW)
 
----
+## Setpoint Response
 
-## Setpoint Response Table
+| Axis  | Setpoint   | Sign | Response         |
+|-------|------------|------|------------------|
+| Roll  | Increase   | +    | Roll right       |
+| Roll  | Decrease   | –    | Roll left        |
+| Pitch | Increase   | +    | Pitch forward    |
+| Pitch | Decrease   | –    | Pitch backward   |
+| Yaw   | Increase   | +    | Yaw right (CW)   |
+| Yaw   | Decrease   | –    | Yaw left (CCW)   |
 
-| Axis  | Setpoint Change | Sign | Response        |
-|-------|-----------------|------|-----------------|
-| Roll  | Increase        | +    | Roll right      |
-| Roll  | Decrease        | –    | Roll left       |
-| Pitch | Increase        | +    | Pitch forward   |
-| Pitch | Decrease        | –    | Pitch backward  |
-| Yaw   | Increase        | +    | Yaw right (CW)  |
-| Yaw   | Decrease        | –    | Yaw left (CCW)  |
+## Control Authority
 
----
+- Total thrust: 160g (800 units) across 4 motors
+- Mass: 70g (hover thrust: 350 units)
+- Max lateral acceleration: 1.0g
+- Thrust-to-weight: 2.28:1
+- Altitude budget: 90g (450 units = hover + 20g margin)
+- Stabilization budget: 70g (350 units = 100% mass)
+- PID output: ±116.67 units/axis (prevents saturation)
+- Integral clamp: ±58.33 units (50% of PID limit)
 
-## Control Authority Budget
+## PiiTune Deep RMSE - PID Auto-Tune System
 
-### Physical Capabilities
-- **Total thrust:** 160g (800 units) across 4 motors
-- **Mass:** 70g (hover thrust: 350 units)
-- **Max lateral acceleration:** 1.0g
-- **Thrust-to-weight:** 2.28:1
+### Overview
+Fully-automated, per-axis PID gain tuning using relay feedback, RMSE error metric, and robust overfitting/stability validation.
 
-### Authority Allocation
-- **Altitude budget:** 90g (450 units = hover + 20g margin)
-- **Stabilization budget:** 70g (350 units = 100% mass)
+### Tuning Process
+1. **Initialization:** For each axis, tuning starts at the P stage (D/I zeroed), relay setpoint toggling excites the axis.
+2. **Stage Loop (P → D → I):**
+  - Increment the relevant gain by a fixed step after each evaluation window.
+  - RMSE is computed over a window of samples.
+  - If RMSE improves, update best gain and reset patience.
+  - If RMSE worsens (beyond a tolerance), increment patience.
+  - If patience runs out, revert to best gain and start a stability test.
+3. **Stability Test:**
+  - Hold the best gain for 10 seconds.
+  - If RMSE remains at/below best, stage is complete.
+  - If RMSE worsens, increment gain and restart timer (protects against overfitting).
+4. **Stage/Axis Completion:**
+  - Progress through P → D → I. When all stages are stable, axis is done.
+  - When all axes are done, tuning stops and gains are stored.
 
-### Performance & Safety
-- **1.0g lateral acceleration:** Strong rejection
-- **PID output:** ±116.67 units/axis (prevents saturation)
-- **Integral clamp:** ±58.33 units (50% of PID limit)
+### Key Features
+- Per-axis, staged tuning (P → D → I)
+- Relay excitation for system identification
+- RMSE-based error evaluation
+- Best gain tracking and patience-driven stopping
+- Overfitting avoidance and stability validation
+- All configuration centralized in macros/arrays
 
-### Design Advantage
-- **Mass-equivalent stabilization budget:** Exceeds typical
-- **Conservative thrust allocation:** Robust in turbulence
-- **Balanced control:** Agility, no saturation
-
----
-
-## PiiTune Deep RMSE - PID Training System
-
-Inspired by the Åström–Hägglund relay auto-tuning method and practical system validation.
-
-### What It Is
-- **Per-Axis, Staged PID Tuning:** Each axis (Roll, Pitch, Yaw) is tuned independently in three stages: P, D, I.
-- **Relay Excitation:** Alternates setpoint at 0.5Hz (15° amplitude) to excite system dynamics for identification.
-- **RMSE-Based Evaluation:** Uses root mean square error (RMSE) at 4Hz to evaluate performance and guide tuning.
-- **Best Gain Tracking:** Remembers the gain value that achieved the lowest RMSE for each stage and axis.
-- **Patience Mechanism:** Waits for 3 consecutive RMSE increases before stopping a stage (prevents premature stopping).
-- **Early Stopping and Revert:** If RMSE increases, reverts to best gain and starts a stability test.
-- **Two-Phase Process:** Phase 1: Incremental gain search; Phase 2: 10s stability validation under relay excitation.
-- **Infinite Gain Exploration:** If stability test fails, increases gain and restarts test until stable.
-- **Automatic Stage Progression:** After stability, moves to next gain (P→D→I) for each axis.
-- **Axis Completion:** After all stages, axis is marked complete; all axes must finish for tuning to end.
-- **State Reset:** All accumulators and state are reset between stages and axes for robust operation.
-
-### Training Process
-**Phase 1: Incremental Discovery (Per Axis)**
-- Start: P=0.5, I=0, D=0 with relay excitation (0.5Hz, 15° amplitude)
-- RMSE evaluation: 4Hz rate, squared error accumulation
-- Increment gain for current stage (P, D, I) until RMSE stops improving
-- Track best RMSE and gain; revert to best gain if RMSE increases
-- Patience: Wait for 3 consecutive RMSE increases before stopping
-
-**Phase 2: Stability Validation (Per Axis)**
-- 10-second endurance test under continuous relay excitation
-- If RMSE increases, increase gain and restart test (infinite gain exploration)
-- On success, progress to next stage (P→D→I); after all, axis is complete
-
-### RMSE Error Metric
-All optimization decisions use:
-
-$RMSE = \sqrt{\frac{1}{N} \sum_{i=1}^N (e_i)^2}$
-
-where $e_i$ is the error at sample $i$, $N$ is the sample count over 250ms evaluation windows.
-
-### Performance Results
-- **Training Time:** ~30-60 seconds per axis (90-180s total)
-- **Stage Completion:** RMSE increases by 20% with 3-sample patience triggers stability test
-- **Gain Quality:** Axis-specific, optimal, stable, and flight-ready
-- **Reliability:** Infinite search guarantees solution for any system
-- **Completeness:** Each axis independently optimized for its unique dynamics
-
-### Validation Methodology
-- **Per-Axis Survival Testing:** 10-second continuous relay operation per axis
-- **Infinite Gain Adjustment:** No limits – finds stable gains for any system
-- **Independent Optimization:** Each axis tuned to its specific requirements
-- **Real-World Ready:** Testing under excitation mimics flight disturbances
-
-**Result:** Fast, reliable, and complete tuning with mathematically optimal and practically stable PID parameters for each axis independently.
-
----
+### Performance
+- Training Time: ~90-180 seconds total
+- Stage Completion: 20% RMSE increase triggers stability test
+- Gain Quality: Axis-specific, stable, and flight-ready
 
 ## Safety & Robustness
-- **Reset all PID states and setpoints** when FCU inactive
-- **Constrain motor outputs** to physical limits
-- **Activate failsafe/landing** on packet timeout or power warning
-- **Abort auto-tune and clear state** if thrust input changes during ramp/tune
-
----
+- Reset all PID states and setpoints when FCU inactive
+- Constrain motor outputs to physical limits (0-800 units)
+- Activate failsafe/landing on packet timeout or power warning
+- Abort auto-tune if thrust input changes during ramp/tune
+- Independent axis safety management
 
 ## Summary
-
-Enables safe, hands-off PID tuning for drones. Delivers reliable, axis-specific gains for stable flight. Further manual tuning is recommended for best performance. Provides a robust starting point for agile, balanced control. Control authority budget and safety features support robust flight dynamics for the PiiDrone X-314 Quad.
-
----
+Enables safe, hands-off PID tuning. Delivers reliable axis-specific gains for stable flight. Control authority budget supports robust flight dynamics for the PiiDrone X-314 Quad.
 
 ## References
 - [PID controller](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller)
@@ -138,4 +95,3 @@ Enables safe, hands-off PID tuning for drones. Delivers reliable, axis-specific 
 - [Reinforcement learning](https://en.wikipedia.org/wiki/Reinforcement_learning)
 - [Machine learning](https://en.wikipedia.org/wiki/Machine_learning)
 - [Smoothstep](https://en.wikipedia.org/wiki/Smoothstep)
----
