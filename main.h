@@ -215,10 +215,12 @@ typedef struct __attribute__((packed, aligned(4)))
   bool is_active;                // Whether this axis is currently being tuned
   float relay_setpoint;          // Current relay excitation setpoint
   uint8_t patience_counter;      // Early stopping patience counter
-  uint8_t padding[2];            // Padding for 4-byte alignment
+  bool stability_check_active;   // Whether stability check is active
+  uint32_t stability_start_time; // Time when stability check started
+  uint8_t padding[5];            // Padding for 4-byte alignment
 } TuneAxisState;
 
-static_assert(sizeof(TuneAxisState) == 32, "TuneAxis State struct must be 32 bytes (8 words)");
+static_assert(sizeof(TuneAxisState) == 40, "TuneAxis State struct must be 40 bytes (10 words)");
 
 static Fcu fcu = {0};
 static Esc esc = {0x8000, 0x8000, 0x8000, 0x8000};
