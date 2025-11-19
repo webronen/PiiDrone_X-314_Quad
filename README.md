@@ -1,21 +1,19 @@
-
 # PiiDrone X-314 Quad
 
 Ultra-light, agile, and stable. 70g including LiPo.
 
-
 ## Motor Layout (X Configuration)
 
 ```
-    Rear
-      |
- |----|----|
- | M4 | M3 |
- |----|----|
- | M2 | M1 |
- |----|----|
-      |
-    Front
+         Rear
+           |
+      | -- | -- |
+      | M4 | M3 |
+      | -- | -- |
+      | M2 | M1 |
+      | -- | -- |
+           |
+         Front
 ```
 
 - M1: Front-right (CCW)
@@ -23,18 +21,16 @@ Ultra-light, agile, and stable. 70g including LiPo.
 - M3: Rear-right (CW)
 - M4: Rear-left (CCW)
 
-
 ## Setpoint Response
 
-| Axis  | Setpoint Change | Sign | Response        |
-|-------|-----------------|------|-----------------|
-| Roll  | Increase        | +    | Roll right      |
-| Roll  | Decrease        | –    | Roll left       |
-| Pitch | Increase        | +    | Pitch forward   |
-| Pitch | Decrease        | –    | Pitch backward  |
-| Yaw   | Increase        | +    | Yaw right (CW)  |
-| Yaw   | Decrease        | –    | Yaw left (CCW)  |
-
+| Axis  | Setpoint Change | Sign | Response       |
+| ----- | --------------- | ---- | -------------- |
+| Roll  | Increase        | +    | Roll right     |
+| Roll  | Decrease        | –    | Roll left      |
+| Pitch | Increase        | +    | Pitch forward  |
+| Pitch | Decrease        | –    | Pitch backward |
+| Yaw   | Increase        | +    | Yaw right (CW) |
+| Yaw   | Decrease        | –    | Yaw left (CCW) |
 
 ## Control Authority
 
@@ -57,8 +53,6 @@ Ultra-light, agile, and stable. 70g including LiPo.
 - Mass-equivalent stabilization budget (exceeds typical)
 - Conservative thrust allocation (robust in turbulence)
 - Balanced control (agility, no saturation)
-
-
 
 ## PiiTune StepSync – Adaptive PID Tuning System
 
@@ -103,8 +97,6 @@ All optimization decisions use direct flight performance measurements:
 - Convergence: Finds true performance boundary, not arbitrary stopping point
 - Robustness: Handles non-ideal responses and measurement noise
 
-
-
 ## Safety & Robustness
 
 - Automatic setpoint reset: Zero commands when tuning complete
@@ -113,29 +105,18 @@ All optimization decisions use direct flight performance measurements:
 - Timing safety: Half-cycle offset ensures proper measurement timing
 - Graceful degradation: Handles unsettled systems and edge cases
 
-
-
 ## Flight Performance Targets
-
 Rock-solid filming profile:
 - Roll/Pitch: <200ms settling, <1.0° overshoot
 - Yaw: <250ms settling, <0.5° overshoot
 
 Smooth, cinematic response perfect for aerial filming.
 
----
-
 ## Summary
-
 Enables safe, hands-off PID tuning for drones. Delivers reliable, flight-ready gains for stable flight. Further manual tuning is recommended for best performance. Provides a robust starting point for agile, balanced control. Control authority budget and safety features support robust flight dynamics for the PiiDrone X-314 Quad.
 
-
 ## References
-
 - [PID controller](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller)
 - [Åström–Hägglund relay method](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller#Relay_(%C3%85str%C3%B6m%E2%80%93H%C3%A9gglund)_method)
-- [Root mean square deviation (RMSE)](https://en.wikipedia.org/wiki/Root_mean_square_deviation)
-- [Reinforcement learning](https://en.wikipedia.org/wiki/Reinforcement_learning)
-- [Machine learning](https://en.wikipedia.org/wiki/Machine_learning)
-- [Smoothstep](https://en.wikipedia.org/wiki/Smoothstep)
+- [Pareto efficiency](https://en.wikipedia.org/wiki/Pareto_efficiency)
 ---
