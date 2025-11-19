@@ -1,9 +1,7 @@
 # PiiDrone X-314 Quad
-
 Ultra-light, agile, and stable. 70g including LiPo.
 
 ## Motor Layout (X Configuration)
-
 ```
          Rear
            |
@@ -15,14 +13,12 @@ Ultra-light, agile, and stable. 70g including LiPo.
            |
          Front
 ```
-
 - M1: Front-right (CCW)
 - M2: Front-left (CW)
 - M3: Rear-right (CW)
 - M4: Rear-left (CCW)
 
 ## Setpoint Response
-
 | Axis  | Setpoint Change | Sign | Response       |
 | ----- | --------------- | ---- | -------------- |
 | Roll  | Increase        | +    | Roll right     |
@@ -55,7 +51,6 @@ Ultra-light, agile, and stable. 70g including LiPo.
 - Balanced control (agility, no saturation)
 
 ## PiiTune StepSync – Adaptive PID Tuning System
-
 Inspired by relay auto-tuning methods and Pareto multi-objective optimization.
 
 ### What It Is
@@ -98,7 +93,6 @@ All optimization decisions use direct flight performance measurements:
 - Robustness: Handles non-ideal responses and measurement noise
 
 ## Safety & Robustness
-
 - Automatic setpoint reset: Zero commands when tuning complete
 - Stage isolation: Clean parameter separation prevents interference
 - Bounds protection: Array bounds checking and stage overflow protection
