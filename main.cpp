@@ -162,7 +162,7 @@ static inline void task_fcu_update(void)
 
   if (tune_state.is_running && !tune_state.is_at_hover)
   {
-    if (pid_thrust_ramp(TUNE_THRUST_MAX, TUNE_RAMP_S))
+    if (pid_thrust_ramp(TUNE_RAMP_MAX, TUNE_RAMP_S))
     {
       tune_state.is_at_hover = true;
     }
@@ -182,7 +182,7 @@ static inline void task_fcu_update(void)
   }
   else if (!tune_state.is_running && tune_state.is_at_hover)
   {
-    if (pid_thrust_ramp(-TUNE_THRUST_MAX, TUNE_RAMP_S))
+    if (pid_thrust_ramp(-TUNE_RAMP_MAX, TUNE_RAMP_S))
     {
       pid_tune_stop();
       pid_state_clear();

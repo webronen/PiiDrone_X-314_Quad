@@ -61,7 +61,7 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 #define PID_LOOP_PERIOD (1.0f / PID_LOOP_HZ)
 #define PID_ARRAY_SIZE 3
 
-#define TUNE_THRUST_MAX PID_OUT_MAX                          // Maximum control output during tuning
+#define TUNE_RAMP_MAX THRUST_HOVER                           // Maximum control output during tuning
 #define TUNE_RAMP_S 5.0f                                     // Thrust ramp duration for stable start (seconds)
 #define TUNE_RELAY_DEGREES 15.0f                             // Relay excitation amplitude (degrees)
 #define TUNE_RELAY_HERTZ 0.5f                                // Relay oscillation frequency (Hz)
