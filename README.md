@@ -51,9 +51,7 @@ Ultra-light, agile, and stable. 70g including LiPo.
 - Balanced control (agility, no saturation)
 
 ## PiiTune StepSync – Adaptive PID Tuning System
-Inspired by relay auto-tuning methods and Pareto multi-objective optimization.
-- Per-axis PID tuning using relay excitation and Pareto-optimized step response analysis.
-- Tunes P, D, I gains sequentially while balancing settling time against overshoot.
+Inspired by relay auto-tuning methods and Pareto multi-objective optimization, PiiTune StepSync performs per-axis PID tuning using relay excitation and Pareto-optimized step response analysis, sequentially tuning P, D, and I gains while balancing settling time against overshoot.
 
 ### What It Is
 - Adaptive PID Tuning: Learns optimal gains through step response analysis
