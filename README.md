@@ -106,11 +106,12 @@ All optimization decisions use direct flight performance measurements:
 - Graceful degradation: Handles unsettled systems and edge cases
 
 ## Flight Performance Targets
-Rock-solid filming profile:
+
+**Hover Performance Targets**
 - Roll/Pitch: <200ms settling, <1.0° overshoot
 - Yaw: <250ms settling, <0.5° overshoot
 
-Smooth, cinematic response perfect for aerial filming.
+Stable, accurate, and fully autonomous hover.
 
 ## Summary
 Enables safe, hands-off PID tuning for drones. Delivers reliable, flight-ready gains for stable flight. Further manual tuning is recommended for best performance. Provides a robust starting point for agile, balanced control. Control authority budget and safety features support robust flight dynamics for the PiiDrone X-314 Quad.
