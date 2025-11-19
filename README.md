@@ -18,8 +18,11 @@ Ultra-light, agile, and stable. 70g including LiPo.
 ```
 
 M1: Front-right (CCW)
+
 M2: Front-left (CW)
+
 M3: Rear-right (CW)
+
 M4: Rear-left (CCW)
 
 ## Setpoint Response
