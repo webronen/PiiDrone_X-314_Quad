@@ -399,109 +399,333 @@ static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s)
   return (x >= 1.0f) ? (start_time_us = 0, true) : false;
 }
 
-static inline bool pid_tune_step(const uint8_t axis, const float error)
+static inline bool pid_tune_step(const uint8_t axis, const float measurement)
 {
-  static TuneAxisState axis_state[3] = {
-      {0, 0, 0, __FLT_MAX__, 0, 0, 0, false, TUNE_RELAY_RADIANS, 0},
-      {0, 0, 0, __FLT_MAX__, 0, 0, 0, false, TUNE_RELAY_RADIANS, 0},
-      {0, 0, 0, __FLT_MAX__, 0, 0, 0, false, TUNE_RELAY_RADIANS, 0}};
+  // Safety check
+  if (axis >= 3)
+    return false;
 
-  // Stage configuration - maps training stages to PID gains and increments
-  static const uint8_t stage_to_gain_index[] = {0, 2, 1}; // P, D, I indices
+  // Full state structure with clear names
+  static struct
+  {
+    // Timing
+    uint32_t relay_start_time;
+    uint32_t evaluation_start_time;
+    uint32_t step_start_time;
+    uint32_t settling_time;
+
+    // Performance tracking
+    float best_settling_time;
+    float best_overshoot;
+    float best_p_gain;
+    float best_d_gain;
+    float best_i_gain;
+
+    // Current state
+    float setpoint_target;
+    float max_overshoot;
+    uint8_t current_stage;
+    uint8_t patience_counter;
+    bool is_active;
+    bool measuring_step_response;
+  } axis_state[3] = {0};
+
+  // Stage configuration
+  static const uint8_t stage_to_gain_index[] = {0, 2, 1}; // P, D, I
   static const float stage_gain_increment[] = {
       TUNE_P_GAIN_INCREMENT,
       TUNE_D_GAIN_INCREMENT,
       TUNE_I_GAIN_INCREMENT};
 
+  // Get current time
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
   const uint32_t current_time = NRF_TIMER0->CC[0];
 
-  // Initialize training for this axis
+  // Initialize axis tuning
   if (!axis_state[axis].is_active)
   {
     axis_state[axis].is_active = true;
-    fcu.pid_setpoint[axis] = axis_state[axis].relay_setpoint;
-
-    // Reset PID gains to zero for safe starting point
-    fcu.pid_gain[axis][0] = TUNE_P_GAIN_INCREMENT; // P = 2
-    fcu.pid_gain[axis][1] = 0.0f;                  // I = 0
-    fcu.pid_gain[axis][2] = 0.0f;                  // D = 0
-
-    axis_state[axis].last_relay_time = current_time;
-    axis_state[axis].last_evaluation_time = current_time;
+    axis_state[axis].measuring_step_response = true;
+    axis_state[axis].setpoint_target = TUNE_RELAY_RADIANS;
+    fcu.pid_setpoint[axis] = axis_state[axis].setpoint_target;
+    axis_state[axis].step_start_time = current_time;
+    axis_state[axis].max_overshoot = 0.0f;
+    axis_state[axis].settling_time = 0;
+    axis_state[axis].best_settling_time = __FLT_MAX__;
+    axis_state[axis].best_overshoot = __FLT_MAX__;
+    axis_state[axis].current_stage = 0;
     axis_state[axis].patience_counter = 0;
+
+    // Initialize gains for first stage (P)
+    fcu.pid_gain[axis][0] = TUNE_P_GAIN_INCREMENT; // P
+    fcu.pid_gain[axis][1] = 0.0f;                  // I
+    fcu.pid_gain[axis][2] = 0.0f;                  // D
+    axis_state[axis].best_p_gain = fcu.pid_gain[axis][0];
+    axis_state[axis].best_d_gain = 0.0f;
+    axis_state[axis].best_i_gain = 0.0f;
+
+    axis_state[axis].relay_start_time = current_time;
+    axis_state[axis].evaluation_start_time = current_time + HZ_TO_US(TUNE_RELAY_HERTZ) / 2;
     return false;
   }
 
-  // Relay excitation: alternate setpoint to excite system dynamics (0.5Hz)
-  if (current_time - axis_state[axis].last_relay_time >= HZ_TO_US(TUNE_RELAY_HERTZ))
+  // Relay excitation at specified frequency
+  if (current_time - axis_state[axis].relay_start_time >= HZ_TO_US(TUNE_RELAY_HERTZ))
   {
-    axis_state[axis].relay_setpoint = -axis_state[axis].relay_setpoint;
-    fcu.pid_setpoint[axis] = axis_state[axis].relay_setpoint;
-    axis_state[axis].last_relay_time = current_time;
+    axis_state[axis].measuring_step_response = true;
+    axis_state[axis].step_start_time = current_time;
+    axis_state[axis].max_overshoot = 0.0f;
+    axis_state[axis].settling_time = 0;
+    axis_state[axis].setpoint_target = -axis_state[axis].setpoint_target;
+    fcu.pid_setpoint[axis] = axis_state[axis].setpoint_target;
+    axis_state[axis].relay_start_time = current_time;
   }
 
-  // Accumulate squared error for RMSE calculation (211Hz accumulation)
-  axis_state[axis].squared_error_sum += error * error;
-  axis_state[axis].sample_count++;
-
-  // RMSE evaluation and gradient-free optimization step (4Hz evaluation)
-  if (current_time - axis_state[axis].last_evaluation_time >= HZ_TO_US(TUNE_SAMPLE_HERTZ))
+  // Measure step response characteristics during each half-cycle
+  if (axis_state[axis].measuring_step_response)
   {
-    // Compute Root Mean Square Error (performance metric)
-    const float current_rmse = __builtin_sqrtf(axis_state[axis].squared_error_sum / axis_state[axis].sample_count);
+    const float target = axis_state[axis].setpoint_target;
+    const float error = target - measurement;
+    const float overshoot = measurement - target;
 
-    // Get current training stage configuration
-    const uint8_t gain_index = stage_to_gain_index[axis_state[axis].training_stage];
-    const float gain_step_size = stage_gain_increment[axis_state[axis].training_stage];
-
-    // Track best performance (global minimum search)
-    if (current_rmse < axis_state[axis].best_rmse_achieved)
+    // Track maximum overshoot
+    if (fabsf(overshoot) > fabsf(axis_state[axis].max_overshoot))
     {
-      axis_state[axis].best_rmse_achieved = current_rmse;
-      axis_state[axis].best_gain_found = fcu.pid_gain[axis][gain_index];
+      axis_state[axis].max_overshoot = overshoot;
+    }
+
+    // Track settling time (to within 0.5°)
+    if (axis_state[axis].settling_time == 0 && fabsf(error) < 0.0087f)
+    {
+      axis_state[axis].settling_time = current_time - axis_state[axis].step_start_time;
+    }
+
+    // Stop measuring after half relay period
+    if (current_time - axis_state[axis].step_start_time >= HZ_TO_US(TUNE_RELAY_HERTZ) / 2)
+    {
+      axis_state[axis].measuring_step_response = false;
+    }
+  }
+
+  // Performance evaluation (offset from relay by half-cycle)
+  if (current_time - axis_state[axis].evaluation_start_time >= HZ_TO_US(TUNE_RELAY_HERTZ))
+  {
+    const float overshoot_radians = fabsf(axis_state[axis].max_overshoot);
+    const float settling_time_ms = axis_state[axis].settling_time ? axis_state[axis].settling_time / 1000.0f : 1000.0f;
+
+    // Safety check for stage bounds
+    if (axis_state[axis].current_stage >= 3)
+    {
+      fcu.pid_setpoint[axis] = 0.0f;
+      axis_state[axis].is_active = false;
+      return false;
+    }
+
+    const uint8_t current_gain_index = stage_to_gain_index[axis_state[axis].current_stage];
+    const float current_gain_increment = stage_gain_increment[axis_state[axis].current_stage];
+
+    // Check for Pareto improvement (both settling time and overshoot)
+    const bool is_performance_improved =
+        (settling_time_ms < axis_state[axis].best_settling_time && overshoot_radians <= axis_state[axis].best_overshoot) ||
+        (settling_time_ms <= axis_state[axis].best_settling_time && overshoot_radians < axis_state[axis].best_overshoot);
+
+    if (is_performance_improved)
+    {
+      axis_state[axis].best_settling_time = settling_time_ms;
+      axis_state[axis].best_overshoot = overshoot_radians;
+
+      // Save optimal gain for current stage
+      switch (axis_state[axis].current_stage)
+      {
+      case 0: // P stage
+        axis_state[axis].best_p_gain = fcu.pid_gain[axis][0];
+        break;
+      case 1: // D stage
+        axis_state[axis].best_d_gain = fcu.pid_gain[axis][2];
+        break;
+      case 2: // I stage
+        axis_state[axis].best_i_gain = fcu.pid_gain[axis][1];
+        break;
+      }
       axis_state[axis].patience_counter = 0;
     }
 
-    // Gradient-free optimization: increment current gain
-    fcu.pid_gain[axis][gain_index] += gain_step_size;
+    // Increment current stage's gain
+    fcu.pid_gain[axis][current_gain_index] += current_gain_increment;
 
-    // Early stopping with patience: prevent overfitting and find global optimum
-    if (current_rmse > axis_state[axis].best_rmse_achieved * TUNE_OVERFIT_TOLERANCE)
+    // Check for convergence
+    if (!is_performance_improved)
     {
       axis_state[axis].patience_counter++;
 
-      // Stop training only after patience threshold is reached
       if (axis_state[axis].patience_counter >= TUNE_PATIENCE_SAMPLES)
       {
-        // Revert to best-found gain (model checkpoint)
-        fcu.pid_gain[axis][gain_index] = axis_state[axis].best_gain_found;
-
-        // Progress to next training stage (P → D → I)
-        if (axis_state[axis].training_stage++ >= 2)
+        // Revert to best-found gain for current stage
+        switch (axis_state[axis].current_stage)
         {
-          // All stages complete for this axis
-          fcu.pid_setpoint[axis] = 0;
-          axis_state[axis].is_active = false;
-          return true;
+        case 0:
+          fcu.pid_gain[axis][0] = axis_state[axis].best_p_gain;
+          break;
+        case 1:
+          fcu.pid_gain[axis][2] = axis_state[axis].best_d_gain;
+          break;
+        case 2:
+          fcu.pid_gain[axis][1] = axis_state[axis].best_i_gain;
+          break;
         }
 
-        // Reset for next stage
-        axis_state[axis].best_rmse_achieved = __FLT_MAX__;
+        // Progress to next stage or complete tuning
+        if (axis_state[axis].current_stage == 2)
+        {
+          // All stages complete - apply final gains
+          fcu.pid_setpoint[axis] = 0.0f;
+          axis_state[axis].is_active = false;
+
+          // Check if all axes are complete
+          bool all_axes_complete = true;
+          for (int i = 0; i < 3; i++)
+          {
+            if (axis_state[i].is_active)
+            {
+              all_axes_complete = false;
+              break;
+            }
+          }
+          return all_axes_complete;
+        }
+        else
+        {
+          // Move to next stage with clean gain isolation
+          axis_state[axis].current_stage++;
+          const uint8_t next_gain_index = stage_to_gain_index[axis_state[axis].current_stage];
+
+          // Reset all gains, then initialize next stage's gain
+          fcu.pid_gain[axis][0] = 0.0f;
+          fcu.pid_gain[axis][1] = 0.0f;
+          fcu.pid_gain[axis][2] = 0.0f;
+          fcu.pid_gain[axis][next_gain_index] = stage_gain_increment[axis_state[axis].current_stage];
+        }
+
+        // Reset performance tracking for next stage
+        axis_state[axis].best_settling_time = __FLT_MAX__;
+        axis_state[axis].best_overshoot = __FLT_MAX__;
         axis_state[axis].patience_counter = 0;
       }
     }
     else
     {
-      // Reset patience counter if performance recovers
       axis_state[axis].patience_counter = 0;
     }
 
-    // Reset accumulators for next evaluation period
-    axis_state[axis].squared_error_sum = 0;
-    axis_state[axis].sample_count = 0;
-    axis_state[axis].last_evaluation_time = current_time;
+    axis_state[axis].evaluation_start_time = current_time;
   }
 
   return false;
 }
+
+// static inline bool pid_tune_step(const uint8_t axis, const float error)
+// {
+//   static TuneAxisState axis_state[3] = {
+//       {0, 0, 0, __FLT_MAX__, 0, 0, 0, false, TUNE_RELAY_RADIANS, 0},
+//       {0, 0, 0, __FLT_MAX__, 0, 0, 0, false, TUNE_RELAY_RADIANS, 0},
+//       {0, 0, 0, __FLT_MAX__, 0, 0, 0, false, TUNE_RELAY_RADIANS, 0}};
+
+//   // Stage configuration - maps training stages to PID gains and increments
+//   static const uint8_t stage_to_gain_index[] = {0, 2, 1}; // P, D, I indices
+//   static const float stage_gain_increment[] = {
+//       TUNE_P_GAIN_INCREMENT,
+//       TUNE_D_GAIN_INCREMENT,
+//       TUNE_I_GAIN_INCREMENT};
+
+//   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
+//   const uint32_t current_time = NRF_TIMER0->CC[0];
+
+//   // Initialize training for this axis
+//   if (!axis_state[axis].is_active)
+//   {
+//     axis_state[axis].is_active = true;
+//     fcu.pid_setpoint[axis] = axis_state[axis].relay_setpoint;
+
+//     // Reset PID gains to zero for safe starting point
+//     fcu.pid_gain[axis][0] = TUNE_P_GAIN_INCREMENT; // P = 2
+//     fcu.pid_gain[axis][1] = 0.0f;                  // I = 0
+//     fcu.pid_gain[axis][2] = 0.0f;                  // D = 0
+
+//     axis_state[axis].last_relay_time = current_time;
+//     axis_state[axis].last_evaluation_time = current_time;
+//     axis_state[axis].patience_counter = 0;
+//     return false;
+//   }
+
+//   // Relay excitation: alternate setpoint to excite system dynamics (0.5Hz)
+//   if (current_time - axis_state[axis].last_relay_time >= HZ_TO_US(TUNE_RELAY_HERTZ))
+//   {
+//     axis_state[axis].relay_setpoint = -axis_state[axis].relay_setpoint;
+//     fcu.pid_setpoint[axis] = axis_state[axis].relay_setpoint;
+//     axis_state[axis].last_relay_time = current_time;
+//   }
+
+//   // Accumulate squared error for RMSE calculation (211Hz accumulation)
+//   axis_state[axis].squared_error_sum += error * error;
+//   axis_state[axis].sample_count++;
+
+//   // RMSE evaluation and gradient-free optimization step (4Hz evaluation)
+//   if (current_time - axis_state[axis].last_evaluation_time >= HZ_TO_US(TUNE_SAMPLE_HERTZ))
+//   {
+//     // Compute Root Mean Square Error (performance metric)
+//     const float current_rmse = __builtin_sqrtf(axis_state[axis].squared_error_sum / axis_state[axis].sample_count);
+
+//     // Get current training stage configuration
+//     const uint8_t gain_index = stage_to_gain_index[axis_state[axis].training_stage];
+//     const float gain_step_size = stage_gain_increment[axis_state[axis].training_stage];
+
+//     // Track best performance (global minimum search)
+//     if (current_rmse < axis_state[axis].best_rmse_achieved)
+//     {
+//       axis_state[axis].best_rmse_achieved = current_rmse;
+//       axis_state[axis].best_gain_found = fcu.pid_gain[axis][gain_index];
+//       axis_state[axis].patience_counter = 0;
+//     }
+
+//     // Gradient-free optimization: increment current gain
+//     fcu.pid_gain[axis][gain_index] += gain_step_size;
+
+//     // Early stopping with patience: prevent overfitting and find global optimum
+//     if (current_rmse > axis_state[axis].best_rmse_achieved)
+//     {
+//       axis_state[axis].patience_counter++;
+
+//       // Stop training only after patience threshold is reached
+//       if (axis_state[axis].patience_counter >= TUNE_PATIENCE_SAMPLES)
+//       {
+//         // Revert to best-found gain (model checkpoint)
+//         fcu.pid_gain[axis][gain_index] = axis_state[axis].best_gain_found;
+
+//         // Progress to next training stage (P → D → I)
+//         if (axis_state[axis].training_stage++ >= 2)
+//         {
+//           // All stages complete for this axis
+//           fcu.pid_setpoint[axis] = 0;
+//           axis_state[axis].is_active = false;
+//           return true;
+//         }
+
+//         // Reset for next stage
+//         axis_state[axis].best_rmse_achieved = __FLT_MAX__;
+//         axis_state[axis].patience_counter = 0;
+//       }
+//     }
+//     else
+//     {
+//       // Reset patience counter if performance recovers
+//       axis_state[axis].patience_counter = 0;
+//     }
+
+//     // Reset accumulators for next evaluation period
+//     axis_state[axis].squared_error_sum = 0;
+//     axis_state[axis].sample_count = 0;
+//     axis_state[axis].last_evaluation_time = current_time;
+//   }
+
+//   return false;
+// }

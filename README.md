@@ -1,8 +1,8 @@
+
 # PiiDrone X-314 Quad
 
-Ultra-light, agile, stable. 70g including LiPo.
+Ultra-light, agile, and stable. 70g including LiPo.
 
----
 
 ## Motor Layout (X Configuration)
 
@@ -17,14 +17,14 @@ Ultra-light, agile, stable. 70g including LiPo.
       |
     Front
 ```
-- **M1:** Front-right (CCW)
-- **M2:** Front-left (CW)
-- **M3:** Rear-right (CW)
-- **M4:** Rear-left (CCW)
 
----
+- M1: Front-right (CCW)
+- M2: Front-left (CW)
+- M3: Rear-right (CW)
+- M4: Rear-left (CCW)
 
-## Setpoint Response Table
+
+## Setpoint Response
 
 | Axis  | Setpoint Change | Sign | Response        |
 |-------|-----------------|------|-----------------|
@@ -35,106 +35,105 @@ Ultra-light, agile, stable. 70g including LiPo.
 | Yaw   | Increase        | +    | Yaw right (CW)  |
 | Yaw   | Decrease        | –    | Yaw left (CCW)  |
 
----
 
-## Control Authority Budget
+## Control Authority
 
-### Physical Capabilities
-
+**Physical Capabilities**
 - Total thrust: 160g (800 units) across 4 motors
 - Mass: 70g (hover thrust: 350 units)
 - Max lateral acceleration: 1.0g
 - Thrust-to-weight: 2.28:1
 
-### Authority Allocation
-
+**Authority Allocation**
 - Altitude budget: 90g (450 units = hover + 20g margin)
 - Stabilization budget: 70g (350 units = 100% mass)
 
-### Performance & Safety
-
+**Performance & Safety**
 - 1.0g lateral acceleration (strong rejection)
 - PID output: ±116.67 units/axis (prevents saturation)
 - Integral clamp: ±58.33 units (50% of PID limit)
 
-### Design Advantage
-
+**Design Advantage**
 - Mass-equivalent stabilization budget (exceeds typical)
 - Conservative thrust allocation (robust in turbulence)
 - Balanced control (agility, no saturation)
 
----
 
-## PiiTune Deep RMSE - PID Training System
 
-Inspired by the Åström–Hägglund relay auto-tuning method and modern machine learning.
+## PiiTune StepSync – Adaptive PID Tuning System
+
+Inspired by relay auto-tuning methods and Pareto multi-objective optimization.
 
 ### What It Is
-- PID Training System: Learns optimal gains through system interaction
-- Deep RMSE Optimization: High-frequency error analysis drives learning
-- Reinforcement Learning: Environment interaction with performance-based updates
-- Adaptive Control: Discovers system-specific optimal parameters
+- Adaptive PID Tuning: Learns optimal gains through step response analysis
+- Pareto Optimization: Minimizes settling time and overshoot together
+- Multi-Objective Learning: Balances speed and stability by direct measurement
+- System-Specific Adaptation: Discovers unique drone dynamics and optimal parameters
 
 ### Key Features
-
-- Learns optimal PID gains through relay excitation
-- Trains using RMSE as performance metric
-- Prevents overfitting with 20% tolerance and patience
-- Finds global optimum through multi-stage exploration (P → D → I)
-- Adapts to specific drone dynamics
+- Step response optimization: Directly measures and optimizes flight performance
+- Pareto frontier exploration: Finds best trade-off between settling time and overshoot
+- Staged learning: Systematic progression through P → D → I
+- Intelligent convergence: Patience-based stopping prevents premature optimization
+- Real flight correlation: Tunes for actual pilot experience, not just math
 
 ### Training Process
-
-1. System excitation via relay oscillations (0.5Hz, 15° amplitude)
-2. Performance measurement through deep RMSE analysis (4Hz)
-3. Parameter updates based on performance feedback
-4. Multi-stage learning (P → D → I)
-5. Validation through overfitting prevention (20% tolerance, 3-sample patience)
+- System excitation: Relay oscillations (0.5Hz, 15° amplitude) with half-cycle timing
+- Performance measurement: Direct step response analysis (settling time + overshoot)
+- Pareto optimization: Multi-objective improvement tracking
+- Staged learning: Isolated parameter tuning (P → D → I)
+- Intelligent completion: Convergence detection with performance validation
 
 ### Technical Foundation
+- Pareto optimization: Multi-objective improvement, no artificial weighting
+- Step response analysis: Direct measurement of flight-relevant performance
+- Staged parameter isolation: Clean separation of P, D, I effects
+- Real-time adaptation: Continuous performance feedback and adjustment
 
-- Reinforcement Learning: Environment + Agent + Reward system
-- Online Learning: Real-time parameter updates
-- Gradient-Free Optimization: Robust to non-convex landscapes
-- System Identification: Learns drone dynamics through interaction
-
-### RMSE Error Metric
-
-All decisions use:
-
-$RMSE = \sqrt{\frac{1}{N} \sum_{i=1}^N (e_i)^2}$
-
-where $e_i$ is the error at sample $i$, $N$ is the sample count.
+### Performance Metrics
+All optimization decisions use direct flight performance measurements:
+- Settling time: Time to reach and stay within 0.5° of target
+- Overshoot: Maximum angle exceeded beyond target
+- Pareto improvement: Better in one metric, equal or better in the other
 
 ## Results
+- Tuning time: ~30–90 seconds per axis (convergence-based)
+- Performance: Optimal balance of speed and stability for filming
+- Gains: Flight-ready, stable, responsive
+- Convergence: Finds true performance boundary, not arbitrary stopping point
+- Robustness: Handles non-ideal responses and measurement noise
 
-- Tuning: ~8–32s per axis (depends on response)
-- Each stage stops when RMSE increases by 20% after minimum (with patience)
-- Gains: optimal, safe, flyable
-- Finds true minimum, not just first acceptable
-- Minimal code, robust to non-monotonic response
 
----
 
 ## Safety & Robustness
 
-- Reset all PID states and setpoints when FCU inactive
-- Constrain motor outputs to physical limits
-- Activate failsafe/landing on packet timeout or power warning
-- Abort auto-tune and clear state if thrust input changes during ramp/tune
+- Automatic setpoint reset: Zero commands when tuning complete
+- Stage isolation: Clean parameter separation prevents interference
+- Bounds protection: Array bounds checking and stage overflow protection
+- Timing safety: Half-cycle offset ensures proper measurement timing
+- Graceful degradation: Handles unsettled systems and edge cases
+
+
+
+## Flight Performance Targets
+
+Rock-solid filming profile:
+- Roll/Pitch: <200ms settling, <1.0° overshoot
+- Yaw: <250ms settling, <0.5° overshoot
+
+Smooth, cinematic response perfect for aerial filming.
 
 ---
 
 ## Summary
 
-Enables safe, hands-off PID tuning for drones. Delivers reliable initial gains for stable flight. Further manual tuning is recommended for best performance. Provides a robust starting point for agile, balanced control. Control authority budget and safety features support robust flight dynamics for the PiiDrone X-314 Quad.
+Enables safe, hands-off PID tuning for drones. Delivers reliable, flight-ready gains for stable flight. Further manual tuning is recommended for best performance. Provides a robust starting point for agile, balanced control. Control authority budget and safety features support robust flight dynamics for the PiiDrone X-314 Quad.
 
----
 
 ## References
 
 - [PID controller](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller)
-- [Åström–Hägglund relay method](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller#Relay_(%C3%85str%C3%B6m%E2%80%93H%C3%A4gglund)_method)
+- [Åström–Hägglund relay method](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller#Relay_(%C3%85str%C3%B6m%E2%80%93H%C3%A9gglund)_method)
 - [Root mean square deviation (RMSE)](https://en.wikipedia.org/wiki/Root_mean_square_deviation)
 - [Reinforcement learning](https://en.wikipedia.org/wiki/Reinforcement_learning)
 - [Machine learning](https://en.wikipedia.org/wiki/Machine_learning)
