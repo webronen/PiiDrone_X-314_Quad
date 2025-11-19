@@ -264,4 +264,4 @@ static inline bool pid_thrust_ramp(const float target, const float s);
 static inline void quaternion_multiply(DataQuaternion *result, const DataQuaternion *q1, const DataQuaternion *q2);
 static inline void quaternion_normalize(DataQuaternion *q);
 
-#endif
+#endif // MAIN_H
