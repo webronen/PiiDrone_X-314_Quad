@@ -139,5 +139,4 @@ Enables safe, hands-off PID tuning for drones. Delivers reliable initial gains f
 - [Reinforcement learning](https://en.wikipedia.org/wiki/Reinforcement_learning)
 - [Machine learning](https://en.wikipedia.org/wiki/Machine_learning)
 - [Smoothstep](https://en.wikipedia.org/wiki/Smoothstep)
-
 ---
