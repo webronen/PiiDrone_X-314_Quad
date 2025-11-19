@@ -205,16 +205,17 @@ static_assert(sizeof(TuneGlobalState) == 4, "TuneGlobal State struct must be 4 b
 
 typedef struct __attribute__((packed, aligned(4)))
 {
-  uint32_t last_evaluation_time; // Last evaluation timestamp
-  float squared_error_sum;       // Sum of squared errors
-  float best_rmse_achieved;      // Best RMSE found
-  float best_gain_found;         // Best gain found
-  uint16_t sample_count;         // Number of samples
-  uint16_t training_stage;       // Stage: 0=P, 1=D, 2=I
-  bool is_active;                // Axis tuning active
-  float relay_setpoint;          // Relay setpoint value
-  uint8_t patience_counter;      // Patience counter for early stopping
-  uint8_t padding[3];            // Padding for 4-byte alignment
+  uint32_t last_relay_time;      // Separate: Relay oscillation timing (0.5Hz)
+  uint32_t last_evaluation_time; // Separate: RMSE evaluation timing (4Hz)
+  float squared_error_sum;       // Accumulated squared error
+  float best_rmse_achieved;      // Best RMSE found in current stage
+  float best_gain_found;         // Best gain corresponding to best RMSE
+  uint16_t sample_count;         // Number of samples in current evaluation
+  uint16_t training_stage;       // Current training stage: 0=P, 1=D, 2=I
+  bool is_active;                // Whether this axis is currently being tuned
+  float relay_setpoint;          // Current relay excitation setpoint
+  uint8_t patience_counter;      // Early stopping patience counter
+  uint8_t padding[2];            // Padding for 4-byte alignment
 } TuneAxisState;
 
 static_assert(sizeof(TuneAxisState) == 32, "TuneAxis State struct must be 32 bytes (8 words)");

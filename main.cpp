@@ -402,9 +402,9 @@ static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s)
 static inline bool pid_tune_step(const uint8_t axis, const float error)
 {
   static TuneAxisState axis_state[3] = {
-      {0, 0, __FLT_MAX__, 0, 0, 0, false, TUNE_RELAY_RADIANS, 0},
-      {0, 0, __FLT_MAX__, 0, 0, 0, false, TUNE_RELAY_RADIANS, 0},
-      {0, 0, __FLT_MAX__, 0, 0, 0, false, TUNE_RELAY_RADIANS, 0}};
+      {0, 0, 0, __FLT_MAX__, 0, 0, 0, false, TUNE_RELAY_RADIANS, 0},
+      {0, 0, 0, __FLT_MAX__, 0, 0, 0, false, TUNE_RELAY_RADIANS, 0},
+      {0, 0, 0, __FLT_MAX__, 0, 0, 0, false, TUNE_RELAY_RADIANS, 0}};
 
   // Stage configuration - maps training stages to PID gains and increments
   static const uint8_t stage_to_gain_index[] = {0, 2, 1}; // P, D, I indices
@@ -421,23 +421,25 @@ static inline bool pid_tune_step(const uint8_t axis, const float error)
   {
     axis_state[axis].is_active = true;
     fcu.pid_setpoint[axis] = axis_state[axis].relay_setpoint;
-    axis_state[axis].patience_counter = 0; // Reset early stopping patience
+    axis_state[axis].last_relay_time = current_time;
+    axis_state[axis].last_evaluation_time = current_time;
+    axis_state[axis].patience_counter = 0;
     return false;
   }
 
-  // Relay excitation: alternate setpoint to excite system dynamics
-  if (current_time - axis_state[axis].last_evaluation_time >= HZ_TO_US(TUNE_RELAY_HERTZ))
+  // Relay excitation: alternate setpoint to excite system dynamics (0.5Hz)
+  if (current_time - axis_state[axis].last_relay_time >= HZ_TO_US(TUNE_RELAY_HERTZ))
   {
-    axis_state[axis].relay_setpoint = -axis_state[axis].relay_setpoint; // Flip excitation direction
+    axis_state[axis].relay_setpoint = -axis_state[axis].relay_setpoint;
     fcu.pid_setpoint[axis] = axis_state[axis].relay_setpoint;
-    axis_state[axis].last_evaluation_time = current_time;
+    axis_state[axis].last_relay_time = current_time;
   }
 
-  // Accumulate squared error for RMSE calculation
+  // Accumulate squared error for RMSE calculation (211Hz accumulation)
   axis_state[axis].squared_error_sum += error * error;
   axis_state[axis].sample_count++;
 
-  // RMSE evaluation and gradient-free optimization step
+  // RMSE evaluation and gradient-free optimization step (4Hz evaluation)
   if (current_time - axis_state[axis].last_evaluation_time >= HZ_TO_US(TUNE_SAMPLE_HERTZ))
   {
     // Compute Root Mean Square Error (performance metric)
@@ -452,7 +454,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float error)
     {
       axis_state[axis].best_rmse_achieved = current_rmse;
       axis_state[axis].best_gain_found = fcu.pid_gain[axis][gain_index];
-      axis_state[axis].patience_counter = 0; // Reset patience on performance improvement
+      axis_state[axis].patience_counter = 0;
     }
 
     // Gradient-free optimization: increment current gain
@@ -461,7 +463,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float error)
     // Early stopping with patience: prevent overfitting and find global optimum
     if (current_rmse > axis_state[axis].best_rmse_achieved * TUNE_OVERFIT_TOLERANCE)
     {
-      axis_state[axis].patience_counter++; // Count consecutive performance degradations
+      axis_state[axis].patience_counter++;
 
       // Stop training only after patience threshold is reached
       if (axis_state[axis].patience_counter >= TUNE_PATIENCE_SAMPLES)
@@ -473,9 +475,9 @@ static inline bool pid_tune_step(const uint8_t axis, const float error)
         if (axis_state[axis].training_stage++ >= 2)
         {
           // All stages complete for this axis
-          fcu.pid_setpoint[axis] = 0; // Reset to hover
+          fcu.pid_setpoint[axis] = 0;
           axis_state[axis].is_active = false;
-          return true; // Training complete for this axis
+          return true;
         }
 
         // Reset for next stage
@@ -485,7 +487,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float error)
     }
     else
     {
-      // Reset patience counter if performance recovers (local minimum escape)
+      // Reset patience counter if performance recovers
       axis_state[axis].patience_counter = 0;
     }
 
@@ -495,6 +497,5 @@ static inline bool pid_tune_step(const uint8_t axis, const float error)
     axis_state[axis].last_evaluation_time = current_time;
   }
 
-  // Training still in progress
   return false;
 }
