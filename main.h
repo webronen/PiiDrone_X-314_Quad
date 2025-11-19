@@ -65,10 +65,10 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 #define TUNE_RAMP_S 5.0f                                     // Thrust ramp duration for stable start (seconds)
 #define TUNE_RELAY_DEGREES 15.0f                             // Relay excitation amplitude (degrees)
 #define TUNE_RELAY_HERTZ 0.5f                                // Relay oscillation frequency (Hz)
-#define TUNE_SAMPLE_HERTZ 4.0f                               // RMSE evaluation rate (Hz)
-#define TUNE_P_GAIN_INCREMENT 2.0f                           // Proportional gain search step size
-#define TUNE_D_GAIN_INCREMENT 1.0f                           // Derivative gain search step size
-#define TUNE_I_GAIN_INCREMENT 0.01f                          // Integral gain search step size
+#define TUNE_SAMPLE_HERTZ 2.0f                               // RMSE evaluation rate (Hz)
+#define TUNE_P_GAIN_INCREMENT 0.5                            // Proportional gain search step size
+#define TUNE_D_GAIN_INCREMENT 0.2f                           // Derivative gain search step size
+#define TUNE_I_GAIN_INCREMENT 0.002f                         // Integral gain search step size
 #define TUNE_OVERFIT_TOLERANCE 1.2f                          // Prevents overfitting - stops when RMSE increases 20%
 #define TUNE_PATIENCE_SAMPLES 3                              // Finds global optimum - allows temporary performance drops
 #define TUNE_RELAY_RADIANS (TUNE_RELAY_DEGREES * DEG_TO_RAD) // Excitation amplitude (radians)

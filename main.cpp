@@ -421,6 +421,12 @@ static inline bool pid_tune_step(const uint8_t axis, const float error)
   {
     axis_state[axis].is_active = true;
     fcu.pid_setpoint[axis] = axis_state[axis].relay_setpoint;
+
+    // Reset PID gains to zero for safe starting point
+    fcu.pid_gain[axis][0] = TUNE_P_GAIN_INCREMENT; // P = 0.5
+    fcu.pid_gain[axis][1] = 0.0f;                  // I = 0
+    fcu.pid_gain[axis][2] = 0.0f;                  // D = 0
+
     axis_state[axis].last_relay_time = current_time;
     axis_state[axis].last_evaluation_time = current_time;
     axis_state[axis].patience_counter = 0;
