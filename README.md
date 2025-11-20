@@ -32,7 +32,7 @@ Ultra-light, agile, and stable. 70g including LiPo.
 
 - Thrust: 160g (800 units) across 4 motors
 - Mass: 70g (hover: 350 units)
-- Max lateral accel: 1.0g
+- Max lateral acceleration: 1.0g
 - Thrust-to-weight: 2.28:1
 - Altitude budget: 90g (450 units)
 - Stabilization budget: 70g (350 units)
@@ -79,9 +79,9 @@ Where:
 - Multi-axis: Independent roll, pitch, yaw tuning
 
 ### Guarantee
-Either finds gains that deliver exactly 200ms/1.0° performance or keeps searching forever. No middle ground, no "good enough" compromises.
+Either finds gains that deliver exactly 200ms/1.0° (roll/pitch) or 250ms/0.5° (yaw) performance, or keeps searching forever. No middle ground, no "good enough" compromises.
 
-Perfect for anyone needing rock-solid hover and precise, reliable flight performance.
+Perfect for anyone needing rock-solid hover and precise, reliable flight performance on all axes.
 
 ---
 
