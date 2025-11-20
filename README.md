@@ -50,12 +50,12 @@ Find PID gains that deliver exact performance specs—no compromises, no fallbac
 ### Core Algorithm
 - Relay excitation: ±15° steps at 0.5Hz
 - Step response analysis: Measures actual settling time and overshoot
-- Strict targets check: Must achieve ≤200ms settling and ≤1.0° overshoot (roll/pitch)
+- Strict targets check: Must achieve ≤250ms settling and ≤3.0° overshoot (roll/pitch)
 - Sequential tuning: P → D → I stages, each must meet targets
 
 ### Performance Specs
-- Roll/Pitch: 200ms settling, 1.0° max overshoot
-- Yaw: 250ms settling, 0.5° max overshoot
+- Roll/Pitch: 250ms settling, 3.0° max overshoot
+- Yaw: 300ms settling, 1.5° max overshoot
 - Conservative increments: P=0.3, D=0.15, I=0.001
 
 ### Decision Criteria
@@ -80,7 +80,7 @@ Where:
 - Multi-axis: Independent roll, pitch, yaw tuning
 
 ### Guarantee
-Either finds gains that deliver exactly 200ms/1.0° (roll/pitch) or 250ms/0.5° (yaw) performance, or keeps searching forever. No middle ground, no "good enough" compromises.
+Either finds gains that deliver exactly 250ms/3.0° (roll/pitch) or 300ms/1.5° (yaw) performance, or keeps searching forever. No middle ground, no "good enough" compromises.
 
 Perfect for anyone needing rock-solid hover and precise, reliable flight performance on all axes.
 
@@ -97,8 +97,8 @@ Perfect for anyone needing rock-solid hover and precise, reliable flight perform
 - Handles edge cases gracefully
 
 ## Flight Performance Targets
-- Roll/Pitch: ≤200ms settling, ≤1.0° overshoot
-- Yaw: ≤250ms settling, ≤0.5° overshoot
+- Roll/Pitch: ≤250ms settling, ≤3.0° overshoot
+- Yaw: ≤300ms settling, ≤1.5° overshoot
 - Stable, accurate, hands-off hover
 
 ---

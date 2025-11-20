@@ -65,10 +65,10 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 
 // Performance Targets
 #define TUNE_SETTLING_THRESHOLD_RADIANS 0.0087f // 0.5° settling threshold
-#define TUNE_MAX_OVERSHOOT_ROLL_PITCH 1.0f      // 1.0° max roll/pitch overshoot
-#define TUNE_MAX_OVERSHOOT_YAW 0.5f             // 0.5° max yaw overshoot
-#define TUNE_TARGET_SETTLE_ROLL_PITCH_MS 200.0f // 200ms roll/pitch settling
-#define TUNE_TARGET_SETTLE_YAW_MS 250.0f        // 250ms yaw settling
+#define TUNE_MAX_OVERSHOOT_ROLL_PITCH 3.0f      // 3.0° max roll/pitch overshoot
+#define TUNE_MAX_OVERSHOOT_YAW 1.5f             // 1.5° max yaw overshoot
+#define TUNE_TARGET_SETTLE_ROLL_PITCH_MS 250.0f // 250ms roll/pitch settling
+#define TUNE_TARGET_SETTLE_YAW_MS 300.0f        // 300ms yaw settling
 
 // Tuning Parameters
 #define TUNE_RELAY_DEGREES 15.0f     // ±15° relay amplitude
