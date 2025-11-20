@@ -62,7 +62,9 @@ Inspired by relay auto-tuning and Pareto optimization. Per-axis PID tuning uses 
 
 ### Decision Formula
 A new gain is accepted if:
+
 $$(T_s^{\text{new}} < T_s^{\text{best}} \land O^{\text{new}} \leq O^{\text{best}}) \quad \text{or} \quad (O^{\text{new}} < O^{\text{best}} \land T_s^{\text{new}} \leq T_s^{\text{best}})$$
+
 Where $T_s$ = settling time, $O$ = overshoot.
 
 ### Target-Based Stopping
