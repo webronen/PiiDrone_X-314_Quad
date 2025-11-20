@@ -62,6 +62,7 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 #define PID_ARRAY_SIZE 3
 
 // PiiTune StepSync Configuration
+
 // Performance Targets
 #define TUNE_SETTLING_THRESHOLD_RADIANS 0.0087f // 0.5° in radians
 #define TUNE_MAX_OVERSHOOT_ROLL_PITCH 1.0f      // 1.0° max overshoot for roll/pitch
