@@ -72,7 +72,7 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 
 // Tuning Parameters
 #define TUNE_RELAY_DEGREES 15.0f     // ±15° relay amplitude
-#define TUNE_RELAY_HERTZ 0.5f        // 0.5Hz relay frequency
+#define TUNE_RELAY_HERTZ 0.5f        // 0.5Hz relay frequency (2s period)
 #define TUNE_P_GAIN_INCREMENT 0.3f   // P gain step size
 #define TUNE_D_GAIN_INCREMENT 0.15f  // D gain step size
 #define TUNE_I_GAIN_INCREMENT 0.001f // I gain step size
