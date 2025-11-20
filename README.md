@@ -88,7 +88,7 @@ Perfect for anyone needing rock-solid hover and precise, reliable flight perform
 ## Results
 - Tuning: Strict, target-based, and uncompromising
 - Gains: Only accepted if they meet exact specs
-- Robust: No fallback—always searching for perfection
+- Robust: No fallback—always searching to meet targets
 
 ## Safety
 - Resets setpoints when done
