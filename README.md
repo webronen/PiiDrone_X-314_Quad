@@ -56,26 +56,6 @@ Ultra-light, agile, and stable. 70g including LiPo.
 
 Inspired by relay auto-tuning methods and Pareto multi-objective optimization, PiiTune StepSync performs per-axis PID tuning using relay excitation and Pareto-optimized step response analysis, sequentially tuning P, D, and I gains while balancing settling time against overshoot.
 
-### Key Transformations
-
-**1. Performance Metric**  
-- Before: RMSE during continuous oscillation  
-- After: Step response (settling time + overshoot) to pilot-like commands
-
-**2. Optimization Goal**  
-- Before: Lowest mathematical error  
-- After: Your specific flight performance targets
-
-**3. Stopping Condition**  
-- Before: RMSE degradation detection  
-- After: Target achievement OR Pareto optimum
-
-**4. Convergence Logic**  
-- Before: Patience-based (wait for confirmation)  
-- After: Immediate (stop when targets met)
-
----
-
 ### What It Is
 - Adaptive PID Tuning: Learns optimal gains through step response analysis
 - Pareto Optimization: Minimizes settling time and overshoot together
