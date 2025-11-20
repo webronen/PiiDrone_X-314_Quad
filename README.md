@@ -63,7 +63,9 @@ Inspired by relay auto-tuning methods and Pareto multi-objective optimization, P
 - Step response optimization: Directly measures and optimizes flight performance
 - Pareto frontier exploration: Finds best trade-off between settling time and overshoot
 - Staged learning: Systematic progression through P → D → I
-- Intelligent convergence: Patience-based stopping prevents premature optimization
+- Immediate convergence: Stops each stage as soon as no Pareto improvement is found
+- Fast tuning: No waiting for confirmation samples—finds optimal gains faster
+- Clean, simple logic: Less state to track, easier to understand
 - Real flight correlation: Tunes for actual pilot experience, not just math
 
 ### Training Process
@@ -71,7 +73,7 @@ Inspired by relay auto-tuning methods and Pareto multi-objective optimization, P
 - Performance measurement: Direct step response analysis (settling time + overshoot)
 - Pareto optimization: Multi-objective improvement tracking
 - Staged learning: Isolated parameter tuning (P → D → I)
-- Intelligent completion: Convergence detection with performance validation
+- Immediate completion: Each stage stops as soon as no further Pareto improvement is detected
 
 ### Technical Foundation
 - Pareto optimization: Multi-objective improvement, no artificial weighting
@@ -86,7 +88,6 @@ All optimization decisions use direct flight performance measurements:
 - Pareto improvement: Better in one metric, equal or better in the other
 
 #### Pareto Optimization Decision Formula
-
 A new gain is accepted if it is not worse in either metric and better in at least one:
 
 $$(T_s^{\text{new}} < T_s^{\text{best}} \land O^{\text{new}} \leq O^{\text{best}}) \quad \text{or} \quad (O^{\text{new}} < O^{\text{best}} \land T_s^{\text{new}} \leq T_s^{\text{best}})$$
@@ -110,7 +111,6 @@ Where:
 - Graceful degradation: Handles unsettled systems and edge cases
 
 ## Flight Performance Targets
-
 Rock-solid hover profile:
 - Roll/Pitch: <200ms settling, <1.0° overshoot
 - Yaw: <250ms settling, <0.5° overshoot

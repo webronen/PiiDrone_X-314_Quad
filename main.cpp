@@ -419,7 +419,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float m)
     float best_settle, best_os;                 // Performance tracking
     float best_gains[3];                        // Optimal P, D, I gains per stage
     float target, max_os;                       // Current setpoint and overshoot
-    uint8_t stage, patience;                    // Stage (0=P,1=D,2=I) and convergence counter
+    uint8_t stage;                              // Stage (0=P,1=D,2=I)
     bool active, step_a;                        // State flags
   } s[3] = {0};
 
@@ -524,19 +524,13 @@ static inline bool pid_tune_step(const uint8_t axis, const float m)
       s[axis].best_settle = settle_ms;
       s[axis].best_os = os_rad;
       s[axis].best_gains[s[axis].stage] = fcu.pid_gain[axis][g_idx_now]; // Save optimal gain
-      s[axis].patience = 0;                                              // Reset patience on improvement
     }
-
-    // Always increment current gain to explore parameter space
-    fcu.pid_gain[axis][g_idx_now] += inc_now;
-
-    /**
-     * Convergence detection: stop stage when no improvement for patience samples
-     * This finds the global optimum, not just first acceptable solution
-     */
-    if (!better && ++s[axis].patience >= TUNE_PATIENCE_SAMPLES)
+    else
     {
-      // Revert to best-found gain for current stage
+      /**
+       * Convergence detected: no Pareto improvement means we've found optimal gain
+       * Revert to best-found gain and progress to next stage
+       */
       fcu.pid_gain[axis][g_idx_now] = s[axis].best_gains[s[axis].stage];
 
       // Stage progression: complete or move to next parameter
@@ -567,13 +561,14 @@ static inline bool pid_tune_step(const uint8_t axis, const float m)
 
       // Reset performance tracking for new stage
       s[axis].best_settle = s[axis].best_os = __FLT_MAX__;
-      s[axis].patience = 0;
+
+      // Skip gain increment for this evaluation cycle
+      s[axis].eval_t = now;
+      return false;
     }
-    else if (better)
-    {
-      // Reset patience counter on any improvement
-      s[axis].patience = 0;
-    }
+
+    // Always increment current gain to explore parameter space (only if still improving)
+    fcu.pid_gain[axis][g_idx_now] += inc_now;
 
     // Reset evaluation timer for next cycle
     s[axis].eval_t = now;
