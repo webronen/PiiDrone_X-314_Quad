@@ -402,8 +402,8 @@ static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s)
 /**
  * PiiTune StepSync - Adaptive PID Tuning System
  *
- * Per-axis PID tuning using relay excitation and Pareto-optimized step response analysis.
- * Tunes P, D, I gains sequentially while balancing settling time against overshoot.
+ * Per-axis PID tuning using relay excitation and target-based step response optimization.
+ * Stops when target settling time and overshoot are achieved.
  */
 
 static inline bool pid_tune_step(const uint8_t axis, const float m)
@@ -426,6 +426,10 @@ static inline bool pid_tune_step(const uint8_t axis, const float m)
   // Stage configuration: maps stages to PID gain indices and increment sizes
   static const uint8_t g_idx[] = {0, 2, 1}; // P=0, D=2, I=1 (PID array indices)
   static const float inc[] = {TUNE_P_GAIN_INCREMENT, TUNE_D_GAIN_INCREMENT, TUNE_I_GAIN_INCREMENT};
+
+  // Target performance for each axis type
+  const float target_settle_ms = (axis == 2) ? TUNE_TARGET_SETTLE_YAW_MS : TUNE_TARGET_SETTLE_ROLL_PITCH_MS;
+  const float target_os_rad = (axis == 2) ? TUNE_MAX_OVERSHOOT_YAW * DEG_TO_RAD : TUNE_MAX_OVERSHOOT_ROLL_PITCH * DEG_TO_RAD;
 
   // Capture current time in microseconds for precise timing
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
@@ -509,11 +513,16 @@ static inline bool pid_tune_step(const uint8_t axis, const float m)
     const float inc_now = inc[s[axis].stage];       // Current increment size
 
     /**
-     * Pareto improvement check: true multi-objective optimization
+     * Target achievement check: stop when we meet performance targets
+     * This ensures we get exactly what we want for stable filming
+     */
+    const bool meets_targets = (settle_ms <= target_settle_ms) && (os_rad <= target_os_rad);
+
+    /**
+     * Pareto improvement check: continue optimizing if not at targets
      * A result is better if:
      * - Settling time improves AND overshoot doesn't worsen, OR
      * - Overshoot improves AND settling time doesn't worsen
-     * This finds the true performance frontier without arbitrary weighting
      */
     const bool better = (settle_ms < s[axis].best_settle && os_rad <= s[axis].best_os) ||
                         (settle_ms <= s[axis].best_settle && os_rad < s[axis].best_os);
@@ -525,10 +534,12 @@ static inline bool pid_tune_step(const uint8_t axis, const float m)
       s[axis].best_os = os_rad;
       s[axis].best_gains[s[axis].stage] = fcu.pid_gain[axis][g_idx_now]; // Save optimal gain
     }
-    else
+
+    // Check if we should stop this stage (targets met or no improvement)
+    if (meets_targets || !better)
     {
       /**
-       * Convergence detected: no Pareto improvement means we've found optimal gain
+       * Convergence detected: targets achieved OR no further improvement
        * Revert to best-found gain and progress to next stage
        */
       fcu.pid_gain[axis][g_idx_now] = s[axis].best_gains[s[axis].stage];
@@ -567,7 +578,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float m)
       return false;
     }
 
-    // Always increment current gain to explore parameter space (only if still improving)
+    // Only increment gain if still optimizing toward targets
     fcu.pid_gain[axis][g_idx_now] += inc_now;
 
     // Reset evaluation timer for next cycle

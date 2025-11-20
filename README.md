@@ -50,8 +50,31 @@ Ultra-light, agile, and stable. 70g including LiPo.
 - Conservative thrust allocation (robust in turbulence)
 - Balanced control (agility, no saturation)
 
+---
+
 ## PiiTune StepSync – Adaptive PID Tuning System
+
 Inspired by relay auto-tuning methods and Pareto multi-objective optimization, PiiTune StepSync performs per-axis PID tuning using relay excitation and Pareto-optimized step response analysis, sequentially tuning P, D, and I gains while balancing settling time against overshoot.
+
+### Key Transformations
+
+**1. Performance Metric**  
+- Before: RMSE during continuous oscillation  
+- After: Step response (settling time + overshoot) to pilot-like commands
+
+**2. Optimization Goal**  
+- Before: Lowest mathematical error  
+- After: Your specific flight performance targets
+
+**3. Stopping Condition**  
+- Before: RMSE degradation detection  
+- After: Target achievement OR Pareto optimum
+
+**4. Convergence Logic**  
+- Before: Patience-based (wait for confirmation)  
+- After: Immediate (stop when targets met)
+
+---
 
 ### What It Is
 - Adaptive PID Tuning: Learns optimal gains through step response analysis
@@ -63,23 +86,32 @@ Inspired by relay auto-tuning methods and Pareto multi-objective optimization, P
 - Step response optimization: Directly measures and optimizes flight performance
 - Pareto frontier exploration: Finds best trade-off between settling time and overshoot
 - Staged learning: Systematic progression through P → D → I
-- Immediate convergence: Stops each stage as soon as no Pareto improvement is found
+- Immediate convergence: Stops each stage as soon as no Pareto improvement is found or targets are met
+- Target-based stopping: Stops tuning as soon as axis-specific performance targets are achieved
+- Axis-specific targets: Roll/Pitch use filming specs, Yaw uses smoother specs
+- Smart fallback: If targets can't be reached, falls back to best available gains
 - Fast tuning: No waiting for confirmation samples—finds optimal gains faster
 - Clean, simple logic: Less state to track, easier to understand
 - Real flight correlation: Tunes for actual pilot experience, not just math
+
+---
 
 ### Training Process
 - System excitation: Relay oscillations (0.5Hz, 15° amplitude) with half-cycle timing
 - Performance measurement: Direct step response analysis (settling time + overshoot)
 - Pareto optimization: Multi-objective improvement tracking
 - Staged learning: Isolated parameter tuning (P → D → I)
-- Immediate completion: Each stage stops as soon as no further Pareto improvement is detected
+- Immediate completion: Each stage stops as soon as no further Pareto improvement is detected or targets are met
+
+---
 
 ### Technical Foundation
 - Pareto optimization: Multi-objective improvement, no artificial weighting
 - Step response analysis: Direct measurement of flight-relevant performance
 - Staged parameter isolation: Clean separation of P, D, I effects
 - Real-time adaptation: Continuous performance feedback and adjustment
+
+---
 
 ### Performance Metrics
 All optimization decisions use direct flight performance measurements:
@@ -88,6 +120,7 @@ All optimization decisions use direct flight performance measurements:
 - Pareto improvement: Better in one metric, equal or better in the other
 
 #### Pareto Optimization Decision Formula
+
 A new gain is accepted if it is not worse in either metric and better in at least one:
 
 $$(T_s^{\text{new}} < T_s^{\text{best}} \land O^{\text{new}} \leq O^{\text{best}}) \quad \text{or} \quad (O^{\text{new}} < O^{\text{best}} \land T_s^{\text{new}} \leq T_s^{\text{best}})$$
@@ -96,29 +129,57 @@ Where:
 - $T_s$ = Settling time
 - $O$ = Overshoot
 
-## Results
+---
+
+### Target-Based Stopping
+
+Tuning for each axis stops immediately when these targets are met:
+
+- **Roll/Pitch:** ≤200ms settling AND ≤1.0° overshoot
+- **Yaw:** ≤250ms settling AND ≤0.5° overshoot
+
+If targets cannot be reached, the best available gains are used. This guarantees efficient, robust, and finite tuning for each axis.
+
+---
+
+### Results
 - Tuning time: ~30–90 seconds per axis (convergence-based)
 - Performance: Optimal balance of speed and stability for flight
 - Gains: Flight-ready, stable, responsive
 - Convergence: Finds true performance boundary, not arbitrary stopping point
 - Robustness: Handles non-ideal responses and measurement noise
 
-## Safety & Robustness
+---
+
+### Safety & Robustness
 - Automatic setpoint reset: Zero commands when tuning complete
 - Stage isolation: Clean parameter separation prevents interference
 - Bounds protection: Array bounds checking and stage overflow protection
 - Timing safety: Half-cycle offset ensures proper measurement timing
 - Graceful degradation: Handles unsettled systems and edge cases
 
+---
+
 ## Flight Performance Targets
+
 Rock-solid hover profile:
 - Roll/Pitch: <200ms settling, <1.0° overshoot
 - Yaw: <250ms settling, <0.5° overshoot
 
 Stable, accurate, and fully autonomous hover.
 
+---
+
 ## Summary
-Enables safe, hands-off PID tuning for drones. Delivers reliable, flight-ready gains for stable flight. Further manual tuning is recommended for best performance. Provides a robust starting point for agile, balanced control. Control authority budget and safety features support robust flight dynamics for the PiiDrone X-314 Quad.
+
+You went from a mathematical exercise to a practical flight tuner:
+
+- **Before:** Found gains that "looked good" in simulation  
+- **After:** Finds gains that feel great in actual flight
+
+The final version gives you the rock-solid, precise hover and stick response you want for demanding flight!
+
+---
 
 ## References
 - [PID controller](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller)
