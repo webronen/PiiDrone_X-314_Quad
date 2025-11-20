@@ -30,127 +30,67 @@ Ultra-light, agile, and stable. 70g including LiPo.
 
 ## Control Authority
 
-**Physical Capabilities**
-- Total thrust: 160g (800 units) across 4 motors
-- Mass: 70g (hover thrust: 350 units)
-- Max lateral acceleration: 1.0g
+- Thrust: 160g (800 units) across 4 motors
+- Mass: 70g (hover: 350 units)
+- Max lateral accel: 1.0g
 - Thrust-to-weight: 2.28:1
-
-**Authority Allocation**
-- Altitude budget: 90g (450 units = hover + 20g margin)
-- Stabilization budget: 70g (350 units = 100% mass)
-
-**Performance & Safety**
-- 1.0g lateral acceleration (strong rejection)
-- PID output: ±116.67 units/axis (prevents saturation)
-- Integral clamp: ±58.33 units (50% of PID limit)
-
-**Design Advantage**
-- Mass-equivalent stabilization budget (exceeds typical)
-- Conservative thrust allocation (robust in turbulence)
-- Balanced control (agility, no saturation)
+- Altitude budget: 90g (450 units)
+- Stabilization budget: 70g (350 units)
+- PID output: ±116.67 units/axis
+- Integral clamp: ±58.33 units
 
 ---
 
 ## PiiTune StepSync – Adaptive PID Tuning System
 
-Inspired by relay auto-tuning methods and Pareto multi-objective optimization, PiiTune StepSync performs per-axis PID tuning using relay excitation and Pareto-optimized step response analysis, sequentially tuning P, D, and I gains while balancing settling time against overshoot.
+Inspired by relay auto-tuning and Pareto optimization. Per-axis PID tuning uses relay excitation and step response analysis, tuning P, D, I gains to meet settling time and overshoot targets.
 
-### What It Is
-- Adaptive PID Tuning: Learns optimal gains through step response analysis
-- Pareto Optimization: Minimizes settling time and overshoot together
-- Multi-Objective Learning: Balances speed and stability by direct measurement
-- System-Specific Adaptation: Discovers unique drone dynamics and optimal parameters
-
-### Key Features
-- Step response optimization: Directly measures and optimizes flight performance
-- Pareto frontier exploration: Finds best trade-off between settling time and overshoot
-- Staged learning: Systematic progression through P → D → I
-- Immediate convergence: Stops each stage as soon as no Pareto improvement is found or targets are met
-- Target-based stopping: Stops tuning as soon as axis-specific performance targets are achieved
-- Axis-specific targets: Roll/Pitch use filming specs, Yaw uses smoother specs
-- Smart fallback: If targets can't be reached, falls back to best available gains
-- Fast tuning: No waiting for confirmation samples—finds optimal gains faster
-- Clean, simple logic: Less state to track, easier to understand
-- Real flight correlation: Tunes for actual pilot experience, not just math
-
----
+### Features
+- Per-axis, staged tuning (P → D → I)
+- Relay excitation (0.5Hz, 15°)
+- Step response: settling time + overshoot
+- Pareto optimization: accepts only gains that improve at least one metric
+- Immediate stop: ends stage when no further improvement or targets are met
+- Target-based: stops when axis-specific targets are reached
+- Smart fallback: uses best gains if targets not met
+- Fast, simple, robust
 
 ### Training Process
-- System excitation: Relay oscillations (0.5Hz, 15° amplitude) with half-cycle timing
-- Performance measurement: Direct step response analysis (settling time + overshoot)
-- Pareto optimization: Multi-objective improvement tracking
-- Staged learning: Isolated parameter tuning (P → D → I)
-- Immediate completion: Each stage stops as soon as no further Pareto improvement is detected or targets are met
+- Excite axis with relay
+- Measure step response
+- Tune each gain until no further Pareto improvement or targets met
 
----
-
-### Technical Foundation
-- Pareto optimization: Multi-objective improvement, no artificial weighting
-- Step response analysis: Direct measurement of flight-relevant performance
-- Staged parameter isolation: Clean separation of P, D, I effects
-- Real-time adaptation: Continuous performance feedback and adjustment
-
----
-
-### Performance Metrics
-All optimization decisions use direct flight performance measurements:
-- Settling time: Time to reach and stay within 0.5° of target
-- Overshoot: Maximum angle exceeded beyond target
-- Pareto improvement: Better in one metric, equal or better in the other
-
-#### Pareto Optimization Decision Formula
-
-A new gain is accepted if it is not worse in either metric and better in at least one:
-
+### Decision Formula
+A new gain is accepted if:
 $$(T_s^{\text{new}} < T_s^{\text{best}} \land O^{\text{new}} \leq O^{\text{best}}) \quad \text{or} \quad (O^{\text{new}} < O^{\text{best}} \land T_s^{\text{new}} \leq T_s^{\text{best}})$$
-
-Where:
-- $T_s$ = Settling time
-- $O$ = Overshoot
-
----
+Where $T_s$ = settling time, $O$ = overshoot.
 
 ### Target-Based Stopping
-
-Tuning for each axis stops immediately when these targets are met:
-
-- **Roll/Pitch:** ≤200ms settling AND ≤1.0° overshoot
-- **Yaw:** ≤250ms settling AND ≤0.5° overshoot
-
-If targets cannot be reached, the best available gains are used. This guarantees efficient, robust, and finite tuning for each axis.
+- Roll/Pitch: ≤200ms settling, ≤1.0° overshoot
+- Yaw: ≤250ms settling, ≤0.5° overshoot
+- If targets not met, use best gains found
 
 ---
 
-### Results
-- Tuning time: ~30–90 seconds per axis (convergence-based)
-- Performance: Optimal balance of speed and stability for flight
-- Gains: Flight-ready, stable, responsive
-- Convergence: Finds true performance boundary, not arbitrary stopping point
-- Robustness: Handles non-ideal responses and measurement noise
+## Results
+- Tuning: ~30–90s per axis
+- Gains: Stable, responsive, and flight-ready
+- Robust to noise and non-ideal responses
 
----
-
-### Safety & Robustness
-- Automatic setpoint reset: Zero commands when tuning complete
-- Stage isolation: Clean parameter separation prevents interference
-- Bounds protection: Array bounds checking and stage overflow protection
-- Timing safety: Half-cycle offset ensures proper measurement timing
-- Graceful degradation: Handles unsettled systems and edge cases
-
----
+## Safety
+- Resets setpoints when done
+- Stage isolation and bounds checks
+- Handles edge cases gracefully
 
 ## Flight Performance Targets
-Rock-solid hover profile:
 - Roll/Pitch: <200ms settling, <1.0° overshoot
 - Yaw: <250ms settling, <0.5° overshoot
-
-Stable, accurate, and fully autonomous hover.
+- Stable, accurate, hands-off hover
 
 ---
 
 ## Summary
-PiiDrone X-314 Quad now features a fully automated, per-axis PID tuning system that delivers precise, robust, and responsive flight control. The StepSync autotune algorithm uses real-world step response metrics and Pareto optimization to efficiently find gains that meet exact flight performance targets for each axis—no guesswork, no endless searching. The result is a drone that achieves rock-solid, hands-off hover and crisp, reliable stick response, ready for demanding applications and confident flight.
+StepSync autotune finds gains that meet exact flight targets for each axis—no guesswork, no endless searching. Delivers rock-solid hover and crisp stick response.
 
 ---
 
