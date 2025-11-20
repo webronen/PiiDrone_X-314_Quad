@@ -408,182 +408,132 @@ static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s)
 
 static inline bool pid_tune_step(const uint8_t axis, const float m)
 {
-  // Validate axis input to prevent out-of-bounds access
-  if (axis >= 3)
-    return false;
-
-  // Per-axis tuning state - all timing and performance tracking
+  // Per-axis state
   static struct
   {
-    uint32_t relay_t, eval_t, step_t, settle_t; // Timing control
-    float best_settle, best_os;                 // Performance tracking
-    float best_gains[3];                        // Optimal P, D, I gains per stage
-    float target, max_os;                       // Current setpoint and overshoot
-    uint8_t stage;                              // Stage (0=P,1=D,2=I)
-    bool active, step_a;                        // State flags
+    uint32_t relay_t, eval_t, step_t, settle_t;
+    float best_settle, best_os;
+    float best_gains[3];
+    float target, max_os;
+    uint8_t stage;
+    bool active, step_a;
   } s[3] = {0};
 
-  // Stage configuration: maps stages to PID gain indices and increment sizes
-  static const uint8_t g_idx[] = {0, 2, 1}; // P=0, D=2, I=1 (PID array indices)
+  // Stage config
+  static const uint8_t g_idx[] = {0, 2, 1};
   static const float inc[] = {TUNE_P_GAIN_INCREMENT, TUNE_D_GAIN_INCREMENT, TUNE_I_GAIN_INCREMENT};
+  static const float max_gains[] = {TUNE_MAX_P_GAIN, TUNE_MAX_D_GAIN, TUNE_MAX_I_GAIN};
 
-  // Target performance for each axis type
+  // Axis targets
   const float target_settle_ms = (axis == 2) ? TUNE_TARGET_SETTLE_YAW_MS : TUNE_TARGET_SETTLE_ROLL_PITCH_MS;
   const float target_os_rad = (axis == 2) ? TUNE_MAX_OVERSHOOT_YAW * DEG_TO_RAD : TUNE_MAX_OVERSHOOT_ROLL_PITCH * DEG_TO_RAD;
 
-  // Capture current time in microseconds for precise timing
+  // Get time
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
   const uint32_t now = NRF_TIMER0->CC[0];
 
-  // Initialize tuning for this axis on first call
+  // Initialize
   if (!s[axis].active)
   {
-    // Clear all state to ensure clean start
     memset(&s[axis], 0, sizeof(s[axis]));
-
-    // Activate axis and begin step measurement
     s[axis].active = s[axis].step_a = true;
-    s[axis].target = TUNE_RELAY_RADIANS;     // Initial setpoint (+15°)
-    fcu.pid_setpoint[axis] = s[axis].target; // Apply to flight controller
-    s[axis].step_t = now;                    // Start step timing
-
-    // Initialize performance tracking to find minimum
+    s[axis].target = TUNE_RELAY_RADIANS;
+    fcu.pid_setpoint[axis] = s[axis].target;
+    s[axis].step_t = now;
     s[axis].best_settle = s[axis].best_os = __FLT_MAX__;
 
-    // Start with minimal P gain, zero I and D
-    fcu.pid_gain[axis][g_idx[0]] = inc[0];         // Set P gain to initial increment
-    s[axis].best_gains[0] = fcu.pid_gain[axis][0]; // Track initial P value
+    fcu.pid_gain[axis][g_idx[0]] = inc[0];
+    fcu.pid_gain[axis][g_idx[1]] = 0;
+    fcu.pid_gain[axis][g_idx[2]] = 0;
+    s[axis].best_gains[g_idx[0]] = fcu.pid_gain[axis][g_idx[0]];
 
-    // Setup timing: relay starts immediately, evaluation offset by half-cycle
     s[axis].relay_t = now;
     s[axis].eval_t = now + HZ_TO_US(TUNE_RELAY_HERTZ) / TUNE_EVALUATION_OFFSET_DIVISOR;
-
-    return false; // Axis activated, tuning in progress
+    return false;
   }
 
-  // Relay excitation: flip setpoint at specified frequency (0.5Hz = 1s period)
+  // Relay excitation
   if (now - s[axis].relay_t >= HZ_TO_US(TUNE_RELAY_HERTZ))
   {
-    // Begin new step measurement cycle
     s[axis].step_a = true;
-    s[axis].step_t = now;                    // Reset step timing
-    s[axis].max_os = s[axis].settle_t = 0;   // Clear previous measurements
-    s[axis].target = -s[axis].target;        // Flip setpoint (+15° ↔ -15°)
-    fcu.pid_setpoint[axis] = s[axis].target; // Apply new setpoint
-    s[axis].relay_t = now;                   // Reset relay timer
+    s[axis].step_t = now;
+    s[axis].max_os = s[axis].settle_t = 0;
+    s[axis].target = -s[axis].target;
+    fcu.pid_setpoint[axis] = s[axis].target;
+    s[axis].relay_t = now;
   }
 
-  // Step response measurement: track performance during each half-cycle
+  // Step measurement
   if (s[axis].step_a)
   {
-    const float err = s[axis].target - m; // Current tracking error
-    const float os = m - s[axis].target;  // Current overshoot (positive or negative)
+    const float err = s[axis].target - m;
+    const float os_mag = __builtin_fabsf(m - s[axis].target);
 
-    // Track maximum overshoot magnitude during this step
-    if (__builtin_fabsf(os) > __builtin_fabsf(s[axis].max_os))
-      s[axis].max_os = os;
+    if (os_mag > s[axis].max_os)
+      s[axis].max_os = os_mag;
 
-    // Detect settling: first time error falls within 0.5° threshold
     if (!s[axis].settle_t && __builtin_fabsf(err) < TUNE_SETTLING_THRESHOLD_RADIANS)
       s[axis].settle_t = now - s[axis].step_t;
 
-    // Stop measuring after half relay period (allow system to settle)
     if (now - s[axis].step_t >= HZ_TO_US(TUNE_RELAY_HERTZ) / TUNE_MAX_STEP_MEASUREMENT_DIVISOR)
       s[axis].step_a = false;
   }
 
-  // Performance evaluation: occurs every full relay period, offset from relay by half-cycle
+  // Evaluation
   if (now - s[axis].eval_t >= HZ_TO_US(TUNE_RELAY_HERTZ))
   {
-    // Extract performance metrics from step measurement
-    const float os_rad = __builtin_fabsf(s[axis].max_os);                   // Absolute overshoot
-    const float settle_ms = s[axis].settle_t ? s[axis].settle_t / 1000.0f : // Convert µs to ms if settled
-                                TUNE_UNSETTLED_PENALTY_MS;                  // Penalty if never settled
+    const float os_rad = s[axis].max_os;
+    const float settle_ms = s[axis].settle_t ? s[axis].settle_t / 1000.0f : TUNE_UNSETTLED_PENALTY_MS;
 
-    // Safety: prevent stage overflow (should never occur with proper staging)
-    if (s[axis].stage >= 3)
-    {
-      fcu.pid_setpoint[axis] = 0; // Stop excitation
-      s[axis].active = false;     // Deactivate axis
-      return false;
-    }
+    const uint8_t g_idx_now = g_idx[s[axis].stage];
+    const float inc_now = inc[s[axis].stage];
 
-    // Get current stage configuration
-    const uint8_t g_idx_now = g_idx[s[axis].stage]; // Current gain index
-    const float inc_now = inc[s[axis].stage];       // Current increment size
-
-    /**
-     * Target achievement check: stop when we meet performance targets
-     * This ensures we get exactly what we want for stable filming
-     */
+    // Check targets and improvement
     const bool meets_targets = (settle_ms <= target_settle_ms) && (os_rad <= target_os_rad);
-
-    /**
-     * Pareto improvement check: continue optimizing if not at targets
-     * A result is better if:
-     * - Settling time improves AND overshoot doesn't worsen, OR
-     * - Overshoot improves AND settling time doesn't worsen
-     */
     const bool better = (settle_ms < s[axis].best_settle && os_rad <= s[axis].best_os) ||
                         (settle_ms <= s[axis].best_settle && os_rad < s[axis].best_os);
 
-    // Update best performance if Pareto improvement found
     if (better)
     {
       s[axis].best_settle = settle_ms;
       s[axis].best_os = os_rad;
-      s[axis].best_gains[s[axis].stage] = fcu.pid_gain[axis][g_idx_now]; // Save optimal gain
+      s[axis].best_gains[g_idx_now] = fcu.pid_gain[axis][g_idx_now];
     }
 
-    // Check if we should stop this stage (targets met or no improvement)
+    // Stage completion
     if (meets_targets || !better)
     {
-      /**
-       * Convergence detected: targets achieved OR no further improvement
-       * Revert to best-found gain and progress to next stage
-       */
-      fcu.pid_gain[axis][g_idx_now] = s[axis].best_gains[s[axis].stage];
+      fcu.pid_gain[axis][g_idx_now] = s[axis].best_gains[g_idx_now];
 
-      // Stage progression: complete or move to next parameter
       if (s[axis].stage == 2)
       {
-        // All stages complete - stop excitation and deactivate
         fcu.pid_setpoint[axis] = 0;
         s[axis].active = false;
-
-        // Return true only when ALL axes complete tuning
         for (int i = 0; i < 3; i++)
           if (s[i].active)
             return false;
-        return true; // Signal complete tuning
+        return true;
       }
       else
       {
-        // Move to next stage with clean gain isolation
         s[axis].stage++;
         const uint8_t next_g_idx = g_idx[s[axis].stage];
-
-        // Reset all gains to zero for clean stage start
-        memset(fcu.pid_gain[axis], 0, sizeof(fcu.pid_gain[axis]));
-
-        // Initialize next stage's gain to minimal value
         fcu.pid_gain[axis][next_g_idx] = inc[s[axis].stage];
+        s[axis].best_gains[next_g_idx] = fcu.pid_gain[axis][next_g_idx];
       }
 
-      // Reset performance tracking for new stage
       s[axis].best_settle = s[axis].best_os = __FLT_MAX__;
-
-      // Skip gain increment for this evaluation cycle
       s[axis].eval_t = now;
       return false;
     }
 
-    // Only increment gain if still optimizing toward targets
+    // Increment and clamp
     fcu.pid_gain[axis][g_idx_now] += inc_now;
+    if (fcu.pid_gain[axis][g_idx_now] > max_gains[s[axis].stage])
+      fcu.pid_gain[axis][g_idx_now] = max_gains[s[axis].stage];
 
-    // Reset evaluation timer for next cycle
     s[axis].eval_t = now;
   }
 
-  return false; // Tuning still in progress
+  return false;
 }

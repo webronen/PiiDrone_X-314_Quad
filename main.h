@@ -64,34 +64,35 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 // PiiTune StepSync Configuration
 
 // Performance Targets
-#define TUNE_SETTLING_THRESHOLD_RADIANS 0.0087f // 0.5° in radians
-#define TUNE_MAX_OVERSHOOT_ROLL_PITCH 1.0f      // 1.0° max overshoot for roll/pitch
-#define TUNE_MAX_OVERSHOOT_YAW 0.5f             // 0.5° max overshoot for yaw
-#define TUNE_TARGET_SETTLE_ROLL_PITCH_MS 200.0f // Target settling time for roll/pitch
-#define TUNE_TARGET_SETTLE_YAW_MS 250.0f        // Target settling time for yaw
+#define TUNE_SETTLING_THRESHOLD_RADIANS 0.0087f // 0.5° settling threshold
+#define TUNE_MAX_OVERSHOOT_ROLL_PITCH 1.0f      // 1.0° max roll/pitch overshoot
+#define TUNE_MAX_OVERSHOOT_YAW 0.5f             // 0.5° max yaw overshoot
+#define TUNE_TARGET_SETTLE_ROLL_PITCH_MS 200.0f // 200ms roll/pitch settling
+#define TUNE_TARGET_SETTLE_YAW_MS 250.0f        // 250ms yaw settling
 
 // Tuning Parameters
-#define TUNE_RELAY_DEGREES 15.0f     // Relay excitation amplitude
-#define TUNE_RELAY_HERTZ 0.5f        // Relay oscillation frequency
-#define TUNE_P_GAIN_INCREMENT 0.3f   // Proportional gain step size
-#define TUNE_D_GAIN_INCREMENT 0.15f  // Derivative gain step size
-#define TUNE_I_GAIN_INCREMENT 0.001f // Integral gain step size
-#define TUNE_PATIENCE_SAMPLES 4      // Convergence patience samples
+#define TUNE_RELAY_DEGREES 15.0f     // ±15° relay amplitude
+#define TUNE_RELAY_HERTZ 0.5f        // 0.5Hz relay frequency
+#define TUNE_P_GAIN_INCREMENT 0.3f   // P gain step size
+#define TUNE_D_GAIN_INCREMENT 0.15f  // D gain step size
+#define TUNE_I_GAIN_INCREMENT 0.001f // I gain step size
+#define TUNE_RAMP_MAX THRUST_HOVER   // Max thrust during tuning
 
 // Timing Parameters
-#define TUNE_EVALUATION_OFFSET_DIVISOR 2    // Half-cycle offset for evaluation
-#define TUNE_UNSETTLED_PENALTY_MS 1000.0f   // Penalty for systems that never settle
-#define TUNE_MAX_STEP_MEASUREMENT_DIVISOR 2 // Half relay period for step measurement
+#define TUNE_EVALUATION_OFFSET_DIVISOR 2    // Half-cycle evaluation offset
+#define TUNE_UNSETTLED_PENALTY_MS 1000.0f   // Penalty if never settles
+#define TUNE_MAX_STEP_MEASUREMENT_DIVISOR 2 // Half-period step measurement
+#define TUNE_RAMP_S 5.0f                    // 5s thrust ramp
 
 // Derived Constants
 #define TUNE_RELAY_RADIANS (TUNE_RELAY_DEGREES * DEG_TO_RAD)
-#define TUNE_SETTLING_THRESHOLD_DEG 0.5f // Explicit degrees version
-#define TUNE_RAMP_MAX THRUST_HOVER       // Maximum control output during tuning
-#define TUNE_RAMP_S 5.0f                 // Thrust ramp duration for stable start (seconds)
 
 // Safety Limits
 #define TUNE_MAX_STAGE_COUNT 3 // P, D, I stages
-#define TUNE_AXIS_COUNT 3      // Roll, Pitch, Yaw
+#define TUNE_AXIS_COUNT 3      // Roll, pitch, yaw
+#define TUNE_MAX_P_GAIN PID_GAIN_MAX
+#define TUNE_MAX_I_GAIN PID_GAIN_MAX
+#define TUNE_MAX_D_GAIN PID_GAIN_MAX
 
 #define ENV_ALPHA 0.25f
 #define D_ALPHA 0.75f
