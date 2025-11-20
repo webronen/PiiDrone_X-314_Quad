@@ -44,7 +44,7 @@ Ultra-light, agile, and stable. 70g including LiPo.
 ## PiiTune StepSync – Adaptive PID Tuning System
 
 ### Mission
-Find PID gains that deliver exact performance specs—no compromises, no fallbacks. Only accepts gains that meet both settling time and overshoot targets.
+Find PID gains that deliver exact performance specs—no compromises, no fallbacks. Only accepts gains that meet both settling time and overshoot targets to deliver stable, precise, and reliable flight control.
 
 ### Core Algorithm
 - Relay excitation: ±15° steps at 0.5Hz
@@ -52,7 +52,7 @@ Find PID gains that deliver exact performance specs—no compromises, no fallbac
 - Strict targets check: Must achieve ≤200ms settling and ≤1.0° overshoot (roll/pitch)
 - Sequential tuning: P → D → I stages, each must meet targets
 
-### Filming-Perfect Specs
+### Performance Specs
 - Roll/Pitch: 200ms settling, 1.0° max overshoot
 - Yaw: 250ms settling, 0.5° max overshoot
 - Conservative increments: P=0.3, D=0.15, I=0.001
