@@ -488,60 +488,28 @@ static inline bool pid_tune_step(const uint8_t axis, const float m)
   if (now - s[axis].eval_t >= HZ_TO_US(TUNE_RELAY_HERTZ))
   {
     const float os_rad = s[axis].max_os;
+    const uint8_t g_idx_now = g_idx[s[axis].stage];
+    const float inc_now = inc[s[axis].stage];
 
-    // Strict settling: if never settled, terminate stage immediately
+    // If system never settled, increment gains and continue searching
     if (!s[axis].settle_t)
     {
-      // System never settled - force stage termination
-      fcu.pid_gain[axis][g_idx[s[axis].stage]] = s[axis].best_gains[g_idx[s[axis].stage]];
-
-      if (s[axis].stage == 2)
-      {
-        fcu.pid_setpoint[axis] = 0;
-        s[axis].active = false;
-        for (int i = 0; i < 3; i++)
-          if (s[i].active)
-            return false;
-        return true;
-      }
-      else
-      {
-        s[axis].stage++;
-        const uint8_t next_g_idx = g_idx[s[axis].stage];
-        fcu.pid_gain[axis][next_g_idx] = inc[s[axis].stage];
-        s[axis].best_gains[next_g_idx] = fcu.pid_gain[axis][next_g_idx];
-      }
-
-      s[axis].best_settle = s[axis].best_os = __FLT_MAX__;
+      fcu.pid_gain[axis][g_idx_now] += inc_now;
+      if (fcu.pid_gain[axis][g_idx_now] > max_gains[s[axis].stage])
+        fcu.pid_gain[axis][g_idx_now] = max_gains[s[axis].stage];
       s[axis].eval_t = now;
       return false;
     }
 
+    // Calculate performance metrics
     const float settle_ms = s[axis].settle_t / 1000.0f;
-    const uint8_t g_idx_now = g_idx[s[axis].stage];
-    const float inc_now = inc[s[axis].stage];
 
-    // Check if performance targets are met
+    // STRICT TARGETS CHECK: Only progress if both targets are met
     const bool meets_targets = (settle_ms <= target_settle_ms) && (os_rad <= target_os_rad);
 
-    // Pareto improvement: better settling without worse overshoot, or vice versa
-    const bool better = (settle_ms < s[axis].best_settle && os_rad <= s[axis].best_os) ||
-                        (settle_ms <= s[axis].best_settle && os_rad < s[axis].best_os);
-
-    // Update best performance if improved
-    if (better)
+    if (meets_targets)
     {
-      s[axis].best_settle = settle_ms;
-      s[axis].best_os = os_rad;
-      s[axis].best_gains[g_idx_now] = fcu.pid_gain[axis][g_idx_now];
-    }
-
-    // Stage completion check
-    if (meets_targets || !better)
-    {
-      // Revert to best-found gain for this stage
-      fcu.pid_gain[axis][g_idx_now] = s[axis].best_gains[g_idx_now];
-
+      // Targets achieved! Keep these exact gains and progress to next stage
       if (s[axis].stage == 2)
       {
         // All stages complete - stop excitation
@@ -556,7 +524,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float m)
       }
       else
       {
-        // Move to next stage while preserving previous gains
+        // Move to next stage
         s[axis].stage++;
         const uint8_t next_g_idx = g_idx[s[axis].stage];
         fcu.pid_gain[axis][next_g_idx] = inc[s[axis].stage];
@@ -569,7 +537,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float m)
       return false;
     }
 
-    // Increment gain and clamp to maximum
+    // Targets not met - increment gains and continue searching
     fcu.pid_gain[axis][g_idx_now] += inc_now;
     if (fcu.pid_gain[axis][g_idx_now] > max_gains[s[axis].stage])
       fcu.pid_gain[axis][g_idx_now] = max_gains[s[axis].stage];

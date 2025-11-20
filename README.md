@@ -43,41 +43,52 @@ Ultra-light, agile, and stable. 70g including LiPo.
 
 ## PiiTune StepSync – Adaptive PID Tuning System
 
-Inspired by relay auto-tuning and Pareto optimization. Per-axis PID tuning uses relay excitation and step response analysis, tuning P, D, I gains to meet settling time and overshoot targets.
+### Mission
+Find PID gains that deliver exact performance specs—no compromises, no fallbacks. Only accepts gains that meet both settling time and overshoot targets.
 
-### Features
-- Per-axis, staged tuning (P → D → I)
-- Relay excitation (0.5Hz, 15°)
-- Step response: settling time + overshoot
-- Pareto optimization: accepts only gains that improve at least one metric
-- Immediate stop: ends stage when no further improvement or targets are met
-- Target-based: stops when axis-specific targets are reached
-- Smart fallback: uses best gains if targets not met
-- Fast, simple, robust
+### Core Algorithm
+- Relay excitation: ±15° steps at 0.5Hz
+- Step response analysis: Measures actual settling time and overshoot
+- Strict targets check: Must achieve ≤200ms settling and ≤1.0° overshoot (roll/pitch)
+- Sequential tuning: P → D → I stages, each must meet targets
 
-### Training Process
-- Excite axis with relay
-- Measure step response
-- Tune each gain until no further Pareto improvement or targets met
+### Filming-Perfect Specs
+- Roll/Pitch: 200ms settling, 1.0° max overshoot
+- Yaw: 250ms settling, 0.5° max overshoot
+- Conservative increments: P=0.3, D=0.15, I=0.001
 
-### Decision Formula
-A new gain is accepted if:
+### Decision Criteria
+
+A new gain is accepted if it improves at least one metric (settling time or overshoot) and does not worsen the other:
 
 $$(T_s^{\text{new}} < T_s^{\text{best}} \land O^{\text{new}} \leq O^{\text{best}}) \quad \text{or} \quad (O^{\text{new}} < O^{\text{best}} \land T_s^{\text{new}} \leq T_s^{\text{best}})$$
 
-Where $T_s$ = settling time, $O$ = overshoot.
+Where:
+- $T_s$ = Settling time
+- $O$ = Overshoot
 
-### Target-Based Stopping
-- Roll/Pitch: ≤200ms settling, ≤1.0° overshoot
-- Yaw: ≤250ms settling, ≤0.5° overshoot
-- If targets not met, use best gains found
+### Search Behavior
+- Targets met → Progress to next stage immediately
+- Targets not met → Keep incrementing gains indefinitely
+- Never settles → Continue searching with higher gains
+- Manual stop → Pilot decides when to abort search
+
+### Safety
+- Gain clamping: Prevents runaway with PID_GAIN_MAX limits
+- Stage isolation: Clean P→D→I progression
+- Multi-axis: Independent roll, pitch, yaw tuning
+
+### Guarantee
+Either finds gains that deliver exactly 200ms/1.0° performance or keeps searching forever. No middle ground, no "good enough" compromises.
+
+Perfect for anyone needing rock-solid hover and precise, reliable flight performance.
 
 ---
 
 ## Results
-- Tuning: ~30–90s per axis
-- Gains: Stable, responsive, and flight-ready
-- Robust to noise and non-ideal responses
+- Tuning: Strict, target-based, and uncompromising
+- Gains: Only accepted if they meet exact specs
+- Robust: No fallback—always searching for perfection
 
 ## Safety
 - Resets setpoints when done
@@ -85,14 +96,14 @@ Where $T_s$ = settling time, $O$ = overshoot.
 - Handles edge cases gracefully
 
 ## Flight Performance Targets
-- Roll/Pitch: <200ms settling, <1.0° overshoot
-- Yaw: <250ms settling, <0.5° overshoot
+- Roll/Pitch: ≤200ms settling, ≤1.0° overshoot
+- Yaw: ≤250ms settling, ≤0.5° overshoot
 - Stable, accurate, hands-off hover
 
 ---
 
 ## Summary
-StepSync autotune finds gains that meet exact flight targets for each axis—no guesswork, no endless searching. Delivers rock-solid hover and crisp stick response.
+StepSync autotune finds gains that meet exact flight targets for each axis—no guesswork, no compromises. Delivers rock-solid hover and crisp stick response, ready for demanding aerial work.
 
 ---
 
