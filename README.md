@@ -42,6 +42,7 @@ Ultra-light, agile, and stable. 70g including LiPo.
 ---
 
 ## PiiTune StepSync – Adaptive PID Tuning System
+Professional Results Without Professional Expertise
 
 ### Mission
 Find PID gains that deliver exact performance specs—no compromises, no fallbacks. Only accepts gains that meet both settling time and overshoot targets to deliver stable, precise, and reliable flight control.
