@@ -85,9 +85,19 @@ All optimization decisions use direct flight performance measurements:
 - Overshoot: Maximum angle exceeded beyond target
 - Pareto improvement: Better in one metric, equal or better in the other
 
+#### Pareto Optimization Decision Formula
+
+A new gain is accepted if it is not worse in either metric and better in at least one:
+
+$$(T_s^{\text{new}} < T_s^{\text{best}} \land O^{\text{new}} \leq O^{\text{best}}) \quad \text{or} \quad (O^{\text{new}} < O^{\text{best}} \land T_s^{\text{new}} \leq T_s^{\text{best}})$$
+
+Where:
+- $T_s$ = Settling time
+- $O$ = Overshoot
+
 ## Results
 - Tuning time: ~30–90 seconds per axis (convergence-based)
-- Performance: Optimal balance of speed and stability for filming
+- Performance: Optimal balance of speed and stability for flight
 - Gains: Flight-ready, stable, responsive
 - Convergence: Finds true performance boundary, not arbitrary stopping point
 - Robustness: Handles non-ideal responses and measurement noise
@@ -101,7 +111,7 @@ All optimization decisions use direct flight performance measurements:
 
 ## Flight Performance Targets
 
-**Hover Performance Targets**
+Rock-solid hover profile:
 - Roll/Pitch: <200ms settling, <1.0° overshoot
 - Yaw: <250ms settling, <0.5° overshoot
 
