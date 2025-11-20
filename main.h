@@ -80,7 +80,6 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 
 // Timing Parameters
 #define TUNE_EVALUATION_OFFSET_DIVISOR 2    // Half-cycle evaluation offset
-#define TUNE_UNSETTLED_PENALTY_MS 1000.0f   // Penalty if never settles
 #define TUNE_MAX_STEP_MEASUREMENT_DIVISOR 2 // Half-period step measurement
 #define TUNE_RAMP_S 5.0f                    // 5s thrust ramp
 
@@ -88,8 +87,6 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 #define TUNE_RELAY_RADIANS (TUNE_RELAY_DEGREES * DEG_TO_RAD)
 
 // Safety Limits
-#define TUNE_MAX_STAGE_COUNT 3 // P, D, I stages
-#define TUNE_AXIS_COUNT 3      // Roll, pitch, yaw
 #define TUNE_MAX_P_GAIN PID_GAIN_MAX
 #define TUNE_MAX_I_GAIN PID_GAIN_MAX
 #define TUNE_MAX_D_GAIN PID_GAIN_MAX
