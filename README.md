@@ -141,7 +141,6 @@ If targets cannot be reached, the best available gains are used. This guarantees
 ---
 
 ## Flight Performance Targets
-
 Rock-solid hover profile:
 - Roll/Pitch: <200ms settling, <1.0° overshoot
 - Yaw: <250ms settling, <0.5° overshoot
@@ -151,13 +150,7 @@ Stable, accurate, and fully autonomous hover.
 ---
 
 ## Summary
-
-You went from a mathematical exercise to a practical flight tuner:
-
-- **Before:** Found gains that "looked good" in simulation  
-- **After:** Finds gains that feel great in actual flight
-
-The final version gives you the rock-solid, precise hover and stick response you want for demanding flight!
+PiiDrone X-314 Quad now features a fully automated, per-axis PID tuning system that delivers precise, robust, and responsive flight control. The StepSync autotune algorithm uses real-world step response metrics and Pareto optimization to efficiently find gains that meet exact flight performance targets for each axis—no guesswork, no endless searching. The result is a drone that achieves rock-solid, hands-off hover and crisp, reliable stick response, ready for demanding applications and confident flight.
 
 ---
 
