@@ -73,6 +73,7 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 #define TUNE_P_GAIN_INCREMENT 0.1f   // P exploration step
 #define TUNE_D_GAIN_INCREMENT 0.01f  // D exploration step
 #define TUNE_I_GAIN_INCREMENT 0.001f // I exploration step
+#define TUNE_SETTLE_RADIANS 0.05f    // Settling threshold (~2.8°)
 #define TUNE_RELAY_RADIANS 0.2f      // Relay amplitude (~11.5°)
 #define TUNE_RELAY_HERTZ 0.5f        // Relay frequency (2s period)
 #define TUNE_RAMP_S 5.0f             // 5s thrust ramp
