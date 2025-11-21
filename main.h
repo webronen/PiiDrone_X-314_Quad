@@ -67,8 +67,6 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
  * Model-free reinforcement learning approach using relay excitation
  * and hypervolume optimization. Sequentially tunes P, D, I gains
  * without artificial limits to find optimal speed-stability balance.
- *
- * Returns: true when all axes complete tuning
  */
 #define TUNE_RAMP_MAX THRUST_HOVER // Max thrust during tuning
 #define TUNE_RAMP_S 5.0f           // 5s thrust ramp
