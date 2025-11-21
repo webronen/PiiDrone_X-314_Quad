@@ -62,8 +62,8 @@ Discover Pareto-optimal PID gains for direct hover stabilization through systema
 
 ### Decision Criteria
 
-A new gain is Pareto-optimal if:
- 
+A new gain is accepted if it meets the Pareto-optimality condition:
+
 $`(T_s^{\text{new}} < T_s^{\text{best}} \land O^{\text{new}} \leq O^{\text{best}}) \quad \text{or} \quad (O^{\text{new}} < O^{\text{best}} \land T_s^{\text{new}} \leq T_s^{\text{best}})`$
 
 Where:  
@@ -72,11 +72,11 @@ Where:
 
 #### Hypervolume Calculation
 
-The hypervolume metric combines both objectives:
- 
+Hypervolume is used to combine both objectives for progress tracking:
+
 $`\text{Hypervolume} = \frac{1}{T_s} \times \frac{1}{O}`$
 
-Higher hypervolume = Faster settling and Smaller overshoot
+Higher hypervolume means both faster settling and smaller overshoot.
 
 ### Convergence Behavior
 - 99% hypervolume convergence: Progresses to next stage when improvements are less than 1%
