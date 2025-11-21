@@ -75,7 +75,7 @@ $`O`$ = Overshoot (lower is better, smaller)
 Higher hypervolume means both faster settling and smaller overshoot.
 
 ### Convergence Behavior
-- 99% hypervolume convergence: Progresses to next stage when improvements are less than 1%
+- 95% hypervolume convergence: Progresses to next stage when improvements are less than 5%
 - No artificial limits: Gains can grow indefinitely if beneficial
 - Pure exploration: Systematic gain incrementing with fixed steps
 - Stage preservation: Best gains carried forward through P→D→I progression
@@ -83,8 +83,8 @@ Higher hypervolume means both faster settling and smaller overshoot.
 ### Tuning Parameters
 - Relay frequency: 0.5Hz (2s period, optimized for control loop)
 - Gain increments: P=0.1, D=0.01, I=0.001
-- Settling threshold: 0.01 radians precision (~0.57°)
-- Convergence: 1% hypervolume improvement threshold
+- Settling threshold: 0.02 radians precision (~1.15°)
+- Convergence: 5% hypervolume improvement threshold
 - Exploration: No maximum gain limits
 
 ### Safety & Robustness
@@ -93,13 +93,13 @@ Higher hypervolume means both faster settling and smaller overshoot.
 - Automatic completion: Resets setpoints when all axes complete
 
 ### Guarantee
-Aims to find the hypervolume-optimal balance between speed and stability for your hardware. Either converges to 99% of optimal hypervolume within each stage, or continues exploring indefinitely. Provides directly tuned control suitable for stable flight.
+Aims to find the hypervolume-optimal balance between speed and stability for your hardware. Either converges to 95% of optimal hypervolume within each stage, or continues exploring indefinitely. Provides directly tuned control suitable for stable flight.
 
 ---
 
 ## Expected Performance
-- Per axis: ~2.5 minutes
-- Total system: ~7.5 minutes
+- Per axis: ~1.5 minutes
+- Total system: ~4.5 minutes
 - Provides: Directly tuned control for stable flight
 
 ---

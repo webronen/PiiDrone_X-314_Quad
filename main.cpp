@@ -493,8 +493,8 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
       memcpy(s[axis].best_gains, fcu.pid_gain[axis], sizeof(s[axis].best_gains));
     }
 
-    // Check hypervolume convergence (1% threshold)
-    if (s[axis].best_hv > 0.0f && fabsf(hv - s[axis].best_hv) / s[axis].best_hv < 0.01f)
+    // Check hypervolume convergence (5% threshold)
+    if (s[axis].best_hv > 0.0f && fabsf(hv - s[axis].best_hv) / s[axis].best_hv < TUNE_HYPERVOLUME_CONVERGENCE)
     {
       // Stage complete - lock in optimal gains
       memcpy(fcu.pid_gain[axis], s[axis].best_gains, sizeof(fcu.pid_gain[axis]));
