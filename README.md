@@ -83,7 +83,7 @@ Higher hypervolume means both faster settling and smaller overshoot.
 ### Tuning Parameters
 - Relay frequency: 0.5Hz (2s period, optimized for control loop)
 - Gain increments: P=0.1, D=0.01, I=0.001
-- Settling threshold: 0.01f radians precision (~0.57°)
+- Settling threshold: 0.01 radians precision (~0.57°)
 - Convergence: 1% hypervolume improvement threshold
 - Exploration: No maximum gain limits
 
