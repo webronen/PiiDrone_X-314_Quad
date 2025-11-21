@@ -402,9 +402,9 @@ static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s)
 /**
  * PiiTune StepSync - Adaptive PID Tuning System
  *
- * Model-free reinforcement learning approach using relay excitation,
- * Pareto frontier optimization, and hypervolume convergence.
- * Sequentially tunes P, D, I gains without artificial limits.
+ * Model-free reinforcement learning approach using relay excitation
+ * and hypervolume optimization. Sequentially tunes P, D, I gains
+ * without artificial limits to find optimal speed-stability balance.
  *
  * Returns: true when all axes complete tuning
  */
@@ -413,48 +413,35 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
   // Tuning state
   static struct
   {
-    uint32_t relay_t, eval_t, step_t, settle_t; // Timing (μs)
-    float best_settle, best_os, best_hv;        // Performance metrics
-    float best_gains[3];                        // Pareto-optimal gains
-    float target, max_os;                       // Relay state
-    uint8_t stage;                              // P→D→I stage
-    bool active, step_a, measuring_settle;      // State flags
+    uint32_t relay_t, step_t, settle_t;
+    float best_hv, max_os;
+    float best_gains[3];
+    float target;
+    uint8_t stage;
+    bool active, step_a, measuring;
   } s[3] = {0};
 
-  // Gain exploration: P → D → I
-  static const uint8_t g_idx[] = {0, 2, 1};
+  // P→D→I exploration: stage 0=P, stage 1=D, stage 2=I
+  static const uint8_t g_idx[] = {0, 2, 1}; // Gain indices: P[0], D[2], I[1]
   static const float inc[] = {
-      TUNE_P_GAIN_INCREMENT,  // 0.1
-      TUNE_D_GAIN_INCREMENT,  // 0.01
-      TUNE_I_GAIN_INCREMENT}; // 0.001
+      TUNE_P_GAIN_INCREMENT, // Stage 0: P-gain increment
+      TUNE_D_GAIN_INCREMENT, // Stage 1: D-gain increment
+      TUNE_I_GAIN_INCREMENT  // Stage 2: I-gain increment
+  };
 
   // Get current time
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
   const uint32_t now = NRF_TIMER0->CC[0];
 
-  // Initialize axis
+  // Initialize tuning for this axis
   if (!s[axis].active)
   {
     memset(&s[axis], 0, sizeof(s[axis]));
-    s[axis].active = s[axis].step_a = true;
-    s[axis].target = TUNE_RELAY_RADIANS; // ±11.5°
+    s[axis].active = s[axis].step_a = s[axis].measuring = true;
+    s[axis].target = TUNE_RELAY_RADIANS;
     fcu.pid_setpoint[axis] = s[axis].target;
-    s[axis].step_t = now;
-
-    // Init performance records
-    s[axis].best_settle = __FLT_MAX__;
-    s[axis].best_os = __FLT_MAX__;
-    s[axis].best_hv = 0.0f;
-
-    // Start with minimal gains
-    fcu.pid_gain[axis][g_idx[0]] = inc[0];
-    fcu.pid_gain[axis][g_idx[1]] = 0.0f;
-    fcu.pid_gain[axis][g_idx[2]] = 0.0f;
-    memcpy(s[axis].best_gains, fcu.pid_gain[axis], sizeof(s[axis].best_gains));
-
-    // Schedule evaluation
-    s[axis].relay_t = now;
-    s[axis].eval_t = now + HZ_TO_US(TUNE_RELAY_HERTZ);
+    s[axis].step_t = s[axis].relay_t = now;
+    fcu.pid_gain[axis][g_idx[0]] = inc[0]; // Start with P gain
     return false;
   }
 
@@ -464,107 +451,75 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     s[axis].step_a = true;
     s[axis].step_t = now;
     s[axis].max_os = 0.0f;
-    s[axis].measuring_settle = true; // Reset settling measurement
+    s[axis].measuring = true;
     s[axis].target = -s[axis].target;
     fcu.pid_setpoint[axis] = s[axis].target;
     s[axis].relay_t = now;
   }
 
-  // Measure overshoot (first half-cycle)
+  // Measure overshoot during first half-cycle
   if (s[axis].step_a)
   {
-    const float os_mag = __builtin_fabsf(err - s[axis].target);
-    if (os_mag > s[axis].max_os)
-      s[axis].max_os = os_mag;
-
-    // Stop overshoot tracking at half-period
+    float os = fabsf(err - s[axis].target);
+    if (os > s[axis].max_os)
+      s[axis].max_os = os;
     if (now - s[axis].step_t >= HZ_TO_US(TUNE_RELAY_HERTZ) / 2)
       s[axis].step_a = false;
   }
 
   // Measure settling time (5% threshold)
-  if (s[axis].measuring_settle)
+  if (s[axis].measuring && fabsf(err - s[axis].target) <= TUNE_SETTLE_RADIANS)
   {
-    if (__builtin_fabsf(err - s[axis].target) <= TUNE_SETTLE_RADIANS) // 0.01f
-    {
-      s[axis].settle_t = now; // Capture settling moment
-      s[axis].measuring_settle = false;
-    }
+    s[axis].settle_t = now;
+    s[axis].measuring = false;
   }
 
-  // Evaluate each cycle
-  if (now - s[axis].eval_t >= HZ_TO_US(TUNE_RELAY_HERTZ))
+  // Evaluate performance each full cycle
+  if (now - s[axis].relay_t >= HZ_TO_US(TUNE_RELAY_HERTZ))
   {
     const uint8_t g_idx_now = g_idx[s[axis].stage];
 
-    // Calculate actual settling time
-    float actual_settle;
-    if (s[axis].measuring_settle)
+    // Calculate actual metrics
+    float settle = s[axis].measuring ? HZ_TO_US(TUNE_RELAY_HERTZ) : (float)(s[axis].settle_t - s[axis].step_t);
+    float os = s[axis].max_os;
+
+    // Hypervolume: combined performance measure (higher = better)
+    float hv = (1.0f / (settle + 1e-9f)) * (1.0f / (os + 1e-9f));
+
+    // Update best gains if hypervolume improved
+    if (hv > s[axis].best_hv)
     {
-      actual_settle = HZ_TO_US(TUNE_RELAY_HERTZ); // Never settled - penalty
-    }
-    else
-    {
-      actual_settle = (float)(s[axis].settle_t - s[axis].step_t); // Actual time
-    }
-
-    const float actual_os = s[axis].max_os;
-
-    // Calculate hypervolume (higher = better)
-    const float settle_perf = 1.0f / (actual_settle + __FLT_EPSILON__);
-    const float os_penalty = 1.0f / (actual_os + __FLT_EPSILON__);
-    const float hv = settle_perf * os_penalty;
-
-    // Pareto condition: improve one metric without degrading other
-    const bool better = (actual_settle < s[axis].best_settle && actual_os <= s[axis].best_os) ||
-                        (actual_os < s[axis].best_os && actual_settle <= s[axis].best_settle);
-
-    // Update Pareto frontier
-    if (better || s[axis].best_hv == 0.0f) // Always accept first evaluation
-    {
-      s[axis].best_settle = actual_settle;
-      s[axis].best_os = actual_os;
       s[axis].best_hv = hv;
       memcpy(s[axis].best_gains, fcu.pid_gain[axis], sizeof(s[axis].best_gains));
     }
 
-    // Check hypervolume convergence (1%)
-    if (s[axis].best_hv > 0.0f)
+    // Check hypervolume convergence (1% threshold)
+    if (s[axis].best_hv > 0.0f && fabsf(hv - s[axis].best_hv) / s[axis].best_hv < 0.01f)
     {
-      const float hv_imp = __builtin_fabsf(hv - s[axis].best_hv) / s[axis].best_hv;
-      if (hv_imp < 0.01f)
+      // Stage complete - lock in optimal gains
+      memcpy(fcu.pid_gain[axis], s[axis].best_gains, sizeof(fcu.pid_gain[axis]));
+
+      if (++s[axis].stage > 2)
       {
-        // Stage complete - lock gains
-        memcpy(fcu.pid_gain[axis], s[axis].best_gains, sizeof(fcu.pid_gain[axis]));
+        // All stages complete - stop excitation
+        fcu.pid_setpoint[axis] = 0.0f;
+        s[axis].active = false;
 
-        if (s[axis].stage == 2)
-        {
-          // All stages complete
-          fcu.pid_setpoint[axis] = 0.0f;
-          s[axis].active = false;
-
-          // Return true when all axes complete
-          for (uint8_t i = 0; i < 3; i++)
-            if (s[i].active)
-              return false;
-          return true;
-        }
-        else
-        {
-          // Advance to next stage
-          s[axis].stage++;
-          s[axis].best_settle = __FLT_MAX__;
-          s[axis].best_os = __FLT_MAX__;
-          s[axis].best_hv = 0.0f;
-          fcu.pid_gain[axis][g_idx[s[axis].stage]] = inc[s[axis].stage];
-          memcpy(s[axis].best_gains, fcu.pid_gain[axis], sizeof(s[axis].best_gains));
-        }
+        // Return true only when all axes complete
+        for (uint8_t i = 0; i < 3; i++)
+          if (s[i].active)
+            return false;
+        return true;
       }
+
+      // Advance to next stage
+      s[axis].best_hv = 0.0f;
+      memcpy(fcu.pid_gain[axis], s[axis].best_gains, sizeof(fcu.pid_gain[axis]));
+      fcu.pid_gain[axis][g_idx[s[axis].stage]] = inc[s[axis].stage];
     }
 
-    // Pure exploration
+    // Pure exploration: increment current stage gain
     fcu.pid_gain[axis][g_idx_now] += inc[s[axis].stage];
-    s[axis].eval_t = now;
   }
 
   return false;

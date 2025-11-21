@@ -64,18 +64,18 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 /**
  * PiiTune StepSync - Adaptive PID Tuning System
  *
- * Model-free reinforcement learning approach using relay excitation,
- * Pareto frontier optimization, and hypervolume convergence.
- * Sequentially tunes P, D, I gains without artificial limits.
+ * Model-free reinforcement learning approach using relay excitation
+ * and hypervolume optimization. Sequentially tunes P, D, I gains
+ * without artificial limits to find optimal speed-stability balance.
  *
  * Returns: true when all axes complete tuning
  */
-#define TUNE_P_GAIN_INCREMENT 0.1f   // P exploration step
-#define TUNE_D_GAIN_INCREMENT 0.01f  // D exploration step
-#define TUNE_I_GAIN_INCREMENT 0.001f // I exploration step
-#define TUNE_SETTLE_RADIANS 0.01     // Settling threshold (~0.57°)
-#define TUNE_RELAY_RADIANS 0.2f      // Relay amplitude (~11.5°)
-#define TUNE_RELAY_HERTZ 0.5f        // Relay frequency (2s period)
+#define TUNE_RELAY_HERTZ 0.5f        // 2s period for control dynamics
+#define TUNE_RELAY_RADIANS 0.2f      // ±11.5° excitation amplitude
+#define TUNE_SETTLE_RADIANS 0.01f    // 5% settling threshold (~0.57°)
+#define TUNE_P_GAIN_INCREMENT 0.1f   // P-gain exploration step
+#define TUNE_D_GAIN_INCREMENT 0.01f  // D-gain exploration step
+#define TUNE_I_GAIN_INCREMENT 0.001f // I-gain exploration step
 #define TUNE_RAMP_S 5.0f             // 5s thrust ramp
 #define TUNE_RAMP_MAX THRUST_HOVER   // Max thrust during tuning
 
