@@ -460,7 +460,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
   // Measure overshoot during first half-cycle
   if (s[axis].step_a)
   {
-    float os = fabsf(err - s[axis].target);
+    const float os = __builtin_fabsf(err - s[axis].target);
     if (os > s[axis].max_os)
       s[axis].max_os = os;
     if (now - s[axis].step_t >= HZ_TO_US(TUNE_RELAY_HERTZ) / 2)
@@ -468,7 +468,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
   }
 
   // Measure settling time (5% threshold)
-  if (s[axis].measuring && fabsf(err - s[axis].target) <= TUNE_SETTLE_RADIANS)
+  if (s[axis].measuring && __builtin_fabsf(err - s[axis].target) <= TUNE_SETTLE_RADIANS)
   {
     s[axis].settle_t = now;
     s[axis].measuring = false;
@@ -480,14 +480,18 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     const uint8_t g_idx_now = g_idx[s[axis].stage];
 
     // Calculate actual metrics
-    float settle = s[axis].measuring ? HZ_TO_US(TUNE_RELAY_HERTZ) : (float)(s[axis].settle_t - s[axis].step_t);
-    float os = s[axis].max_os;
+    const float st = s[axis].measuring ? HZ_TO_US(TUNE_RELAY_HERTZ) : (float)(s[axis].settle_t - s[axis].step_t);
+    const float os = s[axis].max_os;
+
+    // Normalize metrics: settling time [0-1], overshoot [0-1]
+    const float ns = __builtin_fminf(st / HZ_TO_US(TUNE_RELAY_HERTZ), 1.0f);
+    const float no = __builtin_fminf(os / (2.0f * TUNE_RELAY_RADIANS), 1.0f);
 
     // Hypervolume: combined performance measure (higher = better)
-    float hv = (1.0f / (settle + 1e-9f)) * (1.0f / (os + 1e-9f));
+    const float hv = (1.0f - ns) * (1.0f - no);
 
-    // Update best gains if hypervolume improved
-    if (hv > s[axis].best_hv)
+    // Update best gains if hypervolume improved or first measurement
+    if (s[axis].best_hv == 0.0f || hv > s[axis].best_hv)
     {
       s[axis].best_hv = hv;
       memcpy(s[axis].best_gains, fcu.pid_gain[axis], sizeof(s[axis].best_gains));
@@ -512,15 +516,18 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
         return true;
       }
 
-      // Advance to next stage
+      // Advance to next stage - reset tuning state
       s[axis].best_hv = 0.0f;
-      memcpy(fcu.pid_gain[axis], s[axis].best_gains, sizeof(fcu.pid_gain[axis]));
+      s[axis].max_os = 0.0f;
+      s[axis].measuring = true;
+      s[axis].step_a = true;
+      s[axis].relay_t = now;
+      s[axis].step_t = now;
+
+      // Start new stage with current best gains plus new gain increment
+      memcpy(s[axis].best_gains, fcu.pid_gain[axis], sizeof(s[axis].best_gains));
       fcu.pid_gain[axis][g_idx[s[axis].stage]] = inc[s[axis].stage];
     }
 
-    // Pure exploration: increment current stage gain
-    fcu.pid_gain[axis][g_idx_now] += inc[s[axis].stage];
+    return false; // Tuning not yet complete
   }
-
-  return false;
-}
