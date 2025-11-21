@@ -48,7 +48,7 @@ Reinforcement Learning Meets Control Theory
 Discover Pareto-optimal PID gains through systematic exploration, balancing settling performance against overshoot without artificial compromises. Uses hypervolume convergence to find the best possible tradeoff for each axis.
 
 ### Core Algorithm
-- Relay excitation: ±11.5° at 2.0Hz (500ms period)
+- Relay excitation: ±11.5° at 0.5Hz (2s period)
 - Multi-objective optimization: Simultaneously minimizes settling time and overshoot
 - Pareto frontier: Only accepts gains that improve at least one metric without degrading the other
 - Sequential tuning: P → D → I stages with hypervolume convergence
@@ -77,7 +77,7 @@ Where:
 - Stage preservation: Best gains carried forward through P→D→I progression
 
 ### Tuning Parameters
-- Relay frequency: 2.0Hz (optimized for control loop)
+- Relay frequency: 0.5Hz (optimized for control loop)
 - Gain increments: P=0.1, D=0.01, I=0.001
 - Convergence: 1% hypervolume improvement threshold
 - Exploration: No maximum gain limits

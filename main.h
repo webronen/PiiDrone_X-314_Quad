@@ -74,7 +74,7 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 #define TUNE_D_GAIN_INCREMENT 0.01f  // D exploration step
 #define TUNE_I_GAIN_INCREMENT 0.001f // I exploration step
 #define TUNE_RELAY_RADIANS 0.2f      // Relay amplitude (~11.5°)
-#define TUNE_RELAY_HERTZ 2.0f        // Relay frequency (0.5s period)
+#define TUNE_RELAY_HERTZ 0.5f        // Relay frequency (2s period)
 #define TUNE_RAMP_S 5.0f             // 5s thrust ramp
 #define TUNE_RAMP_MAX THRUST_HOVER   // Max thrust during tuning
 
