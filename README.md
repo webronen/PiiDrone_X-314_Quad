@@ -48,7 +48,7 @@ Reinforcement Learning Meets Control Theory
 Discover Pareto-optimal PID gains through systematic exploration, balancing settling performance against overshoot without artificial compromises. Uses hypervolume convergence to find the best possible tradeoff for each axis.
 
 ### Core Algorithm
-- Relay excitation: ±TUNE_RELAY_RADIANS at 2.0Hz (500ms period)
+- Relay excitation: ±11.5° at 2.0Hz (500ms period)
 - Multi-objective optimization: Simultaneously minimizes settling time and overshoot
 - Pareto frontier: Only accepts gains that improve at least one metric without degrading the other
 - Sequential tuning: P → D → I stages with hypervolume convergence
@@ -56,9 +56,9 @@ Discover Pareto-optimal PID gains through systematic exploration, balancing sett
 
 ### Performance Metrics
 - Inverse performance scoring: Higher values = better performance
-- Settle performance: 1.0f / (half_period_us + __FLT_EPSILON__)
-- Overshoot penalty: 1.0f / (max_os + __FLT_EPSILON__)
-- Hypervolume: settle_performance × os_penalty (balanced multi-objective measure)
+- Settle performance: Inverse of settling time
+- Overshoot penalty: Inverse of maximum overshoot
+- Hypervolume: Product of settle performance and overshoot penalty (balanced multi-objective measure)
 
 ### Decision Criteria
 
@@ -71,19 +71,19 @@ Where:
 - $O$ = Overshoot
 
 ### Convergence Behavior
-- 99% hypervolume convergence: Progress to next stage when improvements < 1%
+- 99% hypervolume convergence: Progress to next stage when improvements are less than 1%
 - No artificial limits: Gains can grow indefinitely if beneficial
-- Pure exploration: Systematic gain incrementing with TUNE_*_INCREMENT steps
+- Pure exploration: Systematic gain incrementing with fixed steps
 - Stage preservation: Best gains carried forward through P→D→I progression
 
 ### Tuning Parameters
-- Relay frequency: 2.0Hz (optimal for 211Hz control loop)
+- Relay frequency: 2.0Hz (optimized for control loop)
 - Gain increments: P=0.1, D=0.01, I=0.001 (professionally scaled)
 - Convergence: 1% hypervolume improvement threshold
 - Exploration: No maximum gain limits
 
 ### Safety & Robustness
-- Numerical stability: __FLT_EPSILON__ protected divisions
+- Numerical stability: Protected divisions
 - Quaternion Kalman ready: Works with professional-grade attitude estimation
 - Multi-axis independent: Parallel tuning across roll, pitch, yaw
 - Automatic completion: Resets setpoints when all axes complete
