@@ -73,15 +73,15 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 #define TUNE_RAMP_MAX THRUST_HOVER // Max thrust during tuning
 #define TUNE_RAMP_S 5.0f           // 5s thrust ramp
 
+#define TUNE_RELAY_HERTZ 0.5f     // 2s period for control dynamics
+#define TUNE_RELAY_RADIANS 0.2f   // ±11.5° excitation amplitude
+#define TUNE_SETTLE_RADIANS 0.02f // 5% settling threshold (~1.15°)
+
 #define TUNE_P_GAIN_INCREMENT 0.1f   // P-gain exploration step
 #define TUNE_D_GAIN_INCREMENT 0.01f  // D-gain exploration step
 #define TUNE_I_GAIN_INCREMENT 0.001f // I-gain exploration step
 
-#define TUNE_RELAY_RADIANS 0.2f   // ±11.5° excitation amplitude
-#define TUNE_RELAY_HERTZ 0.5f     // 2s period for control dynamics
-#define TUNE_SETTLE_RADIANS 0.02f // 5% settling threshold (~1.15°)
-
-#define TUNE_HYPERVOLUME_CONVERGENCE 0.05f // 5% hypervolume improvement threshold
+#define TUNE_HYPERVOLUME_CONVERGENCE 0.05f // 5% convergence threshold
 
 #define ENV_ALPHA 0.25f
 #define D_ALPHA 0.75f
