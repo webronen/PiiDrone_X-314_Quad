@@ -442,7 +442,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     fcu.pid_setpoint[axis] = s[axis].target;
     s[axis].step_t = s[axis].relay_t = now;
     fcu.pid_gain[axis][g_idx[0]] = inc[0]; // Start with P gain
-    return false;
+    return false;                          // Tuning not yet complete
   }
 
   // Relay excitation: toggle setpoint each period
@@ -478,6 +478,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
   if (now - s[axis].relay_t >= HZ_TO_US(TUNE_RELAY_HERTZ))
   {
     const uint8_t g_idx_now = g_idx[s[axis].stage];
+    bool stage_completed = false;
 
     // Calculate actual metrics
     const float st = s[axis].measuring ? HZ_TO_US(TUNE_RELAY_HERTZ) : (float)(s[axis].settle_t - s[axis].step_t);
@@ -498,7 +499,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     }
 
     // Check hypervolume convergence (5% threshold)
-    if (s[axis].best_hv > 0.0f && fabsf(hv - s[axis].best_hv) / s[axis].best_hv < TUNE_HYPERVOLUME_CONVERGENCE)
+    if (s[axis].best_hv > 0.0f && __builtin_fabsf(hv - s[axis].best_hv) / s[axis].best_hv < TUNE_HYPERVOLUME_CONVERGENCE)
     {
       // Stage complete - lock in optimal gains
       memcpy(fcu.pid_gain[axis], s[axis].best_gains, sizeof(fcu.pid_gain[axis]));
@@ -512,8 +513,8 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
         // Return true only when all axes complete
         for (uint8_t i = 0; i < 3; i++)
           if (s[i].active)
-            return false;
-        return true;
+            return false; // Tuning not yet complete
+        return true;      // All axes tuning complete
       }
 
       // Advance to next stage - reset tuning state
@@ -527,7 +528,15 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
       // Start new stage with current best gains plus new gain increment
       memcpy(s[axis].best_gains, fcu.pid_gain[axis], sizeof(s[axis].best_gains));
       fcu.pid_gain[axis][g_idx[s[axis].stage]] = inc[s[axis].stage];
+      stage_completed = true;
     }
 
-    return false; // Tuning not yet complete
+    // Pure exploration: increment current stage gain (unless we just advanced stages)
+    if (!stage_completed)
+    {
+      fcu.pid_gain[axis][g_idx_now] += inc[s[axis].stage];
+    }
   }
+
+  return false; // Tuning not yet complete
+}
