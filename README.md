@@ -111,7 +111,7 @@ Aims to find the Pareto-optimal balance between speed and stability for your har
 
 ## Expected Performance
 - Per axis: ~2.5 minutes
-- Total system: 7.5 minutes
+- Total system: ~7.5 minutes
 - Provides rate control suitable for attitude stabilization
 
 ---
