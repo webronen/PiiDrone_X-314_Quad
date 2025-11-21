@@ -61,35 +61,22 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 #define PID_LOOP_PERIOD (1.0f / PID_LOOP_HZ)
 #define PID_ARRAY_SIZE 3
 
-// PiiTune StepSync Configuration
-
-// Performance Targets
-#define TUNE_SETTLING_THRESHOLD_RADIANS 0.0087f // 0.5° settling threshold
-#define TUNE_MAX_OVERSHOOT_ROLL_PITCH 3.0f      // 3.0° max roll/pitch overshoot
-#define TUNE_MAX_OVERSHOOT_YAW 1.5f             // 1.5° max yaw overshoot
-#define TUNE_TARGET_SETTLE_ROLL_PITCH_MS 250.0f // 250ms roll/pitch settling
-#define TUNE_TARGET_SETTLE_YAW_MS 300.0f        // 300ms yaw settling
-
-// Tuning Parameters
-#define TUNE_RELAY_DEGREES 15.0f     // ±15° relay amplitude
-#define TUNE_RELAY_HERTZ 0.5f        // 0.5Hz relay frequency (2s period)
-#define TUNE_P_GAIN_INCREMENT 0.3f   // P gain step size
-#define TUNE_D_GAIN_INCREMENT 0.15f  // D gain step size
-#define TUNE_I_GAIN_INCREMENT 0.001f // I gain step size
+/**
+ * PiiTune StepSync - Adaptive PID Tuning System
+ *
+ * Model-free reinforcement learning approach using relay excitation,
+ * Pareto frontier optimization, and hypervolume convergence.
+ * Sequentially tunes P, D, I gains without artificial limits.
+ *
+ * Returns: true when all axes complete tuning
+ */
+#define TUNE_P_GAIN_INCREMENT 0.1f   // P exploration step
+#define TUNE_D_GAIN_INCREMENT 0.01f  // D exploration step
+#define TUNE_I_GAIN_INCREMENT 0.001f // I exploration step
+#define TUNE_RELAY_RADIANS 0.2f      // Relay amplitude (~11.5°)
+#define TUNE_RELAY_HERTZ 2.0f        // Relay frequency (0.5s period)
+#define TUNE_RAMP_S 5.0f             // 5s thrust ramp
 #define TUNE_RAMP_MAX THRUST_HOVER   // Max thrust during tuning
-
-// Timing Parameters
-#define TUNE_EVALUATION_OFFSET_DIVISOR 2    // Half-cycle evaluation offset
-#define TUNE_MAX_STEP_MEASUREMENT_DIVISOR 2 // Half-period step measurement
-#define TUNE_RAMP_S 5.0f                    // 5s thrust ramp
-
-// Derived Constants
-#define TUNE_RELAY_RADIANS (TUNE_RELAY_DEGREES * DEG_TO_RAD)
-
-// Safety Limits
-#define TUNE_MAX_P_GAIN PID_GAIN_MAX
-#define TUNE_MAX_I_GAIN PID_GAIN_MAX
-#define TUNE_MAX_D_GAIN PID_GAIN_MAX
 
 #define ENV_ALPHA 0.25f
 #define D_ALPHA 0.75f
