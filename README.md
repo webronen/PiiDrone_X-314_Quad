@@ -70,6 +70,16 @@ Where:
 - $T_s$ = Settling time
 - $O$ = Overshoot
 
+#### Hypervolume Calculation
+
+The hypervolume metric combines both objectives:
+
+$$
+\text{Hypervolume} = \frac{1}{T_s} \times \frac{1}{O}
+$$
+
+Higher hypervolume indicates better combined performance (lower settling time and overshoot).
+
 ### Convergence Behavior
 - 99% hypervolume convergence: Progresses to next stage when improvements are less than 1%
 - No artificial limits: Gains can grow indefinitely if beneficial
