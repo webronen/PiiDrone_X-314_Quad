@@ -45,7 +45,7 @@ Ultra-light, agile, and stable. 70g including LiPo.
 Reinforcement Learning Meets Control Theory
 
 ### Mission
-Discover Pareto-optimal PID gains through systematic exploration, balancing settling performance against overshoot without artificial compromises. Uses hypervolume convergence to find the best possible tradeoff for each axis.
+Discover Pareto-optimal PID gains for direct hover stabilization through systematic exploration, balancing settling performance against overshoot without artificial compromises. Uses hypervolume convergence to find the best possible tradeoff for each axis.
 
 ### Core Algorithm
 - Relay excitation: ±11.5° at 0.5Hz (2s period)
@@ -99,25 +99,25 @@ Higher hypervolume = Faster settling and Smaller overshoot
 - Automatic completion: Resets setpoints when all axes complete
 
 ### Guarantee
-Aims to find the Pareto-optimal balance between speed and stability for your hardware. Either converges to 99% of optimal hypervolume within each stage, or continues exploring indefinitely. Provides a foundation for stable hover when combined with angle control.
+Aims to find the Pareto-optimal balance between speed and stability for your hardware. Either converges to 99% of optimal hypervolume within each stage, or continues exploring indefinitely. Provides directly tuned control suitable for stable flight.
 
 ---
 
 ## Results
 - Tuning: Model-free reinforcement learning approach
 - Gains: Pareto-optimal tradeoffs between settling and overshoot
-- Performance: Provides rate control suitable for hover integration
+- Performance: Provides tuned control suitable for stable flight
 - Robustness: Designed for numerical robustness
 
 ## Expected Performance
 - Per axis: ~2.5 minutes
 - Total system: ~7.5 minutes
-- Provides rate control suitable for attitude stabilization
+- Provides: Directly tuned control for stable flight performance
 
 ---
 
 ## Summary
-StepSync uses multi-objective optimization to discover PID gains that balance speed and stability. The reinforcement learning approach systematically explores the gain space while ensuring Pareto-optimal improvements, delivering rate control suitable for stable hover performance.
+StepSync uses multi-objective optimization to discover PID gains that balance speed and stability. The reinforcement learning approach systematically explores the gain space while ensuring Pareto-optimal improvements, delivering tuned control suitable for stable flight performance.
 
 Suitable for developers who want automated tuning without system identification or manual compromise.
 
