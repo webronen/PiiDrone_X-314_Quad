@@ -77,7 +77,7 @@ Where:
 - Stage preservation: Best gains carried forward through P→D→I progression
 
 ### Tuning Parameters
-- Relay frequency: 0.5Hz (optimized for control loop)
+- Relay frequency: 0.5Hz (2s period, optimized for control loop)
 - Gain increments: P=0.1, D=0.01, I=0.001
 - Convergence: 1% hypervolume improvement threshold
 - Exploration: No maximum gain limits
@@ -100,8 +100,8 @@ Aims to find the Pareto-optimal balance between speed and stability for your har
 - Robustness: Designed for numerical robustness
 
 ## Expected Performance
-- Per axis: ~45-60 seconds tuning time
-- Total system: ~2.5-3 minutes for all axes
+- Per axis: ~2.5 minutes
+- Total system: 7.5 minutes
 - Provides rate control suitable for attitude stabilization
 
 ---
