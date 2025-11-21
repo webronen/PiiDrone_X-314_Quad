@@ -90,7 +90,7 @@ Higher hypervolume means both faster settling and smaller overshoot.
 ### Safety & Robustness
 - Numerical stability: Protected divisions
 - Multi-axis independent: Parallel tuning across roll, pitch, yaw
-- Automatic completion: Resets setpoints when each axis completes
+- Automatic completion: Resets setpoint when axis completes
 
 ### Guarantee
 Aims to find the hypervolume-optimal balance between speed and stability for your hardware. Either converges to 95% of optimal hypervolume within each stage, or continues exploring indefinitely. Provides directly tuned control suitable for stable flight.
