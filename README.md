@@ -78,7 +78,7 @@ $$
 \text{Hypervolume} = \frac{1}{T_s} \times \frac{1}{O}
 $$
 
-Higher hypervolume = Faster settling + Smaller overshoot
+Higher hypervolume = Faster settling and Smaller overshoot
 
 ### Convergence Behavior
 - 99% hypervolume convergence: Progresses to next stage when improvements are less than 1%
