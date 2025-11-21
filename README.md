@@ -42,6 +42,7 @@ Ultra-light, agile, and stable. 70g including LiPo.
 ---
 
 ## PiiTune StepSync – Adaptive PID Tuning System
+Reinforcement Learning Meets Control Theory
 
 ### Mission
 Discover Pareto-optimal PID gains through systematic exploration, balancing settling performance against overshoot without artificial compromises. Uses hypervolume convergence to find the best possible tradeoff for each axis.
