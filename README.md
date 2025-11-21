@@ -67,8 +67,8 @@ A new gain is Pareto-optimal if:
 $$(T_s^{\text{new}} < T_s^{\text{best}} \land O^{\text{new}} \leq O^{\text{best}}) \quad \text{or} \quad (O^{\text{new}} < O^{\text{best}} \land T_s^{\text{new}} \leq T_s^{\text{best}})$$
 
 Where:
-- $T_s$ = Settling time
-- $O$ = Overshoot
+- $T_s$ = Settling time → Lower is better (faster)
+- $O$ = Overshoot → Lower is better (smaller)
 
 #### Hypervolume Calculation
 
@@ -78,7 +78,7 @@ $$
 \text{Hypervolume} = \frac{1}{T_s} \times \frac{1}{O}
 $$
 
-Higher hypervolume indicates better combined performance (lower settling time and overshoot).
+Higher hypervolume = Faster settling + Smaller overshoot
 
 ### Convergence Behavior
 - 99% hypervolume convergence: Progresses to next stage when improvements are less than 1%
