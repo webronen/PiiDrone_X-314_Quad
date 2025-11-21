@@ -64,19 +64,27 @@ Discover Pareto-optimal PID gains for direct hover stabilization through systema
 
 A new gain is Pareto-optimal if:
 
-$$(T_s^{\text{new}} < T_s^{\text{best}} \land O^{\text{new}} \leq O^{\text{best}}) \quad \text{or} \quad (O^{\text{new}} < O^{\text{best}} \land T_s^{\text{new}} \leq T_s^{\text{best}})$$
+**Plain text:**  
+(Ts_new < Ts_best AND O_new ≤ O_best)  
+or  
+(O_new < O_best AND Ts_new ≤ Ts_best)
 
-Where:
-- $T_s$ = Settling time → Lower is better (faster)
-- $O$ = Overshoot → Lower is better (smaller)
+**Math:**  
+$`(T_s^{\text{new}} < T_s^{\text{best}} \land O^{\text{new}} \leq O^{\text{best}}) \quad \text{or} \quad (O^{\text{new}} < O^{\text{best}} \land T_s^{\text{new}} \leq T_s^{\text{best}})`$
+
+Where:  
+- $`T_s`$ = Settling time (lower is better, faster)  
+- $`O`$ = Overshoot (lower is better, smaller)
 
 #### Hypervolume Calculation
 
 The hypervolume metric combines both objectives:
 
-$$
-\text{Hypervolume} = \frac{1}{T_s} \times \frac{1}{O}
-$$
+**Plain text:**  
+Hypervolume = (1 / Ts) × (1 / O)
+
+**Math:**  
+$`\text{Hypervolume} = \frac{1}{T_s} \times \frac{1}{O}`$
 
 Higher hypervolume = Faster settling and Smaller overshoot
 
