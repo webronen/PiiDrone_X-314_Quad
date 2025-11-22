@@ -32,7 +32,6 @@ Ultra-light, agile, and stable. 70g including LiPo.
 | Yaw   | Decrease        | –    | Yaw left (CCW) |
 
 ## Control Authority
-
 - Thrust: 160g (800 units) across 4 motors
 - Mass: 70g (hover: 350 units)
 - Max lateral acceleration: 1.0g
@@ -63,7 +62,6 @@ Discover hypervolume-optimal PID gains for direct hover stabilization through sy
 - Hypervolume: Product of settle performance and overshoot penalty (balanced multi-objective measure)
 
 ### Decision Criteria
-
 A new gain is accepted if it improves the hypervolume metric:
 
 $`\text{Hypervolume}^{\text{new}} > \text{Hypervolume}^{\text{best}}`$
@@ -105,6 +103,9 @@ Aims to find the hypervolume-optimal balance between speed and stability for you
 - Each axis: 3 stages × 30 seconds = 90 seconds
 - Entire system: 3 axes × 90 seconds = 270 seconds (4.5 minutes)
 - Output: Directly tuned control for stable flight
+
+Timing may vary based on system dynamics and hardware characteristics.  
+Typical range: 2–6 minutes total depending on plant complexity and convergence.
 
 ---
 
