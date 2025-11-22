@@ -437,21 +437,22 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
   const uint32_t now = NRF_TIMER0->CC[0];
 
   // Initialize tuning for this axis
-  const bool needs_init = !state[axis].active;
-  if (needs_init)
+  if (!state[axis].active)
   {
     memset(&state[axis], 0, sizeof(state[axis]));
     state[axis].active = state[axis].step_active = state[axis].measuring = true;
     state[axis].target = TUNE_RELAY_RADIANS;
     fcu.pid_setpoint[axis] = state[axis].target;
     state[axis].step_time = state[axis].relay_time = now;
-    fcu.pid_gain[axis][stages[0].gain_idx] = stages[0].inc;
+
+    const uint8_t gain_idx = stages[0].gain_idx;
+    const float inc = stages[0].inc;
+    fcu.pid_gain[axis][gain_idx] = inc;
     return false;
   }
 
   // Relay excitation: toggle setpoint each period
-  const bool relay_period_elapsed = now - state[axis].relay_time >= HZ_TO_US(TUNE_RELAY_HERTZ);
-  if (relay_period_elapsed)
+  if (now - state[axis].relay_time >= HZ_TO_US(TUNE_RELAY_HERTZ))
   {
     state[axis].step_active = true;
     state[axis].step_time = now;
@@ -468,67 +469,72 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     const float os = __builtin_fabsf(err - state[axis].target);
     if (os > state[axis].max_os)
       state[axis].max_os = os;
-
-    const bool half_cycle_elapsed = now - state[axis].step_time >= HZ_TO_US(TUNE_RELAY_HERTZ) / 2;
-    if (half_cycle_elapsed)
+    if (now - state[axis].step_time >= HZ_TO_US(TUNE_RELAY_HERTZ) / 2)
       state[axis].step_active = false;
   }
 
-  // Measure settling time within settle band (target ± band)
-  const bool within_settle_band = __builtin_fabsf(err - state[axis].target) <= TUNE_SETTLE_RADIANS;
-  if (state[axis].measuring && within_settle_band)
+  // Measure settling time within settle band
+  if (state[axis].measuring && __builtin_fabsf(err - state[axis].target) <= TUNE_SETTLE_RADIANS)
   {
     state[axis].settle_time = now;
     state[axis].measuring = false;
   }
 
   // Evaluate performance each full cycle
-  const bool should_evaluate = now - state[axis].relay_time >= HZ_TO_US(TUNE_RELAY_HERTZ);
-  if (!should_evaluate)
+  if (now - state[axis].relay_time < HZ_TO_US(TUNE_RELAY_HERTZ))
     return false;
 
-  const uint8_t gain_idx = stages[state[axis].stage].gain_idx;
-  const float inc = stages[state[axis].stage].inc;
+  // Store current stage configuration
+  const uint8_t stage_idx = state[axis].stage;
+  const uint8_t gain_idx = stages[stage_idx].gain_idx;
+  const float inc = stages[stage_idx].inc;
 
-  // Calculate metrics
+  // Calculate and normalize metrics
   const float settle_time = state[axis].measuring ? HZ_TO_US(TUNE_RELAY_HERTZ) : (float)(state[axis].settle_time - state[axis].step_time);
-  const float overshoot = state[axis].max_os;
-
-  // Normalize metrics
   const float norm_settle = __builtin_fminf(settle_time / HZ_TO_US(TUNE_RELAY_HERTZ), 1.0f);
-  const float norm_os = __builtin_fminf(overshoot / (2.0f * TUNE_RELAY_RADIANS), 1.0f);
+  const float norm_os = __builtin_fminf(state[axis].max_os / (2.0f * TUNE_RELAY_RADIANS), 1.0f);
 
-  // Hypervolume: combined performance (higher = faster settling, lower overshoot)
+  // Hypervolume: combined performance (higher = better)
   const float hv = (1.0f - norm_settle) * (1.0f - norm_os);
 
-  // Update best gains if hypervolume improved
-  const bool new_best = state[axis].best_hv == 0.0f || hv > state[axis].best_hv;
-  if (new_best)
+  // Penalize non-responsive tuning
+  if (hv < TUNE_NON_RESPONSIVE_PENALTY)
+  {
+    state[axis].settle_time = state[axis].step_time + HZ_TO_US(TUNE_RELAY_HERTZ);
+    state[axis].measuring = false;
+  }
+
+  // Update best gains if improved
+  if (state[axis].best_hv == 0.0f || hv > state[axis].best_hv)
   {
     state[axis].best_hv = hv;
     memcpy(state[axis].best_gains, fcu.pid_gain[axis], sizeof(state[axis].best_gains));
   }
 
-  // Check hypervolume convergence (relative improvement below threshold)
-  const bool has_baseline = state[axis].best_hv > 0.0f;
-  const float hv_improvement = __builtin_fabsf(hv - state[axis].best_hv) / state[axis].best_hv;
-  const bool has_converged = has_baseline && hv_improvement < TUNE_HYPERVOLUME_CONVERGENCE;
-
-  if (!has_converged)
+  // Check convergence
+  if (state[axis].best_hv > 0.0f && __builtin_fabsf(hv - state[axis].best_hv) / state[axis].best_hv < TUNE_HYPERVOLUME_CONVERGENCE)
   {
-    // Pure exploration: increment current gain
-    fcu.pid_gain[axis][gain_idx] += inc;
-    return false;
-  }
+    // Stage complete - lock in optimal gains
+    memcpy(fcu.pid_gain[axis], state[axis].best_gains, sizeof(fcu.pid_gain[axis]));
 
-  // Stage complete - lock in optimal gains
-  memcpy(fcu.pid_gain[axis], state[axis].best_gains, sizeof(fcu.pid_gain[axis]));
+    if (++state[axis].stage > 2)
+    {
+      // All stages complete
+      fcu.pid_setpoint[axis] = 0.0f;
+      state[axis].active = false;
 
-  // Check if all stages complete
-  const bool all_stages_done = ++state[axis].stage > 2;
-  if (!all_stages_done)
-  {
-    // Advance to next stage - reset state
+      // Return true only when all axes complete
+      for (uint8_t i = 0; i < 3; i++)
+        if (state[i].active)
+          return false;
+      return true;
+    }
+
+    // Advance to next stage
+    const uint8_t next_stage_idx = state[axis].stage;
+    const uint8_t next_gain_idx = stages[next_stage_idx].gain_idx;
+    const float next_inc = stages[next_stage_idx].inc;
+
     state[axis].best_hv = 0.0f;
     state[axis].max_os = 0.0f;
     state[axis].measuring = true;
@@ -536,20 +542,14 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     state[axis].relay_time = now;
     state[axis].step_time = now;
 
-    // Start new stage with best gains plus new gain
     memcpy(state[axis].best_gains, fcu.pid_gain[axis], sizeof(state[axis].best_gains));
-    fcu.pid_gain[axis][stages[state[axis].stage].gain_idx] = stages[state[axis].stage].inc;
-    return false;
+    fcu.pid_gain[axis][next_gain_idx] = next_inc;
+  }
+  else
+  {
+    // Continue exploration
+    fcu.pid_gain[axis][gain_idx] += inc;
   }
 
-  // All stages complete - stop excitation
-  fcu.pid_setpoint[axis] = 0.0f;
-  state[axis].active = false;
-
-  // Return true only when all axes complete
-  for (uint8_t i = 0; i < 3; i++)
-    if (state[i].active)
-      return false;
-
-  return true; // All axes tuning complete
+  return false;
 }

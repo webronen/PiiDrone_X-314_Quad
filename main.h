@@ -80,6 +80,7 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 #define TUNE_I_GAIN_INCREMENT 0.001f // I-gain exploration step
 
 #define TUNE_HYPERVOLUME_CONVERGENCE 0.10f // 10% convergence threshold
+#define TUNE_NON_RESPONSIVE_PENALTY 0.10f  // Uniform penalty for non-responsive tuning
 
 #define ENV_ALPHA 0.25f
 #define D_ALPHA 0.75f
