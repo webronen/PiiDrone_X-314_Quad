@@ -6,15 +6,15 @@ Ultra-light, agile, and stable. 70g including LiPo.
 
 ## Motor Layout (X Configuration)
 ```
-         Rear
-           |     |
-           | --- | --- |
-           | M4  | M3  |
-           | --  | --  |
-           | M2  | M1  |
-           | --  | --  |
-           |     |
-         Front
+   Rear
+     o
+| -- | -- |
+| M4 | M3 |
+| -- | -- |
+| M2 | M1 |
+| -- | -- |
+     v
+   Front
 ```
 - M1: Front-right (CCW)
 - M2: Front-left (CW)
