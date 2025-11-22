@@ -447,46 +447,44 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     return false;
   }
 
-  // Relay excitation: toggle setpoint each period
-  if (now - state[axis].relay_time >= HZ_TO_US(TUNE_RELAY_HERTZ))
+  // Early exit: only measure if not evaluation time
+  if (now - state[axis].relay_time < HZ_TO_US(TUNE_RELAY_HERTZ))
   {
-    state[axis].step_active = true;
-    state[axis].step_time = now;
-    state[axis].max_os = 0.0f;
-    state[axis].measuring = true;
-    state[axis].target = -state[axis].target;
-    fcu.pid_setpoint[axis] = state[axis].target;
-    state[axis].relay_time = now;
-  }
+    // Measure overshoot during first half-cycle
+    if (state[axis].step_active)
+    {
+      const float os = __builtin_fabsf(err - state[axis].target);
+      if (os > state[axis].max_os)
+        state[axis].max_os = os;
 
-  // Measure overshoot during first half-cycle
-  if (state[axis].step_active)
-  {
-    const float os = __builtin_fabsf(err - state[axis].target);
-    if (os > state[axis].max_os)
-      state[axis].max_os = os;
+      if (now - state[axis].step_time >= TUNE_RELAY_HALF_PERIOD_US)
+        state[axis].step_active = false;
+    }
 
-    if (now - state[axis].step_time >= TUNE_RELAY_HALF_PERIOD_US)
-      state[axis].step_active = false;
-  }
+    // Measure settling time within settle band (target ± band)
+    if (state[axis].measuring && __builtin_fabsf(err - state[axis].target) <= TUNE_SETTLE_RADIANS)
+    {
+      state[axis].settle_time = now;
+      state[axis].measuring = false;
+    }
 
-  // Measure settling time within settle band (target ± band)
-  if (state[axis].measuring && __builtin_fabsf(err - state[axis].target) <= TUNE_SETTLE_RADIANS)
-  {
-    state[axis].settle_time = now;
-    state[axis].measuring = false;
-  }
-
-  // Evaluate performance each full cycle
-  const bool should_evaluate = now - state[axis].relay_time >= HZ_TO_US(TUNE_RELAY_HERTZ);
-  if (!should_evaluate)
     return false;
+  }
 
-  // Calculate metrics
+  // Evaluation time: toggle relay AND evaluate previous cycle
+  state[axis].step_active = true;
+  state[axis].step_time = now;
+  state[axis].max_os = 0.0f;
+  state[axis].measuring = true;
+  state[axis].target = -state[axis].target;
+  fcu.pid_setpoint[axis] = state[axis].target;
+  state[axis].relay_time = now;
+
+  // Evaluate previous cycle performance
   const float settle_time = state[axis].measuring ? HZ_TO_US(TUNE_RELAY_HERTZ) : (float)(state[axis].settle_time - state[axis].step_time);
   const float overshoot = state[axis].max_os;
 
-  // Normalize metrics with epsilon protection
+  // Normalize metrics
   const float norm_settle = __builtin_fminf(settle_time / HZ_TO_US(TUNE_RELAY_HERTZ), 1.0f);
   const float norm_os = __builtin_fminf(overshoot / (2.0f * TUNE_RELAY_RADIANS), 1.0f);
 
@@ -506,7 +504,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     state[axis].best_hv = hv;
   }
 
-  // Check hypervolume convergence (relative improvement below threshold)
+  // Continue exploration if no baseline or significant improvement
   if (state[axis].best_hv == 0.0f ||
       (__builtin_fabsf(hv - state[axis].best_hv) / state[axis].best_hv >= TUNE_HYPERVOLUME_CONVERGENCE))
   {
