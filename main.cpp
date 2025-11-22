@@ -528,8 +528,9 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     return false;
   }
 
-  // Stage complete - lock in optimal gains
+  // Stage complete - lock in optimal gains and reset setpoint
   memcpy(fcu.pid_gain[axis], state[axis].best_gains, sizeof(fcu.pid_gain[axis]));
+  fcu.pid_setpoint[axis] = 0.0f;
 
   // Check if all stages complete
   const bool all_stages_done = ++state[axis].stage > 2;
@@ -550,7 +551,6 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
   }
 
   // All stages complete - stop excitation
-  fcu.pid_setpoint[axis] = 0.0f;
   state[axis].active = false;
 
   // Return true only when all axes complete
