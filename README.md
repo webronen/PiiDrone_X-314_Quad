@@ -7,13 +7,13 @@ Ultra-light, agile, and stable. 70g including LiPo.
 ## Motor Layout (X Configuration)
 ```
          Rear
-           |
-      | -- | -- |
-      | M4 | M3 |
-      | -- | -- |
-      | M2 | M1 |
-      | -- | -- |
-           |
+           |     |
+           | --- | --- |
+           | M4  | M3  |
+           | --  | --  |
+           | M2  | M1  |
+           | --  | --  |
+           |     |
          Front
 ```
 - M1: Front-right (CCW)
@@ -92,6 +92,7 @@ Higher hypervolume means both faster settling and smaller overshoot.
 - Numerical stability: Protected divisions
 - Multi-axis independent: Parallel tuning across roll, pitch, yaw
 - Automatic completion: Resets setpoint when axis completes
+- Oscillation validation: Applies a uniform penalty to non-responsive systems to prevent false convergence
 
 ### Guarantee
 Aims to find the hypervolume-optimal balance between speed and stability for your hardware. Either converges to 90% of optimal hypervolume within each stage, or continues exploring indefinitely. Provides directly tuned control suitable for stable flight.
