@@ -211,25 +211,6 @@ typedef struct __attribute__((packed, aligned(4)))
 
 static_assert(sizeof(TuneGlobalState) == 4, "TuneGlobal State struct must be 4 bytes (1 words)");
 
-typedef struct __attribute__((packed, aligned(4)))
-{
-  uint32_t last_relay_time;      // Separate: Relay oscillation timing (0.5Hz)
-  uint32_t last_evaluation_time; // Separate: RMSE evaluation timing (4Hz)
-  float squared_error_sum;       // Accumulated squared error
-  float best_rmse_achieved;      // Best RMSE found in current stage
-  float best_gain_found;         // Best gain corresponding to best RMSE
-  uint16_t sample_count;         // Number of samples in current evaluation
-  uint16_t training_stage;       // Current training stage: 0=P, 1=D, 2=I
-  bool is_active;                // Whether this axis is currently being tuned
-  float relay_setpoint;          // Current relay excitation setpoint
-  uint8_t patience_counter;      // Early stopping patience counter
-  bool stability_check_active;   // Whether stability check is active
-  uint32_t stability_start_time; // Time when stability check started
-  uint8_t padding[5];            // Padding for 4-byte alignment
-} TuneAxisState;
-
-static_assert(sizeof(TuneAxisState) == 40, "TuneAxis State struct must be 40 bytes (10 words)");
-
 static Fcu fcu = {0};
 static Esc esc = {0x8000, 0x8000, 0x8000, 0x8000};
 static volatile Rcu received_packet = {0};
