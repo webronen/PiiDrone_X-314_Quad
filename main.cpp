@@ -104,7 +104,7 @@ void loop(void)
   const bool landing_timeout = loop_start_us >= last_landing_us;
 
   // Update async packet timeout to prevent landing during auto-tuning
-  if (tune_state.is_running)
+  if (tune_state.at_progress)
     last_packet_us = loop_start_us + HZ_TO_US(0.1f);
 
   // Handle received radio packets before strict periodic tasks
@@ -160,14 +160,14 @@ static inline void task_fcu_update(void)
   DataQuaternion error;
   quaternion_multiply(&error, &hover_quaternion, &conjugate);
 
-  if (tune_state.is_running && !tune_state.is_at_hover)
+  if (tune_state.at_progress && !tune_state.is_at_hover)
   {
     if (pid_thrust_ramp(TUNE_RAMP_MAX, TUNE_RAMP_S))
     {
       tune_state.is_at_hover = true;
     }
   }
-  else if (tune_state.is_running && tune_state.is_at_hover)
+  else if (tune_state.at_progress && tune_state.is_at_hover)
   {
     static float *const error_ptr[3] = {&error.x, &error.y, &error.z};
     const float current_error = *error_ptr[tune_state.tuning_axis];
@@ -176,11 +176,11 @@ static inline void task_fcu_update(void)
     {
       if (++tune_state.tuning_axis == 1)
       {
-        tune_state.is_running = false;
+        tune_state.at_progress = false;
       }
     }
   }
-  else if (!tune_state.is_running && tune_state.is_at_hover)
+  else if (!tune_state.at_progress && tune_state.is_at_hover)
   {
     if (pid_thrust_ramp(-TUNE_RAMP_MAX, TUNE_RAMP_S))
     {
@@ -337,7 +337,7 @@ static inline void handle_pid_tune(void)
   pid_tune_stop();
   pid_state_clear();
 
-  tune_state.is_running = true;
+  tune_state.at_progress = true;
 
   FCU_SET_ACTIVE(fcu.status);
   FCU_SET_AUTOTUNE(fcu.status);
@@ -369,7 +369,7 @@ static inline void handle_thrust_update(void)
   uint16_t thrust;
   memcpy(&thrust, (const void *)&received_packet.data[0], sizeof(thrust));
 
-  if (tune_state.is_running)
+  if (tune_state.at_progress)
   {
     pid_tune_stop();
     pid_state_clear();

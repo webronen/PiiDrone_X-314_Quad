@@ -203,9 +203,9 @@ static_assert(sizeof(Task) == 16, "Task struct must be 16 bytes (4 words)");
 
 typedef struct __attribute__((packed, aligned(4)))
 {
-  bool is_running;     // Is autotune in progress
+  bool at_progress;    // Is autotune in progress
   bool is_at_hover;    // Has the drone reached stable hover
-  uint8_t tuning_axis; // Current axis being tuned (0=roll, 1=pitch, 2=yaw)
+  uint8_t tuning_axis; // Progressing axis (0=roll, 1=pitch, 2=yaw, 3=complete)
   uint8_t padding[1];  // Padding for 4-byte alignment
 } TuneGlobalState;
 
