@@ -90,7 +90,7 @@ Higher hypervolume means both faster settling and smaller overshoot.
 
 ### Safety & Robustness
 - Numerical stability: Protected divisions
-- Multi-axis independent: Parallel tuning across roll, pitch, yaw
+- Multi-axis independent: Sequential tuning across roll, pitch, yaw
 - Automatic completion: Resets setpoint when axis completes
 - Oscillation validation: Applies a uniform penalty to non-responsive systems to prevent false convergence
 
