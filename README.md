@@ -78,7 +78,7 @@ $`O`$ = Overshoot (lower is better, smaller)
 Higher hypervolume means both faster settling and smaller overshoot.
 
 ### Convergence Behavior
-- 95% hypervolume convergence: Progresses to next stage when improvements are less than 5%
+- 90% hypervolume convergence: Progresses to next stage when improvements are less than or equal to 10%
 - No artificial limits: Gains can grow indefinitely if beneficial
 - Pure exploration: Systematic gain incrementing with fixed steps
 - Stage preservation: Best gains carried forward through P→D→I progression
@@ -86,8 +86,8 @@ Higher hypervolume means both faster settling and smaller overshoot.
 ### Tuning Parameters
 - Relay frequency: 0.5Hz (2s period, optimized for control loop)
 - Gain increments: P=0.1, D=0.01, I=0.001
-- Settling threshold: 0.02 radians precision (~1.15°)
-- Convergence: 5% hypervolume improvement threshold
+- Settling threshold: 0.08 radians precision (~4.6°)
+- Convergence: 10% hypervolume improvement threshold
 - Exploration: No maximum gain limits
 
 ### Safety & Robustness
@@ -96,14 +96,15 @@ Higher hypervolume means both faster settling and smaller overshoot.
 - Automatic completion: Resets setpoint when axis completes
 
 ### Guarantee
-Aims to find the hypervolume-optimal balance between speed and stability for your hardware. Either converges to 95% of optimal hypervolume within each stage, or continues exploring indefinitely. Provides directly tuned control suitable for stable flight.
+Aims to find the hypervolume-optimal balance between speed and stability for your hardware. Either converges to 90% of optimal hypervolume within each stage, or continues exploring indefinitely. Provides directly tuned control suitable for stable flight.
 
 ---
 
 ## Expected Performance
-- Per axis: ~1.5 minutes
-- Total system: ~4.5 minutes
-- Provides: Directly tuned control for stable flight
+- Each stage (P, D, I): ~30 seconds
+- Each axis: 3 stages × 30 seconds = 90 seconds
+- Entire system: 3 axes × 90 seconds = 270 seconds (4.5 minutes)
+- Output: Directly tuned control for stable flight
 
 ---
 

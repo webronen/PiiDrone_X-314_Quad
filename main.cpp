@@ -474,7 +474,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
       state[axis].step_active = false;
   }
 
-  // Measure settling time (5% threshold)
+  // Measure settling time within settle band (target ± band)
   const bool within_settle_band = __builtin_fabsf(err - state[axis].target) <= TUNE_SETTLE_RADIANS;
   if (state[axis].measuring && within_settle_band)
   {
@@ -498,7 +498,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
   const float norm_settle = __builtin_fminf(settle_time / HZ_TO_US(TUNE_RELAY_HERTZ), 1.0f);
   const float norm_os = __builtin_fminf(overshoot / (2.0f * TUNE_RELAY_RADIANS), 1.0f);
 
-  // Hypervolume: combined performance (higher = better)
+  // Hypervolume: combined performance (higher = faster settling, lower overshoot)
   const float hv = (1.0f - norm_settle) * (1.0f - norm_os);
 
   // Update best gains if hypervolume improved
@@ -509,7 +509,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     memcpy(state[axis].best_gains, fcu.pid_gain[axis], sizeof(state[axis].best_gains));
   }
 
-  // Check hypervolume convergence
+  // Check hypervolume convergence (relative improvement below threshold)
   const bool has_baseline = state[axis].best_hv > 0.0f;
   const float hv_improvement = __builtin_fabsf(hv - state[axis].best_hv) / state[axis].best_hv;
   const bool has_converged = has_baseline && hv_improvement < TUNE_HYPERVOLUME_CONVERGENCE;
