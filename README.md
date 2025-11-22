@@ -1,6 +1,5 @@
 License: CC BY-NC 4.0
-
-https://creativecommons.org/licenses/by-nc/4.0/legalcode
+- https://creativecommons.org/licenses/by-nc/4.0/legalcode
 
 # PiiDrone X-314 Quad
 Ultra-light, agile, and stable. 70g including LiPo.
