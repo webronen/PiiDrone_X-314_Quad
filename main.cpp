@@ -415,7 +415,6 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
   {
     uint32_t relay_time, step_time, settle_time;
     float best_hv, max_os;
-    float best_gains[3];
     float target;
     uint8_t stage;
     bool active, step_active, measuring;
@@ -508,12 +507,12 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     state[axis].settle_time = state[axis].step_time + HZ_TO_US(TUNE_RELAY_HERTZ);
     state[axis].measuring = false;
   }
-  // Update best gains if hypervolume improved
+
+  // Update best hypervolume if improved
   const bool new_best = state[axis].best_hv == 0.0f || hv > state[axis].best_hv;
   if (new_best)
   {
     state[axis].best_hv = hv;
-    memcpy(state[axis].best_gains, fcu.pid_gain[axis], sizeof(state[axis].best_gains));
   }
 
   // Check hypervolume convergence (relative improvement below threshold)
@@ -528,8 +527,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     return false;
   }
 
-  // Stage complete - lock in optimal gains and reset setpoint
-  memcpy(fcu.pid_gain[axis], state[axis].best_gains, sizeof(fcu.pid_gain[axis]));
+  // Stage complete - reset setpoint (fcu.pid_gain already has optimal gains)
   fcu.pid_setpoint[axis] = 0.0f;
 
   // Check if all stages complete
@@ -544,19 +542,14 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     state[axis].relay_time = now;
     state[axis].step_time = now;
 
-    // Start new stage with best gains plus new gain
-    memcpy(state[axis].best_gains, fcu.pid_gain[axis], sizeof(state[axis].best_gains));
-    fcu.pid_gain[axis][stages[state[axis].stage].gain_idx] = stages[state[axis].stage].inc;
+    // Start new stage with current gains plus new gain increment
+    fcu.pid_gain[axis][stages[state[axis].stage].gain_idx] += stages[state[axis].stage].inc;
     return false;
   }
 
-  // All stages complete - stop excitation
+  // All stages complete for this axis - stop excitation
   state[axis].active = false;
 
-  // Return true only when all axes complete
-  for (uint8_t i = 0; i < 3; i++)
-    if (state[i].active)
-      return false;
-
-  return true; // All axes tuning complete
+  // This axis tuning complete
+  return true;
 }
