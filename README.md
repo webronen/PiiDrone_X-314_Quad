@@ -72,7 +72,7 @@ $`\frac{|\text{err} - \text{prev\_err}|}{|\text{prev\_err}|} \leq 0.10`$
 
 Non-responsive systems are penalized if hypervolume $< 0.10$.
 
-No absolute thresholds are used—everything is relative to the previous state.
+No absolute thresholds are used, everything is relative to the previous state.
 
 ### Convergence Behavior
 - 90% hypervolume convergence: Progresses to next stage when improvements are less than or equal to 10%
