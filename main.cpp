@@ -410,10 +410,10 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
   // Persistent tuning state maintained across function calls
   static struct
   {
-    uint32_t relay_time, step_time, settle_time; // Timing control
-    float hv_prev, max_os, prev_err;             // Hypervolume history and current overshoot
-    uint8_t stage, zero_crossings;               // Current stage: 0=P, 1=D, 2=I
-    bool active, step_active, measuring;         // State machine flags
+    uint32_t relay_time, step_time, settle_time; // Relay cycle timing, step start, oscillation settle
+    float hv_prev, max_os, prev_err;             // Previous hypervolume, max overshoot, last error
+    uint8_t stage, zero_crossings;               // Current tuning stage, oscillation zero-crossings
+    bool active, step_active, measuring;         // Tuning active, step in progress, measuring oscillations
   } state = {0};
 
   // Tuning stage progression with gain-specific increments
@@ -448,7 +448,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     // Track maximum overshoot during step response (first half of relay period)
     if (state.step_active)
     {
-      float os = __builtin_fabsf(err - fcu.pid_setpoint[axis]);
+      const float os = __builtin_fabsf(err - fcu.pid_setpoint[axis]);
       if (os > state.max_os)
         state.max_os = os;
       if (now - state.step_time >= TUNE_RELAY_HALF_PERIOD_US)
@@ -459,7 +459,10 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     if (state.measuring)
     {
       // Detect when error changes sign (zero crossing) with noise immunity
-      if ((state.prev_err * err) <= 0.0f && __builtin_fabsf(err) > 0.001f)
+      const bool is_zero_crossing = (state.prev_err * err) <= 0.0f;
+      const bool is_significant_change = __builtin_fabsf(err - state.prev_err) / (__builtin_fabsf(state.prev_err) + __FLT_EPSILON__) > TUNE_RELATIVE_CHANGE_THRESHOLD;
+
+      if (is_zero_crossing && is_significant_change)
       {
         // System has oscillated enough - consider it settled after one full cycle
         if (++state.zero_crossings >= 2) // At least one full oscillation cycle
@@ -474,8 +477,8 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
   }
 
   // Relay cycle complete - calculate performance metrics
-  float current_os = state.max_os;
-  float settle_time = state.measuring ? TUNE_RELAY_FULL_PERIOD_US : (float)(state.settle_time - state.step_time);
+  const float current_os = state.max_os;
+  const float settle_time = state.measuring ? TUNE_RELAY_FULL_PERIOD_US : (float)(state.settle_time - state.step_time);
 
   /**
    * Calculate hypervolume performance metric:
@@ -486,8 +489,8 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
    * - Smaller overshoot (lower normalized_overshoot)
    * - Range: 0.0 (worst) to 1.0 (ideal)
    */
-  float hv = (1.0f - __builtin_fminf(settle_time / TUNE_RELAY_FULL_PERIOD_US, 1.0f)) *
-             (1.0f - __builtin_fminf(current_os / TUNE_RELAY_FULL_PERIOD_RADIANS, 1.0f));
+  const float hv = (1.0f - __builtin_fminf(settle_time / TUNE_RELAY_FULL_PERIOD_US, 1.0f)) *
+                   (1.0f - __builtin_fminf(current_os / TUNE_RELAY_FULL_PERIOD_RADIANS, 1.0f));
 
   // Non-responsive detection: insufficient oscillation (hypervolume < 10%)
   if (hv < TUNE_HYPERVOLUME_CONVERGENCE)

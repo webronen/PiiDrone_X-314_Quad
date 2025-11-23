@@ -76,7 +76,8 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 #define TUNE_D_GAIN_INCREMENT 0.01f  // D-gain exploration step
 #define TUNE_I_GAIN_INCREMENT 0.001f // I-gain exploration step
 
-#define TUNE_HYPERVOLUME_CONVERGENCE 0.10f // 10% relative change threshold
+#define TUNE_HYPERVOLUME_CONVERGENCE 0.1f   // 10% hypervolume improvement threshold
+#define TUNE_RELATIVE_CHANGE_THRESHOLD 0.1f // 10% zero-crossing significance threshold
 
 #define TUNE_RAMP_MAX THRUST_HOVER // Max thrust during tuning
 #define TUNE_RAMP_S 5.0f           // 5s thrust ramp
