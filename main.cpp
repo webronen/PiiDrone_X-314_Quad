@@ -411,8 +411,8 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
   static struct
   {
     uint32_t relay_time, step_time, settle_time; // Timing control
-    float hv_prev, max_os;                       // Hypervolume history and current overshoot
-    uint8_t stage;                               // Current stage: 0=P, 1=D, 2=I
+    float hv_prev, max_os, prev_err;             // Hypervolume history and current overshoot
+    uint8_t stage, zero_crossings;               // Current stage: 0=P, 1=D, 2=I
     bool active, step_active, measuring;         // State machine flags
   } state = {0};
 
@@ -426,10 +426,6 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
       {2, TUNE_D_GAIN_INCREMENT},  // Stage 1: Derivative tuning
       {1, TUNE_I_GAIN_INCREMENT}}; // Stage 2: Integral tuning
 
-  // Persistent state for pure relative oscillation detection
-  static float prev_err = 0.0f;
-  static uint8_t zero_crossings = 0;
-
   // Capture current microsecond time for precise timing
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
   const uint32_t now = NRF_TIMER0->CC[0];
@@ -441,8 +437,8 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     state.active = state.step_active = state.measuring = true;
     fcu.pid_setpoint[axis] = TUNE_RELAY_HALF_PERIOD_RADIANS;
     state.step_time = state.relay_time = now;
-    prev_err = err;
-    zero_crossings = 0;
+    state.prev_err = err;
+    state.zero_crossings = 0;
     return false;
   }
 
@@ -463,18 +459,16 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     if (state.measuring)
     {
       // Detect when error changes sign (zero crossing) with noise immunity
-      if ((prev_err * err) <= 0.0f && __builtin_fabsf(err) > 0.001f)
+      if ((state.prev_err * err) <= 0.0f && __builtin_fabsf(err) > 0.001f)
       {
-        zero_crossings++;
-
         // System has oscillated enough - consider it settled after one full cycle
-        if (zero_crossings >= 2) // At least one full oscillation cycle
+        if (++state.zero_crossings >= 2) // At least one full oscillation cycle
         {
           state.settle_time = now;
           state.measuring = false;
         }
       }
-      prev_err = err;
+      state.prev_err = err;
     }
     return false;
   }
@@ -509,8 +503,8 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
   state.measuring = true;
   fcu.pid_setpoint[axis] = -fcu.pid_setpoint[axis];
   state.relay_time = now;
-  prev_err = err;
-  zero_crossings = 0; // Reset oscillation counter for next cycle
+  state.prev_err = err;
+  state.zero_crossings = 0; // Reset oscillation counter for next cycle
 
   /**
    * Hypervolume convergence check:
