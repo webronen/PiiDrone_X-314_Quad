@@ -111,7 +111,7 @@ Typical range: 2–6 minutes total depending on plant complexity and convergence
 ---
 
 ## Summary
-StepSync uses hypervolume optimization to discover PID gains that balance speed and stability. The reinforcement learning approach systematically explores the gain space while ensuring continuous improvements, delivering tuned control suitable for stable flight performance.
+PiiTune RL‑314 PID uses hypervolume optimization to discover PID gains that balance speed and stability. The reinforcement learning approach systematically explores the gain space while ensuring continuous improvements, delivering tuned control suitable for stable flight performance.
 
 Suitable for developers who want automated tuning without system identification or manual compromise.
 
