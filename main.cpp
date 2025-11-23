@@ -406,7 +406,7 @@ static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s)
  * and hypervolume optimization. Sequentially tunes P, D, I gains
  * without artificial limits to find optimal speed-stability balance.
  *
- * Returns: true when all axes complete tuning
+ * Returns: true when all stages complete, false otherwise.
  */
 static inline bool pid_tune_step(const uint8_t axis, const float err)
 {
