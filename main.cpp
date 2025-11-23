@@ -410,119 +410,79 @@ static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s)
  */
 static inline bool pid_tune_step(const uint8_t axis, const float err)
 {
-  // Tuning state
-  static struct
-  {
+  static struct {
     uint32_t relay_time, step_time, settle_time;
-    float best_hv, max_os;
-    float target;
+    float hv_prev, max_os;
     uint8_t stage;
     bool active, step_active, measuring;
-  } state[3] = {0};
+  } state = {0};
 
-  // P→D→I tuning stages
-  static struct
-  {
-    uint8_t gain_idx; // PID gains array index
-    float inc;        // Gain increment value
-  } stages[] = {
-      {0, TUNE_P_GAIN_INCREMENT}, // Stage 0: P gain
-      {2, TUNE_D_GAIN_INCREMENT}, // Stage 1: D gain
-      {1, TUNE_I_GAIN_INCREMENT}  // Stage 2: I gain
+  static const struct { 
+    const uint8_t gain_idx;
+    const float inc; 
+  } stages[3] = {
+    {0, TUNE_P_GAIN_INCREMENT},
+    {2, TUNE_D_GAIN_INCREMENT},
+    {1, TUNE_I_GAIN_INCREMENT}
   };
 
-  // Get current time
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
   const uint32_t now = NRF_TIMER0->CC[0];
 
-  // Initialize tuning for this axis
-  if (!state[axis].active)
-  {
-    memset(&state[axis], 0, sizeof(state[axis]));
-    state[axis].active = state[axis].step_active = state[axis].measuring = true;
-    state[axis].target = TUNE_RELAY_RADIANS;
-    fcu.pid_setpoint[axis] = state[axis].target;
-    state[axis].step_time = state[axis].relay_time = now;
-    fcu.pid_gain[axis][stages[0].gain_idx] = stages[0].inc;
+  if (!state.active) {
+    memset(&state, 0, sizeof(state));
+    state.active = state.step_active = state.measuring = true;
+    state.stage = 0;
+    fcu.pid_setpoint[axis] = TUNE_RELAY_RADIANS;
+    state.step_time = state.relay_time = now;
+    state.hv_prev = 0.0f;
     return false;
   }
 
-  // Early exit: only measure if not evaluation time
-  if (now - state[axis].relay_time < HZ_TO_US(TUNE_RELAY_HERTZ))
-  {
-    // Measure overshoot during first half-cycle
-    if (state[axis].step_active)
-    {
-      const float os = __builtin_fabsf(err - state[axis].target);
-      if (os > state[axis].max_os)
-        state[axis].max_os = os;
-
-      if (now - state[axis].step_time >= TUNE_RELAY_HALF_PERIOD_US)
-        state[axis].step_active = false;
+  if (now - state.relay_time < HZ_TO_US(TUNE_RELAY_HERTZ)) {
+    if (state.step_active) {
+      const float os = __builtin_fabsf(err - fcu.pid_setpoint[axis]);
+      if (os > state.max_os) state.max_os = os;
+      if (now - state.step_time >= TUNE_RELAY_HALF_PERIOD_US) 
+        state.step_active = false;
     }
-
-    // Measure settling time within settle band (target ± band)
-    if (state[axis].measuring && __builtin_fabsf(err - state[axis].target) <= TUNE_SETTLE_RADIANS)
-    {
-      state[axis].settle_time = now;
-      state[axis].measuring = false;
+    if (state.measuring && __builtin_fabsf(err - fcu.pid_setpoint[axis]) <= TUNE_SETTLE_RADIANS) {
+      state.settle_time = now;
+      state.measuring = false;
     }
-
     return false;
   }
 
-  // Evaluation time: toggle relay AND evaluate previous cycle
-  state[axis].step_active = true;
-  state[axis].step_time = now;
-  state[axis].max_os = 0.0f;
-  state[axis].measuring = true;
-  state[axis].target = -state[axis].target;
-  fcu.pid_setpoint[axis] = state[axis].target;
-  state[axis].relay_time = now;
+  state.step_active = true;
+  state.step_time = now;
+  state.max_os = 0.0f;
+  state.measuring = true;
+  fcu.pid_setpoint[axis] = -fcu.pid_setpoint[axis];
+  state.relay_time = now;
 
-  // Evaluate previous cycle performance
-  const float settle_time = state[axis].measuring ? HZ_TO_US(TUNE_RELAY_HERTZ) : (float)(state[axis].settle_time - state[axis].step_time);
-  const float overshoot = state[axis].max_os;
+  const float settle_t = state.measuring ? HZ_TO_US(TUNE_RELAY_HERTZ) : (float)(state.settle_time - state.step_time);
+  const float hv = (1.0f - __builtin_fminf(settle_t / HZ_TO_US(TUNE_RELAY_HERTZ), 1.0f)) *
+                   (1.0f - __builtin_fminf(state.max_os / (2.0f * TUNE_RELAY_RADIANS), 1.0f));
 
-  // Normalize metrics
-  const float norm_settle = __builtin_fminf(settle_time / HZ_TO_US(TUNE_RELAY_HERTZ), 1.0f);
-  const float norm_os = __builtin_fminf(overshoot / (2.0f * TUNE_RELAY_RADIANS), 1.0f);
-
-  // Hypervolume: combined performance (higher = faster settling, lower overshoot)
-  const float hv = (1.0f - norm_settle) * (1.0f - norm_os);
-
-  // Uniform penalty for non-responsive tuning (no oscillation)
-  if (hv < TUNE_NON_RESPONSIVE_PENALTY)
-  {
-    state[axis].settle_time = state[axis].step_time + HZ_TO_US(TUNE_RELAY_HERTZ);
-    state[axis].measuring = false;
+  if (hv < TUNE_NON_RESPONSIVE_PENALTY) {
+    state.settle_time = state.step_time + HZ_TO_US(TUNE_RELAY_HERTZ);
+    state.measuring = false;
   }
 
-  // Update best hypervolume if improved
-  if (state[axis].best_hv == 0.0f || hv > state[axis].best_hv)
-  {
-    state[axis].best_hv = hv;
-  }
-
-  // Continue exploration if no baseline or significant improvement
-  if (state[axis].best_hv == 0.0f ||
-      (__builtin_fabsf(hv - state[axis].best_hv) / state[axis].best_hv >= TUNE_HYPERVOLUME_CONVERGENCE))
-  {
-    fcu.pid_gain[axis][stages[state[axis].stage].gain_idx] += stages[state[axis].stage].inc;
+  if (state.hv_prev == 0.0f || (__builtin_fabsf(hv - state.hv_prev) / state.hv_prev >= TUNE_HYPERVOLUME_CONVERGENCE)) {
+    fcu.pid_gain[axis][stages[state.stage].gain_idx] += stages[state.stage].inc;
+    state.hv_prev = hv;
     return false;
   }
 
-  // Stage complete - reset setpoint
   fcu.pid_setpoint[axis] = 0.0f;
-
-  // Check if all stages complete
-  if (++state[axis].stage > 2)
-  {
-    // All stages complete for this axis - stop excitation
-    state[axis].active = false;
+  
+  if (++state.stage > 2) {
+    state.active = false;
     return true;
   }
-
-  // More stages remain - continue tuning next stage
+  
+  fcu.pid_gain[axis][stages[state.stage].gain_idx] += stages[state.stage].inc;
+  state.hv_prev = 0.0f;
   return false;
 }
