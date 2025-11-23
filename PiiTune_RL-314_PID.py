@@ -349,7 +349,7 @@ class PIDBalanceVisualizer:
                 "OSCILLATION DETECTION:",
                 "• Zero-crossing + 10% relative change",
                 "• Settling: 2+ significant crossings", 
-                "• Progress: HV improvement <10%",
+                "• Progress: HV improvement ≥10%",
                 "• Non-responsive: HV <10%",
                 "• Stages: P → D → I"
             ]
