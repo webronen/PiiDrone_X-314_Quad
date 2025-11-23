@@ -160,6 +160,7 @@ static inline void task_fcu_update(void)
   DataQuaternion error;
   quaternion_multiply(&error, &hover_quaternion, &conjugate);
 
+  // PiiTune RL-314 - Auto-tuning state machine
   if (tune_state.at_progress && !tune_state.is_at_hover)
   {
     if (pid_thrust_ramp(TUNE_RAMP_MAX, TUNE_RAMP_S))
@@ -401,89 +402,100 @@ static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s)
 
 /**
  * PiiTune RL‑314 PID – Hypervolume Performance Explorer
- *
- * Model-free reinforcement learning approach using relay excitation
- * and hypervolume optimization. Sequentially tunes P, D, I gains
- * without artificial limits to find optimal speed-stability balance.
- *
- * Returns: true when all stages complete, false otherwise.
+ * Uses pure relative metrics for oscillation detection and convergence
  */
+
 static inline bool pid_tune_step(const uint8_t axis, const float err)
 {
-  // Persistent tuning state for axis and stage
+  // Persistent tuning state
   static struct
   {
-    uint32_t relay_time, step_time, settle_time;
-    float hv_prev, max_os;
-    uint8_t stage;
-    bool active, step_active, measuring;
+    uint32_t relay_time, step_time, settle_time; // Timing control
+    float hv_prev, max_os;                       // Performance metrics
+    uint8_t stage;                               // Current stage: 0=P, 1=D, 2=I
+    bool active, step_active, measuring;         // State machine flags
   } state = {0};
 
-  // Tuning stages: P, D, I with respective increments
+  // Tuning stage progression
   static const struct
   {
-    const uint8_t gain_idx;
-    const float inc;
+    const uint8_t gain_idx; // PID gain index: 0=P, 1=I, 2=D
+    const float inc;        // Gain increment per cycle
   } stages[3] = {
-      {0, TUNE_P_GAIN_INCREMENT},
-      {2, TUNE_D_GAIN_INCREMENT},
-      {1, TUNE_I_GAIN_INCREMENT}};
+      {0, TUNE_P_GAIN_INCREMENT},  // Stage 0: Proportional tuning
+      {2, TUNE_D_GAIN_INCREMENT},  // Stage 1: Derivative tuning
+      {1, TUNE_I_GAIN_INCREMENT}}; // Stage 2: Integral tuning
 
-  // Capture current time
+  // Persistent error for pure relative settling detection
+  static float prev_err = 0.0f;
+
+  // Capture current microsecond time
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
   const uint32_t now = NRF_TIMER0->CC[0];
 
-  // Initialize tuning state on first call
+  // Initialize tuning on first call
   if (!state.active)
   {
     memset(&state, 0, sizeof(state));
     state.active = state.step_active = state.measuring = true;
     fcu.pid_setpoint[axis] = TUNE_RELAY_HALF_PERIOD_RADIANS;
     state.step_time = state.relay_time = now;
+    prev_err = err;
     return false;
   }
 
-  // Relay excitation: monitor response and overshoot
+  // Monitor system response during relay period
   if (now - state.relay_time < TUNE_RELAY_FULL_PERIOD_US)
   {
-    // Overshoot tracking during active step
+    // Track maximum overshoot during step response
     if (state.step_active)
     {
-      const float os = __builtin_fabsf(err - fcu.pid_setpoint[axis]);
+      float os = __builtin_fabsf(err - fcu.pid_setpoint[axis]);
       if (os > state.max_os)
         state.max_os = os;
       if (now - state.step_time >= TUNE_RELAY_HALF_PERIOD_US)
         state.step_active = false;
     }
-    // Settling detection during measurement phase
-    if (state.measuring && __builtin_fabsf(err - fcu.pid_setpoint[axis]) <= TUNE_SETTLE_RADIANS)
+
+    // Pure relative settling detection: error change ≤10%
+    if (state.measuring)
     {
-      state.settle_time = now;
-      state.measuring = false;
+      float err_change = __builtin_fabsf(err - prev_err) / __builtin_fabsf(prev_err);
+      if (err_change <= TUNE_HYPERVOLUME_CONVERGENCE)
+      {
+        state.settle_time = now;
+        state.measuring = false;
+      }
+      prev_err = err;
     }
     return false;
   }
 
-  // Relay step complete: evaluate hypervolume metric
+  // Relay cycle complete - calculate performance metrics
+  float current_os = state.max_os;
+  float settle_time = state.measuring ? TUNE_RELAY_FULL_PERIOD_US : (float)(state.settle_time - state.step_time);
+
+  // Calculate hypervolume: pure relative performance metric
+  float hv = (1.0f - __builtin_fminf(settle_time / TUNE_RELAY_FULL_PERIOD_US, 1.0f)) *
+             (1.0f - __builtin_fminf(current_os / TUNE_RELAY_FULL_PERIOD_RADIANS, 1.0f));
+
+  // Pure relative non-responsive detection: hypervolume < 10%
+  if (hv < TUNE_HYPERVOLUME_CONVERGENCE)
+  {
+    state.settle_time = state.step_time + TUNE_RELAY_FULL_PERIOD_US;
+    state.measuring = false;
+  }
+
+  // Prepare next relay cycle
   state.step_active = true;
   state.step_time = now;
   state.max_os = 0.0f;
   state.measuring = true;
   fcu.pid_setpoint[axis] = -fcu.pid_setpoint[axis];
   state.relay_time = now;
+  prev_err = err;
 
-  const float settle_time = state.measuring ? TUNE_RELAY_FULL_PERIOD_US : (float)(state.settle_time - state.step_time);
-  const float hv = (1.0f - __builtin_fminf(settle_time / TUNE_RELAY_FULL_PERIOD_US, 1.0f)) *
-                   (1.0f - __builtin_fminf(state.max_os / TUNE_RELAY_FULL_PERIOD_RADIANS, 1.0f));
-
-  // Oscillation validation: apply penalty for non-responsive systems
-  if (hv < TUNE_NON_RESPONSIVE_PENALTY)
-  {
-    state.settle_time = state.step_time + TUNE_RELAY_FULL_PERIOD_US;
-    state.measuring = false;
-  }
-
-  // Hypervolume convergence: increment gain if improvement threshold not met
+  // Pure relative convergence: continue if improving by ≥10%
   if (state.hv_prev == 0.0f || (__builtin_fabsf(hv - state.hv_prev) / state.hv_prev >= TUNE_HYPERVOLUME_CONVERGENCE))
   {
     fcu.pid_gain[axis][stages[state.stage].gain_idx] += stages[state.stage].inc;
@@ -491,17 +503,13 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     return false;
   }
 
-  // Stage complete: reset setpoint and prepare for next gain
+  // Stage complete: progress to next PID component
   fcu.pid_setpoint[axis] = 0.0f;
 
-  // All stages complete for this axis
   if (++state.stage > 2)
-  {
-    state.active = false;
-    return true;
-  }
+    return (state.active = false), true;
 
-  // Prepare for next stage: increment gain and reset hypervolume
+  // Initialize next tuning stage
   fcu.pid_gain[axis][stages[state.stage].gain_idx] += stages[state.stage].inc;
   state.hv_prev = 0.0f;
   return false;

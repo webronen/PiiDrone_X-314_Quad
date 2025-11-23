@@ -47,29 +47,32 @@ Ultra-light, agile, and stable. 70g including LiPo.
 Where Reinforcement Learning meets Control Theory to deliver professional results without professional expertise.
 
 ### Mission
-Discover hypervolume-optimal PID gains for direct hover stabilization through systematic exploration, balancing settling performance against overshoot without artificial compromises. Uses hypervolume convergence to find the best possible tradeoff for each axis.
+Discover hypervolume-optimal PID gains for direct hover stabilization through systematic exploration, balancing settling performance against overshoot without artificial compromises. Uses pure relative metrics and hypervolume convergence to find the best possible tradeoff for each axis.
 
 ### Core Algorithm
-The optimizer uses relay excitation and staged PID gain tuning for each axis. Gains are incremented systematically, and each candidate is evaluated using settling time and overshoot. The combined performance is measured by the hypervolume metric, and only gains that improve this metric are accepted. Convergence is determined by hypervolume improvement, with best gains preserved and tuning proceeding automatically across axes.
+The optimizer uses relay excitation and staged PID gain tuning for each axis. Gains are incremented systematically, and each candidate is evaluated using settling time and overshoot. All decisions are made using pure relative comparisons with a single 10% threshold. The combined performance is measured by the hypervolume metric, and only gains that improve this metric are accepted. Convergence is determined by relative hypervolume improvement, with best gains preserved and tuning proceeding automatically across axes.
 
 ### Performance Metrics
-- Settle performance: Inverse of settling time (higher = better)
-- Overshoot penalty: Inverse of maximum overshoot (higher = better)
-- Hypervolume: Product of settle performance and overshoot penalty (balanced multi-objective measure)
+- Settle performance: Inverse of relative settling time (higher = better)
+- Overshoot penalty: Inverse of relative maximum overshoot (higher = better)
+- Hypervolume: Product of relative settle performance and overshoot penalty (balanced multi-objective measure)
 
 ### Decision Criteria
-A new gain is accepted if it improves the hypervolume metric:
+A new gain is accepted if it improves the hypervolume metric by at least 10%:
 
-$`\text{Hypervolume}^{\text{new}} > \text{Hypervolume}^{\text{best}}`$
+$`\frac{|\text{Hypervolume}^{\text{new}} - \text{Hypervolume}^{\text{prev}}|}{\text{Hypervolume}^{\text{prev}}} \geq 0.10`$
 
 Where:
 
-$`\text{Hypervolume} = \frac{1}{T_s} \times \frac{1}{O}`$
+$`\text{Hypervolume} = (1 - \min(\text{settling time} / \text{relay period}, 1)) \times (1 - \min(\text{overshoot} / \text{relay amplitude}, 1))`$
 
-$`T_s`$ = Settling time (lower is better, faster)  
-$`O`$ = Overshoot (lower is better, smaller)
+Settling detection is performed using pure relative error change:
 
-Higher hypervolume means both faster settling and smaller overshoot.
+$`\frac{|\text{err} - \text{prev\_err}|}{|\text{prev\_err}|} \leq 0.10`$
+
+Non-responsive systems are penalized if hypervolume $< 0.10$.
+
+No absolute thresholds are used—everything is relative to the previous state.
 
 ### Convergence Behavior
 - 90% hypervolume convergence: Progresses to next stage when improvements are less than or equal to 10%
@@ -80,8 +83,7 @@ Higher hypervolume means both faster settling and smaller overshoot.
 ### Tuning Parameters
 - Relay frequency: 0.5Hz (2s period, optimized for control loop)
 - Gain increments: P=0.1, D=0.01, I=0.001
-- Settling threshold: 0.08 radians precision (~4.6°)
-- Convergence: 10% hypervolume improvement threshold
+- All thresholds: 10% relative change
 - Exploration: No maximum gain limits
 
 ### Safety & Robustness
@@ -107,7 +109,7 @@ Typical range: 2–6 minutes total depending on plant complexity and convergence
 ---
 
 ## Summary
-PiiTune RL‑314 PID uses hypervolume optimization to discover PID gains that balance speed and stability. The reinforcement learning approach systematically explores the gain space while ensuring continuous improvements, delivering tuned control suitable for stable flight performance.
+PiiTune RL‑314 PID uses pure relative hypervolume optimization to discover PID gains that balance speed and stability. The reinforcement learning approach systematically explores the gain space while ensuring continuous improvements, delivering tuned control suitable for stable flight performance.
 
 Suitable for developers who want automated tuning without system identification or manual compromise.
 

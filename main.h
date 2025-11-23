@@ -63,27 +63,23 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 
 /**
  * PiiTune RL‑314 PID – Hypervolume Performance Explorer
- *
- * Model-free reinforcement learning approach using relay excitation
- * and hypervolume optimization. Sequentially tunes P, D, I gains
- * without artificial limits to find optimal speed-stability balance.
+ * Uses pure relative metrics for oscillation detection and convergence
  */
-#define TUNE_RAMP_MAX THRUST_HOVER // Max thrust during tuning
-#define TUNE_RAMP_S 5.0f           // 5s thrust ramp
 
-#define TUNE_RELAY_HERTZ 0.5f               // 2s period for control dynamics
-#define TUNE_RELAY_HALF_PERIOD_RADIANS 0.2f // ±11.5° half period excitation amplitude
-#define TUNE_RELAY_FULL_PERIOD_RADIANS 0.4f // ±23° full period excitation amplitude
-#define TUNE_SETTLE_RADIANS 0.08f           // ~4.6° settling threshold
-#define TUNE_RELAY_HALF_PERIOD_US HZ_TO_US(TUNE_RELAY_HERTZ / 2.0f)
-#define TUNE_RELAY_FULL_PERIOD_US HZ_TO_US(TUNE_RELAY_HERTZ)
+#define TUNE_RELAY_HERTZ 0.5f                                        // 2s period for control dynamics
+#define TUNE_RELAY_HALF_PERIOD_RADIANS 0.2f                          // ±11.5° excitation amplitude
+#define TUNE_RELAY_FULL_PERIOD_RADIANS 0.4f                          // ±23° full period amplitude
+#define TUNE_RELAY_HALF_PERIOD_US (1000000 / (TUNE_RELAY_HERTZ * 2)) // 1s
+#define TUNE_RELAY_FULL_PERIOD_US (1000000 / TUNE_RELAY_HERTZ)       // 2s
 
 #define TUNE_P_GAIN_INCREMENT 0.1f   // P-gain exploration step
 #define TUNE_D_GAIN_INCREMENT 0.01f  // D-gain exploration step
 #define TUNE_I_GAIN_INCREMENT 0.001f // I-gain exploration step
 
-#define TUNE_HYPERVOLUME_CONVERGENCE 0.10f // 10% convergence threshold
-#define TUNE_NON_RESPONSIVE_PENALTY 0.10f  // Hypervolume threshold for non-responsive tuning (no oscillation)
+#define TUNE_HYPERVOLUME_CONVERGENCE 0.10f // 10% relative change threshold
+
+#define TUNE_RAMP_MAX THRUST_HOVER // Max thrust during tuning
+#define TUNE_RAMP_S 5.0f           // 5s thrust ramp
 
 #define ENV_ALPHA 0.25f
 #define D_ALPHA 0.75f
