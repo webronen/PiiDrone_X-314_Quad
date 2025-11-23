@@ -119,8 +119,8 @@ Suitable for developers who want automated tuning without system identification 
 ---
 
 ## References
-- [PID controller](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller)
-- [Åström–Hägglund relay method](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller#Relay_(%C3%85str%C3%B6m%E2%80%93H%C3%A9gglund)_method)
+- [PID controller](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller#)
+- [Åström–Hägglund relay method](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller#Relay_(%C3%85str%C3%B6m%E2%80%93H%C3%A4gglund)_method)
 - [Multi-objective optimization](https://en.wikipedia.org/wiki/Multi-objective_optimization)
 - [Hypervolume indicator](https://en.wikipedia.org/wiki/Hypervolume_indicator)
 - [Reinforcement learning](https://en.wikipedia.org/wiki/Reinforcement_learning)
