@@ -438,7 +438,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
   {
     memset(&state, 0, sizeof(state));
     state.active = state.step_active = state.measuring = true;
-    fcu.pid_setpoint[axis] = TUNE_RELAY_RADIANS;
+    fcu.pid_setpoint[axis] = TUNE_RELAY_HALF_PERIOD_RADIANS;
     state.step_time = state.relay_time = now;
     return false;
   }
@@ -451,7 +451,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
       const float os = __builtin_fabsf(err - fcu.pid_setpoint[axis]);
       if (os > state.max_os)
         state.max_os = os;
-      if (now - state.step_time >= HZ_TO_US(TUNE_RELAY_HERTZ) / 2)
+      if (now - state.step_time >= TUNE_RELAY_HALF_PERIOD_US)
         state.step_active = false;
     }
     // Settling detection
@@ -471,9 +471,9 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
   fcu.pid_setpoint[axis] = -fcu.pid_setpoint[axis];
   state.relay_time = now;
 
-  const float settle_time = state.measuring ? HZ_TO_US(TUNE_RELAY_HERTZ) : (float)(state.settle_time - state.step_time);
-  const float hv = (1.0f - __builtin_fminf(settle_time / HZ_TO_US(TUNE_RELAY_HERTZ), 1.0f)) *
-                   (1.0f - __builtin_fminf(state.max_os / (2.0f * TUNE_RELAY_RADIANS), 1.0f));
+  const float settle_time = state.measuring ? TUNE_RELAY_FULL_PERIOD_US : (float)(state.settle_time - state.step_time);
+  const float hv = (1.0f - __builtin_fminf(settle_time / TUNE_RELAY_FULL_PERIOD_US, 1.0f)) *
+                   (1.0f - __builtin_fminf(state.max_os / TUNE_RELAY_FULL_PERIOD_RADIANS, 1.0f));
 
   // Oscillation validation: apply penalty for non-responsive systems
   if (hv < TUNE_NON_RESPONSIVE_PENALTY)
