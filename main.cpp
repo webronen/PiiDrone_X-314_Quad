@@ -444,7 +444,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
   }
 
   // Relay excitation: monitor response and overshoot
-  if (now - state.relay_time < HZ_TO_US(TUNE_RELAY_HERTZ))
+  if (now - state.relay_time < TUNE_RELAY_FULL_PERIOD_US)
   {
     if (state.step_active)
     {
