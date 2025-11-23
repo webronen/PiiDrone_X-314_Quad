@@ -43,7 +43,7 @@ Ultra-light, agile, and stable. 70g including LiPo.
 
 ---
 
-## PiiTune StepSync – Adaptive PID Tuning System
+## PiiTune RL‑314 PID – Hypervolume Performance Optimizer
 Where Reinforcement Learning meets Control Theory to deliver professional results without professional expertise.
 
 ### Mission

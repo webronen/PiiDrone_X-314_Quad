@@ -82,8 +82,6 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 #define TUNE_HYPERVOLUME_CONVERGENCE 0.10f // 10% convergence threshold
 #define TUNE_NON_RESPONSIVE_PENALTY 0.10f  // Hypervolume threshold for non-responsive tuning (no oscillation)
 
-#define TUNE_RELAY_HALF_PERIOD_US (HZ_TO_US(TUNE_RELAY_HERTZ) / 2)
-
 #define ENV_ALPHA 0.25f
 #define D_ALPHA 0.75f
 

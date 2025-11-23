@@ -410,49 +410,56 @@ static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s)
  */
 static inline bool pid_tune_step(const uint8_t axis, const float err)
 {
-  static struct {
+  static struct
+  {
     uint32_t relay_time, step_time, settle_time;
     float hv_prev, max_os;
     uint8_t stage;
     bool active, step_active, measuring;
   } state = {0};
 
-  static const struct { 
+  static const struct
+  {
     const uint8_t gain_idx;
-    const float inc; 
+    const float inc;
   } stages[3] = {
-    {0, TUNE_P_GAIN_INCREMENT},
-    {2, TUNE_D_GAIN_INCREMENT},
-    {1, TUNE_I_GAIN_INCREMENT}
-  };
+      {0, TUNE_P_GAIN_INCREMENT},
+      {2, TUNE_D_GAIN_INCREMENT},
+      {1, TUNE_I_GAIN_INCREMENT}};
 
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
   const uint32_t now = NRF_TIMER0->CC[0];
 
-  if (!state.active) {
+  // Initialize or measure
+  if (!state.active)
+  {
     memset(&state, 0, sizeof(state));
     state.active = state.step_active = state.measuring = true;
-    state.stage = 0;
     fcu.pid_setpoint[axis] = TUNE_RELAY_RADIANS;
     state.step_time = state.relay_time = now;
-    state.hv_prev = 0.0f;
     return false;
   }
 
-  if (now - state.relay_time < HZ_TO_US(TUNE_RELAY_HERTZ)) {
-    if (state.step_active) {
+  // Fast measurement exit
+  if (now - state.relay_time < HZ_TO_US(TUNE_RELAY_HERTZ))
+  {
+    if (state.step_active)
+    {
       const float os = __builtin_fabsf(err - fcu.pid_setpoint[axis]);
-      if (os > state.max_os) state.max_os = os;
-      if (now - state.step_time >= TUNE_RELAY_HALF_PERIOD_US) 
+      if (os > state.max_os)
+        state.max_os = os;
+      if (now - state.step_time >= HZ_TO_US(TUNE_RELAY_HERTZ) / 2)
         state.step_active = false;
     }
-    if (state.measuring && __builtin_fabsf(err - fcu.pid_setpoint[axis]) <= TUNE_SETTLE_RADIANS) {
+    if (state.measuring && __builtin_fabsf(err - fcu.pid_setpoint[axis]) <= TUNE_SETTLE_RADIANS)
+    {
       state.settle_time = now;
       state.measuring = false;
     }
     return false;
   }
 
+  // Evaluation: reset cycle and calculate performance
   state.step_active = true;
   state.step_time = now;
   state.max_os = 0.0f;
@@ -460,28 +467,36 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
   fcu.pid_setpoint[axis] = -fcu.pid_setpoint[axis];
   state.relay_time = now;
 
-  const float settle_t = state.measuring ? HZ_TO_US(TUNE_RELAY_HERTZ) : (float)(state.settle_time - state.step_time);
-  const float hv = (1.0f - __builtin_fminf(settle_t / HZ_TO_US(TUNE_RELAY_HERTZ), 1.0f)) *
+  const float settle_time = state.measuring ? HZ_TO_US(TUNE_RELAY_HERTZ) : (float)(state.settle_time - state.step_time);
+  const float hv = (1.0f - __builtin_fminf(settle_time / HZ_TO_US(TUNE_RELAY_HERTZ), 1.0f)) *
                    (1.0f - __builtin_fminf(state.max_os / (2.0f * TUNE_RELAY_RADIANS), 1.0f));
 
-  if (hv < TUNE_NON_RESPONSIVE_PENALTY) {
+  // Direct convergence decision
+  if (hv < TUNE_NON_RESPONSIVE_PENALTY)
+  {
     state.settle_time = state.step_time + HZ_TO_US(TUNE_RELAY_HERTZ);
     state.measuring = false;
   }
 
-  if (state.hv_prev == 0.0f || (__builtin_fabsf(hv - state.hv_prev) / state.hv_prev >= TUNE_HYPERVOLUME_CONVERGENCE)) {
+  // Single conditional for continue/complete
+  if (state.hv_prev == 0.0f || (__builtin_fabsf(hv - state.hv_prev) / state.hv_prev >= TUNE_HYPERVOLUME_CONVERGENCE))
+  {
     fcu.pid_gain[axis][stages[state.stage].gain_idx] += stages[state.stage].inc;
     state.hv_prev = hv;
     return false;
   }
 
+  // Stage completion
   fcu.pid_setpoint[axis] = 0.0f;
-  
-  if (++state.stage > 2) {
+
+  // Direct return for completion
+  if (++state.stage > 2)
+  {
     state.active = false;
     return true;
   }
-  
+
+  // Next stage
   fcu.pid_gain[axis][stages[state.stage].gain_idx] += stages[state.stage].inc;
   state.hv_prev = 0.0f;
   return false;
