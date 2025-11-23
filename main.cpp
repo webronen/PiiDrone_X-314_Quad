@@ -446,6 +446,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
   // Relay excitation: monitor response and overshoot
   if (now - state.relay_time < TUNE_RELAY_FULL_PERIOD_US)
   {
+    // Overshoot tracking during active step
     if (state.step_active)
     {
       const float os = __builtin_fabsf(err - fcu.pid_setpoint[axis]);
@@ -454,7 +455,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
       if (now - state.step_time >= TUNE_RELAY_HALF_PERIOD_US)
         state.step_active = false;
     }
-    // Settling detection
+    // Settling detection during measurement phase
     if (state.measuring && __builtin_fabsf(err - fcu.pid_setpoint[axis]) <= TUNE_SETTLE_RADIANS)
     {
       state.settle_time = now;
@@ -478,7 +479,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
   // Oscillation validation: apply penalty for non-responsive systems
   if (hv < TUNE_NON_RESPONSIVE_PENALTY)
   {
-    state.settle_time = state.step_time + HZ_TO_US(TUNE_RELAY_HERTZ);
+    state.settle_time = state.step_time + TUNE_RELAY_FULL_PERIOD_US;
     state.measuring = false;
   }
 
