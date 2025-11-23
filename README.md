@@ -90,7 +90,9 @@ No absolute thresholds are used—everything is relative to the previous state.
 - Numerical stability: Protected divisions
 - Multi-axis independent: Sequential tuning across roll, pitch, yaw
 - Automatic completion: Resets setpoint when axis completes
-- Oscillation validation: Applies a uniform penalty to non-responsive systems to prevent false convergence
+- Oscillation validation:
+  - Uses zero-crossing counting (≥2 crossings required) to confirm true oscillation
+  - Applies a uniform penalty to non-responsive systems to prevent false convergence
 
 ### Guarantee
 Aims to find the hypervolume-optimal balance between speed and stability for your hardware. Either converges to 90% of optimal hypervolume within each stage, or continues exploring indefinitely. Provides directly tuned control suitable for stable flight.
