@@ -43,26 +43,14 @@ Ultra-light, agile, and stable. 70g including LiPo.
 
 ---
 
-## PiiTune RL‑314 PID – Hypervolume Performance Optimizer
-Where Reinforcement Learning meets Control Theory to deliver reliable results without requiring expert knowledge.
+## PiiTune RL‑314 PID – Hypervolume Performance Explorer
+Where Reinforcement Learning meets Control Theory to deliver professional results without professional expertise.
 
 ### Mission
 Discover hypervolume-optimal PID gains for direct hover stabilization through systematic exploration, balancing settling performance against overshoot without artificial compromises. Uses hypervolume convergence to find the best possible tradeoff for each axis.
 
 ### Core Algorithm
-
-#### Step-by-Step Logic
-1. **Relay Excitation:** Each axis is excited with a ±11.5° relay signal at 0.5Hz (2s period) to induce a measurable response.
-2. **Staged Gain Tuning:** PID gains are tuned in three sequential stages: P → D → I. Each stage uses systematic gain incrementing (P: +0.1, D: +0.01, I: +0.001).
-3. **Step Response Measurement:** For each gain candidate, the system measures settling time ($`T_s`$) and maximum overshoot ($`O`$) in response to the relay excitation.
-4. **Hypervolume Calculation:** The combined performance metric is calculated as $`\text{Hypervolume} = \frac{1}{T_s} \times \frac{1}{O}`$.
-5. **Acceptance Criteria:** A new gain is accepted only if it improves the hypervolume compared to the best so far:  
-   $`\text{Hypervolume}^{\text{new}} > \text{Hypervolume}^{\text{best}}`$
-6. **Direct Convergence:** The stage advances when hypervolume improvements are less than or equal to 10% (convergence threshold). No patience or artificial limits are used; gains can grow indefinitely if beneficial.
-7. **Uniform State Management:** All tuning state and configuration are managed per-axis and per-stage, with best gains preserved and carried forward.
-8. **Automatic Completion:** When an axis completes all stages, its setpoint is reset and tuning proceeds to the next axis.
-
-This process is repeated for each axis (roll, pitch, yaw), ensuring robust, hypervolume-optimal PID gains for direct hover stabilization.
+The optimizer uses relay excitation and staged PID gain tuning for each axis. Gains are incremented systematically, and each candidate is evaluated using settling time and overshoot. The combined performance is measured by the hypervolume metric, and only gains that improve this metric are accepted. Convergence is determined by hypervolume improvement, with best gains preserved and tuning proceeding automatically across axes.
 
 ### Performance Metrics
 - Settle performance: Inverse of settling time (higher = better)

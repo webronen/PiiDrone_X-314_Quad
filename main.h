@@ -62,7 +62,7 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 #define PID_ARRAY_SIZE 3
 
 /**
- * PiiTune StepSync - Adaptive PID Tuning System
+ * PiiTune RL‑314 PID – Hypervolume Performance Explorer
  *
  * Model-free reinforcement learning approach using relay excitation
  * and hypervolume optimization. Sequentially tunes P, D, I gains

@@ -400,7 +400,7 @@ static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s)
 }
 
 /**
- * PiiTune StepSync - Adaptive PID Tuning System
+ * PiiTune RL‑314 PID – Hypervolume Performance Explorer
  *
  * Model-free reinforcement learning approach using relay excitation
  * and hypervolume optimization. Sequentially tunes P, D, I gains
