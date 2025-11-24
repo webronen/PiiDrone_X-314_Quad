@@ -458,9 +458,11 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     // Pure relative oscillation detection: detect zero crossings
     if (state.measuring)
     {
-      // Detect when error changes sign (zero crossing) with noise immunity
+      // Detect when error changes sign (zero crossing) and relative change is significant
       const bool is_zero_crossing = (state.prev_err * err) <= 0.0f;
-      const bool is_significant_change = __builtin_fabsf(err - state.prev_err) / (__builtin_fabsf(state.prev_err) + __FLT_EPSILON__) > TUNE_RELATIVE_CHANGE_THRESHOLD;
+
+      const float relative_change = __builtin_fabsf(err - state.prev_err) / (__builtin_fabsf(state.prev_err) + __FLT_EPSILON__);
+      const bool is_significant_change = relative_change > TUNE_RELATIVE_CHANGE_THRESHOLD;
 
       if (is_zero_crossing && is_significant_change)
       {
