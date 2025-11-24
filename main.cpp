@@ -91,53 +91,41 @@ void setup(void)
 
 void loop(void)
 {
-  // Capture current timer value for this loop iteration
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
-  const uint32_t loop_start_us = NRF_TIMER0->CC[0];
+  const uint32_t sync_current_us = NRF_TIMER0->CC[0];
+  
+  static uint32_t async_packet_us = sync_current_us;
+  static uint32_t async_landing_us = sync_current_us;
 
-  // Async packet loss and landing (target = now + interval, Recovery from delays)
-  static uint32_t last_packet_us = loop_start_us;
-  static uint32_t last_landing_us = loop_start_us;
+  const bool async_packet_timeout = sync_current_us >= async_packet_us;
+  const bool async_landing_timeout = sync_current_us >= async_landing_us;
 
-  // Check if async timeouts occurred
-  const bool packet_timeout = loop_start_us >= last_packet_us;
-  const bool landing_timeout = loop_start_us >= last_landing_us;
-
-  // Update async packet timeout to prevent landing during auto-tuning
   if (tune_state.at_progress)
-    last_packet_us = loop_start_us + HZ_TO_US(0.1f);
-
-  // Handle received radio packets before strict periodic tasks
-  if (NRF_RADIO->EVENTS_CRCOK)
+    async_packet_us = sync_current_us + HZ_TO_US(0.1f);
+  
+    if (NRF_RADIO->EVENTS_CRCOK)
   {
-    // Clear packet received event, so next packet can be detected
     NRF_RADIO->EVENTS_CRCOK = 0;
 
-    // Update async packet target time
-    last_packet_us = loop_start_us + HZ_TO_US(0.1f);
-
-    // Process received packet if addressed to this node and zone
+    async_packet_us = sync_current_us + HZ_TO_US(0.1f);
+    
     if (received_packet.node == NODE_ID && received_packet.zone == ZONE_ID)
       handle_type[received_packet.type % PACKET_TYPE_COUNT]();
   }
 
-  // Strict periodic tasks (target += interval, Cannot recover from delays)
   for (uint8_t i = 0; i < SCHEDULER_TASK_COUNT; i++)
   {
-    if (loop_start_us >= tasks[i].previous_us)
+    if (sync_current_us >= tasks[i].previous_us)
     {
-      // Update strict periodic target time
       tasks[i].previous_us += tasks[i].interval_us;
       tasks[i].task();
     }
   }
 
-  // Async landing step for packet loss or power-fail warning
-  if (FCU_IS_ACTIVE(fcu.status) && (packet_timeout || FCU_IS_POFWARN(fcu.status)) && landing_timeout)
+  if (FCU_IS_ACTIVE(fcu.status) && (async_packet_timeout || FCU_IS_POFWARN(fcu.status)) && async_landing_timeout)
   {
-    // Update async landing target time
-    last_landing_us = loop_start_us + HZ_TO_US(1);
-    // Decrement thrust smoothly (units per target time)
+    async_landing_us = sync_current_us + HZ_TO_US(1);
+    
     FCU_LANDING_STEP(fcu.thrust, 10, 10, fcu.status);
   }
 }
