@@ -93,7 +93,7 @@ void loop(void)
 {
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
   const uint32_t sync_current_us = NRF_TIMER0->CC[0];
-  
+
   static uint32_t async_packet_us = sync_current_us;
   static uint32_t async_landing_us = sync_current_us;
 
@@ -102,13 +102,13 @@ void loop(void)
 
   if (tune_state.at_progress)
     async_packet_us = sync_current_us + HZ_TO_US(0.1f);
-  
-    if (NRF_RADIO->EVENTS_CRCOK)
+
+  if (NRF_RADIO->EVENTS_CRCOK)
   {
     NRF_RADIO->EVENTS_CRCOK = 0;
 
     async_packet_us = sync_current_us + HZ_TO_US(0.1f);
-    
+
     if (received_packet.node == NODE_ID && received_packet.zone == ZONE_ID)
       handle_type[received_packet.type % PACKET_TYPE_COUNT]();
   }
@@ -125,7 +125,7 @@ void loop(void)
   if (FCU_IS_ACTIVE(fcu.status) && (async_packet_timeout || FCU_IS_POFWARN(fcu.status)) && async_landing_timeout)
   {
     async_landing_us = sync_current_us + HZ_TO_US(1);
-    
+
     FCU_LANDING_STEP(fcu.thrust, 10, 10, fcu.status);
   }
 }
@@ -141,7 +141,17 @@ static inline void task_fcu_update(void)
   fcu.temperature += ((temperature._value + TEMPERATURE_OFFSET) - fcu.temperature) * ENV_ALPHA;
   fcu.humidity += (humidity._value - fcu.humidity) * ENV_ALPHA;
 
-  static const DataQuaternion hover_quaternion = {0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
+  static bool is_calibrated = false;
+  static uint8_t boot_ready = 0;
+
+  static DataQuaternion hover_quaternion = {0.0f, 0.0f, 0.0f, 1.0f};
+
+  if (!is_calibrated && ++boot_ready >= 211)
+  {
+    hover_quaternion = quaternion._data;
+    is_calibrated = true;
+  }
+
   const DataQuaternion conjugate = {-quaternion._data.x, -quaternion._data.y,
                                     -quaternion._data.z, quaternion._data.w};
 
