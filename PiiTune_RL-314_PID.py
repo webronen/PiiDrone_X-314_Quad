@@ -346,7 +346,7 @@ class PIDBalanceVisualizer:
         # Algorithm info
         if self.state['active']:
             instructions = [
-                "OSCILLATION DETECTION:",
+                "HYPERVOLUME TUNING:",
                 "• Zero-crossing + 10% relative change",
                 "• Settling: 2+ significant crossings", 
                 "• Progress: HV improvement ≥10%",
