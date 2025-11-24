@@ -147,10 +147,7 @@ static inline void task_fcu_update(void)
   static DataQuaternion hover_quaternion = {0.0f, 0.0f, 0.0f, 1.0f};
 
   if (!is_calibrated && ++boot_ready >= 211)
-  {
-    hover_quaternion = quaternion._data;
-    is_calibrated = true;
-  }
+    is_calibrated = ((hover_quaternion = quaternion._data), true);
 
   const DataQuaternion conjugate = {-quaternion._data.x, -quaternion._data.y,
                                     -quaternion._data.z, quaternion._data.w};
@@ -264,7 +261,7 @@ static inline void task_pof_update(void)
 {
   fcu.battery = nicla::getCurrentBatteryVoltage();
 
-  FCU_UPDATE_POFWARN(fcu.status, NRF_POWER->EVENTS_POFWARN);
+  FCU_UPDATE_POFWARN(fcu.status, (bool)NRF_POWER->EVENTS_POFWARN);
   NRF_POWER->EVENTS_POFWARN = 0;
 }
 
