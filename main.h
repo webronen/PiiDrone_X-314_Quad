@@ -162,7 +162,7 @@ typedef struct __attribute__((packed, aligned(4)))
   float battery;                                  // Volts (V)
   uint16_t thrust;                                // PWM value (0-800)
   uint16_t distance;                              // millimeters (mm)
-  uint8_t status;                                 // bit 0: FCU active, bit 1: POF warning, bits: 2-7: reserved
+  uint8_t status;                                 // bit 0: FCU active, bit 1: POF warning, bit 2: Auto-Tune active, bits 3-7: reserved
   uint8_t reserved[183];                          // Padding to 252 bytes for RCU data, preserving 4-byte alignment
 } Fcu;
 
