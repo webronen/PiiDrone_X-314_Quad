@@ -371,30 +371,31 @@ static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s)
 
 static inline bool pid_tune_step(const uint8_t axis, const float err)
 {
-  // Persistent tuning state maintained across function calls
+  // Tuning state (persistent across calls)
   static struct
   {
-    uint32_t relay_time, step_time, settle_time; // Relay cycle timing, step start, oscillation settle
-    float hv_prev, max_os, prev_err;             // Previous hypervolume, max overshoot, last error
-    uint8_t stage, zero_crossings;               // Current tuning stage, oscillation zero-crossings
-    bool active, step_active, measuring;         // Tuning active, step in progress, measuring oscillations
+    uint32_t relay_time, step_time, settle_time;
+    float hv_prev, max_os, prev_err;
+    uint8_t stage, zero_crossings;
+    bool active, step_active, measuring;
   } state = {0};
 
-  // Tuning stage progression with gain-specific increments
+  // PID gain tuning stages: P → D → I
   static const struct
   {
-    const uint8_t gain_idx; // PID gain index: 0=P, 1=I, 2=D
-    const float inc;        // Gain increment per cycle
+    const uint8_t gain_idx; // 0=P, 1=I, 2=D
+    const float inc;        // Gain increment
   } stages[3] = {
-      {0, TUNE_P_GAIN_INCREMENT},  // Stage 0: Proportional tuning
-      {2, TUNE_D_GAIN_INCREMENT},  // Stage 1: Derivative tuning
-      {1, TUNE_I_GAIN_INCREMENT}}; // Stage 2: Integral tuning
+      {0, TUNE_P_GAIN_INCREMENT}, // Stage 0: P
+      {2, TUNE_D_GAIN_INCREMENT}, // Stage 1: D
+      {1, TUNE_I_GAIN_INCREMENT}, // Stage 2: I
+  };
 
-  // Capture current microsecond time for precise timing
+  // Get current time
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
   const uint32_t now = NRF_TIMER0->CC[0];
 
-  // Initialize tuning state on first call
+  // Initialize on first call
   if (!state.active)
   {
     memset(&state, 0, sizeof(state));
@@ -402,14 +403,13 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
     fcu.pid_setpoint[axis] = TUNE_RELAY_HALF_PERIOD_RADIANS;
     state.step_time = state.relay_time = now;
     state.prev_err = err;
-    state.zero_crossings = 0;
     return false;
   }
 
-  // Monitor system response during relay excitation period
+  // Monitor during relay period
   if (now - state.relay_time < TUNE_RELAY_FULL_PERIOD_US)
   {
-    // Track maximum overshoot during step response (first half of relay period)
+    // Track overshoot
     if (state.step_active)
     {
       const float os = __builtin_fabsf(err - fcu.pid_setpoint[axis]);
@@ -419,53 +419,40 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
         state.step_active = false;
     }
 
-    // Pure relative oscillation detection: detect zero crossings
+    // Detect oscillations (zero crossings)
     if (state.measuring)
     {
-      // Detect when error changes sign (zero crossing) and relative change is significant
-      const bool is_zero_crossing = (state.prev_err * err) <= 0.0f;
+      const bool zero_cross = (state.prev_err * err) <= 0.0f;
+      const float rel_change = __builtin_fabsf(err - state.prev_err) / (__builtin_fabsf(state.prev_err) + __FLT_EPSILON__);
+      const bool significant = rel_change > TUNE_RELATIVE_CHANGE_THRESHOLD;
 
-      const float relative_change = __builtin_fabsf(err - state.prev_err) / (__builtin_fabsf(state.prev_err) + __FLT_EPSILON__);
-      const bool is_significant_change = relative_change > TUNE_RELATIVE_CHANGE_THRESHOLD;
-
-      if (is_zero_crossing && is_significant_change)
+      if (zero_cross && significant && ++state.zero_crossings >= 2)
       {
-        // System has oscillated enough - consider it settled after one full cycle
-        if (++state.zero_crossings >= 2) // At least one full oscillation cycle
-        {
-          state.settle_time = now;
-          state.measuring = false;
-        }
+        state.settle_time = now;
+        state.measuring = false;
       }
       state.prev_err = err;
     }
     return false;
   }
 
-  // Relay cycle complete - calculate performance metrics
-  const float current_os = state.max_os;
-  const float settle_time = state.measuring ? TUNE_RELAY_FULL_PERIOD_US : (float)(state.settle_time - state.step_time);
+  // Relay cycle complete - calculate performance
+  const float overshoot = state.max_os;
+  const float settle_time = state.measuring ? TUNE_RELAY_FULL_PERIOD_US
+                                            : (float)(state.settle_time - state.step_time);
 
-  /**
-   * Calculate hypervolume performance metric:
-   * (1 - normalized_settle_time) × (1 - normalized_overshoot)
-   *
-   * Higher values indicate better performance:
-   * - Faster settling (lower normalized_settle_time)
-   * - Smaller overshoot (lower normalized_overshoot)
-   * - Range: 0.0 (worst) to 1.0 (ideal)
-   */
+  // Hypervolume metric: (1 - norm_settle) × (1 - norm_overshoot)
   const float hv = (1.0f - __builtin_fminf(settle_time / TUNE_RELAY_FULL_PERIOD_US, 1.0f)) *
-                   (1.0f - __builtin_fminf(current_os / TUNE_RELAY_FULL_PERIOD_RADIANS, 1.0f));
+                   (1.0f - __builtin_fminf(overshoot / TUNE_RELAY_FULL_PERIOD_RADIANS, 1.0f));
 
-  // Non-responsive detection: insufficient oscillation (hypervolume < 10%)
+  // Detect non-responsive systems
   if (hv < TUNE_HYPERVOLUME_CONVERGENCE)
   {
     state.settle_time = state.step_time + TUNE_RELAY_FULL_PERIOD_US;
     state.measuring = false;
   }
 
-  // Prepare for next relay cycle - toggle excitation direction
+  // Next relay cycle
   state.step_active = true;
   state.step_time = now;
   state.max_os = 0.0f;
@@ -473,28 +460,23 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
   fcu.pid_setpoint[axis] = -fcu.pid_setpoint[axis];
   state.relay_time = now;
   state.prev_err = err;
-  state.zero_crossings = 0; // Reset oscillation counter for next cycle
+  state.zero_crossings = 0;
 
-  /**
-   * Hypervolume convergence check:
-   * Continue current stage if performance improves by ≥10%
-   * Progress to next stage when improvements diminish
-   */
-  if (state.hv_prev == 0.0f || (__builtin_fabsf(hv - state.hv_prev) / state.hv_prev >= TUNE_HYPERVOLUME_CONVERGENCE))
+  // Check for performance improvement
+  if (state.hv_prev == 0.0f || __builtin_fabsf(hv - state.hv_prev) / state.hv_prev >= TUNE_HYPERVOLUME_CONVERGENCE)
   {
     fcu.pid_gain[axis][stages[state.stage].gain_idx] += stages[state.stage].inc;
     state.hv_prev = hv;
     return false;
   }
 
-  // Current stage complete - progress to next PID component
-  fcu.pid_setpoint[axis] = 0.0f; // Return system to center
+  // Stage complete - move to next PID component
+  fcu.pid_setpoint[axis] = 0.0f;
 
-  // Check if all stages are complete
   if (++state.stage > 2)
     return (state.active = false), true;
 
-  // Initialize next tuning stage with initial gain increment
+  // Start next stage
   fcu.pid_gain[axis][stages[state.stage].gain_idx] += stages[state.stage].inc;
   state.hv_prev = 0.0f;
   return false;
