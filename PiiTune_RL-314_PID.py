@@ -406,7 +406,7 @@ class PIDBalanceVisualizer:
             
             self.update()
             self.draw()
-            clock.tick(120)
+            clock.tick(30)  # Limit to 30 FPS
         
         pygame.quit()
         sys.exit()
