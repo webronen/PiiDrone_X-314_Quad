@@ -87,6 +87,9 @@ void setup(void)
   vl53l4cx.VL53L4CX_SetMeasurementTimingBudgetMicroSeconds(33000);
   vl53l4cx.VL53L4CX_SetUserROI(&vl53l4cx_UserRoi);
   vl53l4cx.VL53L4CX_StartMeasurement();
+
+  flash_storage_init();
+  pid_load_gains();
 }
 
 void loop(void)
@@ -147,7 +150,10 @@ static inline void task_fcu_update(void)
   static DataQuaternion hover_quaternion = {0.0f, 0.0f, 0.0f, 1.0f};
 
   if (!is_calibrated && ++boot_ready >= 211)
-    is_calibrated = ((hover_quaternion = quaternion._data), true);
+  {
+    hover_quaternion = quaternion._data;
+    is_calibrated = true;
+  }
 
   const DataQuaternion conjugate = {-quaternion._data.x, -quaternion._data.y,
                                     -quaternion._data.z, quaternion._data.w};
@@ -172,7 +178,7 @@ static inline void task_fcu_update(void)
     {
       if (++tune_state.tuning_axis == 1)
       {
-        pid_store_gains();
+        pid_save_gains();
         memset(&tune_state, 0, sizeof(tune_state));
       }
     }
@@ -257,9 +263,46 @@ static inline void task_bat_update(void)
   fcu.battery = nicla::getCurrentBatteryVoltage();
 }
 
-static inline void pid_store_gains(void)
+static inline void flash_storage_init(void)
 {
-  // TODO: Store PID gains to non-volatile memory
+  spif = mbed::BlockDevice::get_default_instance();
+  spif->init();
+}
+
+static inline bool pid_load_gains(void)
+{
+  if (fs.mount(spif) != 0)
+    return false;
+
+  mbed::File file;
+  const bool success = (file.open(&fs, "pid_gains.bin", O_RDONLY) == 0);
+
+  if (success)
+  {
+    file.read(fcu.pid_gain, sizeof(fcu.pid_gain));
+    file.close();
+  }
+
+  fs.unmount();
+  return success;
+}
+
+static inline bool pid_save_gains(void)
+{
+  if (fs.mount(spif) != 0)
+    fs.reformat(spif);
+
+  mbed::File file;
+  const bool success = (file.open(&fs, "pid_gains.bin", O_WRONLY | O_CREAT | O_TRUNC) == 0);
+
+  if (success)
+  {
+    file.write(fcu.pid_gain, sizeof(fcu.pid_gain));
+    file.close();
+  }
+
+  fs.unmount();
+  return success;
 }
 
 static inline void pid_calculate(const float sp, const float pv, const float Kp, const float Ki,
@@ -309,6 +352,7 @@ static inline void handle_pid_tune(void)
   memset(fcu.pid_gain, 0, sizeof(fcu.pid_gain));
   memset(pid_state, 0, sizeof(pid_state));
   memset(&tune_state, 0, sizeof(tune_state));
+
   fcu.thrust = 0;
 }
 
