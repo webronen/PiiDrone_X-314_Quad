@@ -97,37 +97,6 @@ VL53L4CX_UserRoi_t vl53l4cx_UserRoi = {6, 6, 9, 9};
 #define TYPE_THRUST 3
 #define TYPE_TELEMETRY 4
 
-#define FCU_STATUS_ACTIVE (1U << 0)
-#define FCU_STATUS_POFWARN (1U << 1)
-#define FCU_STATUS_AUTOTUNE (1U << 2)
-
-#define FCU_IS_ACTIVE(status) (status & FCU_STATUS_ACTIVE)
-#define FCU_SET_ACTIVE(status) (status |= FCU_STATUS_ACTIVE)
-#define FCU_CLEAR_ACTIVE(status) (status &= ~FCU_STATUS_ACTIVE)
-#define FCU_UPDATE_ACTIVE(status, cond) ((cond) ? FCU_SET_ACTIVE(status) : FCU_CLEAR_ACTIVE(status))
-
-#define FCU_IS_POFWARN(status) (status & FCU_STATUS_POFWARN)
-#define FCU_SET_POFWARN(status) (status |= FCU_STATUS_POFWARN)
-#define FCU_CLEAR_POFWARN(status) (status &= ~FCU_STATUS_POFWARN)
-#define FCU_UPDATE_POFWARN(status, cond) ((cond) ? FCU_SET_POFWARN(status) : FCU_CLEAR_POFWARN(status))
-
-#define FCU_IS_AUTOTUNE(status) (status & FCU_STATUS_AUTOTUNE)
-#define FCU_SET_AUTOTUNE(status) (status |= FCU_STATUS_AUTOTUNE)
-#define FCU_CLEAR_AUTOTUNE(status) (status &= ~FCU_STATUS_AUTOTUNE)
-#define FCU_UPDATE_AUTOTUNE(status, cond) ((cond) ? FCU_SET_AUTOTUNE(status) : FCU_CLEAR_AUTOTUNE(status))
-
-#define FCU_LANDING_STEP(thrust, threshold, step, status) \
-  ((thrust) >= (threshold) ? ((thrust) -= (step)) : FCU_CLEAR_ACTIVE(status))
-
-#define FCU_UPDATE_GAIN(gain_array, axis, gain, value, min, max) \
-  (gain_array[(axis) % PID_ARRAY_SIZE][(gain) % PID_ARRAY_SIZE] = constrain((value), (min), (max)))
-
-#define FCU_UPDATE_SETPOINT(setpoint_array, axis, value, min, max) \
-  (setpoint_array[(axis) % PID_ARRAY_SIZE] = constrain((value), (min), (max)))
-
-#define FCU_UPDATE_THRUST(status, thrust, value, min, max) \
-  (thrust = constrain(FCU_IS_POFWARN(status) ? ((value) < (thrust) ? (value) : (thrust)) : (value), (min), (max)))
-
 #define ACCELEROMETER_HZ 400
 #define ACCELEROMETER_LATENCY 1
 #define ACCELEROMETER_RANGE 8
@@ -162,8 +131,7 @@ typedef struct __attribute__((packed, aligned(4)))
   float battery;                                  // Volts (V)
   uint16_t thrust;                                // PWM value (0-800)
   uint16_t distance;                              // millimeters (mm)
-  uint8_t status;                                 // bit 0: FCU active, bit 1: POF warning, bit 2: Auto-Tune active, bits 3-7: reserved
-  uint8_t reserved[183];                          // Padding to 252 bytes for RCU data, preserving 4-byte alignment
+  uint8_t reserved[184];                          // Padding to 252 bytes for RCU data, preserving 4-byte alignment
 } Fcu;
 
 static_assert(sizeof(Fcu) == 252, "Fcu struct must be 252 bytes (63 words)");
@@ -223,7 +191,7 @@ static inline void task_fcu_update(void);
 static inline void task_esc_update(void);
 static inline void task_tof_update(void);
 static inline void task_tel_update(void);
-static inline void task_pof_update(void);
+static inline void task_bat_update(void);
 
 static Task tasks[SCHEDULER_TASK_COUNT] = {
     {"IMU", task_imu_update, HZ_TO_US(401), 0},
@@ -231,7 +199,7 @@ static Task tasks[SCHEDULER_TASK_COUNT] = {
     {"ESC", task_esc_update, HZ_TO_US(101), 0},
     {"TOF", task_tof_update, HZ_TO_US(31), 0},
     {"TEL", task_tel_update, HZ_TO_US(3), 0},
-    {"POF", task_pof_update, HZ_TO_US(2), 0}};
+    {"BAT", task_bat_update, HZ_TO_US(2), 0}};
 
 static inline void handle_pid_tune(void);
 static inline void handle_pid_update(void);
@@ -246,8 +214,6 @@ static void (*const handle_type[PACKET_TYPE_COUNT])(void) = {
 };
 
 static inline void pid_store_gains(void);
-static inline void pid_state_clear(void);
-static inline void pid_tune_stop(void);
 static inline void pid_calculate(const float sp, const float pv, const float Kp, const float Ki,
                                  const float Kd, float *_I, float *_D, float *_pv, float *out);
 static inline bool pid_tune_step(const uint8_t axis, const float err);

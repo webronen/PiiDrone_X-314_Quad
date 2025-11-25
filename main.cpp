@@ -122,11 +122,11 @@ void loop(void)
     }
   }
 
-  if (FCU_IS_ACTIVE(fcu.status) && (async_packet_timeout || FCU_IS_POFWARN(fcu.status)) && async_landing_timeout)
+  if (fcu.thrust > 0 && (async_packet_timeout || (bool)NRF_POWER->EVENTS_POFWARN) && async_landing_timeout)
   {
+    NRF_POWER->EVENTS_POFWARN = 0;
     async_landing_us = sync_current_us + HZ_TO_US(1);
-
-    FCU_LANDING_STEP(fcu.thrust, 10, 10, fcu.status);
+    fcu.thrust -= fcu.thrust >= 10 ? 10 : 0;
   }
 }
 
@@ -172,17 +172,9 @@ static inline void task_fcu_update(void)
     {
       if (++tune_state.tuning_axis == 1)
       {
-        tune_state.at_progress = false;
+        pid_store_gains();
+        memset(&tune_state, 0, sizeof(tune_state));
       }
-    }
-  }
-  else if (!tune_state.at_progress && tune_state.is_at_hover)
-  {
-    if (pid_thrust_ramp(-TUNE_RAMP_MAX, TUNE_RAMP_S))
-    {
-      pid_tune_stop();
-      pid_state_clear();
-      pid_store_gains();
     }
   }
 
@@ -198,8 +190,11 @@ static inline void task_fcu_update(void)
 
 static inline void task_esc_update(void)
 {
-  if (!FCU_IS_ACTIVE(fcu.status))
-    pid_state_clear();
+  if (fcu.thrust == 0)
+  {
+    memset(fcu.pid_setpoint, 0, sizeof(fcu.pid_setpoint));
+    memset(pid_state, 0, sizeof(pid_state));
+  }
 
   const float m1 = fcu.thrust + pid_state[0].out - pid_state[1].out - pid_state[2].out;
   const float m2 = fcu.thrust - pid_state[0].out - pid_state[1].out + pid_state[2].out;
@@ -257,34 +252,14 @@ static inline void task_tel_update(void)
   NRF_RADIO->TASKS_RXEN = 1;
 }
 
-static inline void task_pof_update(void)
+static inline void task_bat_update(void)
 {
   fcu.battery = nicla::getCurrentBatteryVoltage();
-
-  FCU_UPDATE_POFWARN(fcu.status, (bool)NRF_POWER->EVENTS_POFWARN);
-  NRF_POWER->EVENTS_POFWARN = 0;
-}
-
-static inline void pid_tune_stop(void)
-{
-  memset(&tune_state, 0, sizeof(tune_state));
-
-  FCU_CLEAR_AUTOTUNE(fcu.status);
 }
 
 static inline void pid_store_gains(void)
 {
   // TODO: Store PID gains to non-volatile memory
-}
-
-static inline void pid_state_clear(void)
-{
-  fcu.thrust = 0;
-
-  memset(fcu.pid_setpoint, 0, sizeof(fcu.pid_setpoint));
-  memset(pid_state, 0, sizeof(pid_state));
-
-  FCU_CLEAR_ACTIVE(fcu.status);
 }
 
 static inline void pid_calculate(const float sp, const float pv, const float Kp, const float Ki,
@@ -330,13 +305,11 @@ static inline void quaternion_normalize(DataQuaternion *q)
 
 static inline void handle_pid_tune(void)
 {
-  pid_tune_stop();
-  pid_state_clear();
-
-  tune_state.at_progress = true;
-
-  FCU_SET_ACTIVE(fcu.status);
-  FCU_SET_AUTOTUNE(fcu.status);
+  memset(fcu.pid_setpoint, 0, sizeof(fcu.pid_setpoint));
+  memset(fcu.pid_gain, 0, sizeof(fcu.pid_gain));
+  memset(pid_state, 0, sizeof(pid_state));
+  memset(&tune_state, 0, sizeof(tune_state));
+  fcu.thrust = 0;
 }
 
 static inline void handle_pid_update(void)
@@ -347,7 +320,7 @@ static inline void handle_pid_update(void)
   float pid_gain;
   memcpy(&pid_gain, (const void *)&received_packet.data[2], sizeof(pid_gain));
 
-  FCU_UPDATE_GAIN(fcu.pid_gain, axis, gain, pid_gain, PID_GAIN_MIN, PID_GAIN_MAX);
+  fcu.pid_gain[axis][gain] = (float)constrain(pid_gain, PID_GAIN_MIN, PID_GAIN_MAX);
 }
 
 static inline void handle_setpoint_update(void)
@@ -357,7 +330,7 @@ static inline void handle_setpoint_update(void)
   float pid_setpoint;
   memcpy(&pid_setpoint, (const void *)&received_packet.data[1], sizeof(pid_setpoint));
 
-  FCU_UPDATE_SETPOINT(fcu.pid_setpoint, axis, pid_setpoint, SETPOINT_MIN, SETPOINT_MAX);
+  fcu.pid_setpoint[axis] = (float)constrain(pid_setpoint, SETPOINT_MIN, SETPOINT_MAX);
 }
 
 static inline void handle_thrust_update(void)
@@ -366,13 +339,9 @@ static inline void handle_thrust_update(void)
   memcpy(&thrust, (const void *)&received_packet.data[0], sizeof(thrust));
 
   if (tune_state.at_progress)
-  {
-    pid_tune_stop();
-    pid_state_clear();
-  }
+    tune_state.at_progress = false;
 
-  FCU_UPDATE_THRUST(fcu.status, fcu.thrust, thrust, THRUST_MIN, THRUST_MAX);
-  FCU_UPDATE_ACTIVE(fcu.status, (fcu.thrust > THRUST_MIN));
+  fcu.thrust = (uint16_t)constrain(thrust, THRUST_MIN, THRUST_MAX);
 }
 
 static inline bool pid_thrust_ramp(const float to_thrust, const float in_time_s)
