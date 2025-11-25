@@ -351,6 +351,7 @@ static inline void handle_pid_tune(void)
   memset(pid_state, 0, sizeof(pid_state));
   memset(&tune_state, 0, sizeof(tune_state));
 
+  tune_state.at_progress = true;
   fcu.thrust = 0;
 }
 
