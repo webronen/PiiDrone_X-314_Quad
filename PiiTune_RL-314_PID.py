@@ -48,7 +48,7 @@ class PIDBalanceVisualizer:
         # System dynamics
         self.velocity = 0.0
         self.position = 0.0
-        self.dt = 0.016
+        self.dt = 1.0 / 211  # ≈ 0.00474
         
         # Tuning state - EXACTLY matching C structure
         self.state = {
@@ -110,26 +110,44 @@ class PIDBalanceVisualizer:
         return self.position
     
     def pid_control(self):
-        """PID controller"""
-        error = self.pid_setpoint - self.position
-        
-        # P term
-        p_term = self.pid_gains[0] * error
-        
-        # I term
-        self.pid_integral += error * self.dt
-        i_term = self.pid_gains[1] * self.pid_integral
-        
-        # D term
-        derivative = (error - self.prev_error) / self.dt
-        d_term = self.pid_gains[2] * derivative
-        
-        self.prev_error = error
-        
-        # Anti-windup
-        self.pid_integral = np.clip(self.pid_integral, -5, 5)
-        
-        return p_term + i_term + d_term
+        """Updated PID controller matching new C implementation"""
+        # Constants (set to match your C defines)
+        PID_LOOP_HZ = 1.0 / self.dt
+        D_ALPHA = 0.75  # Example value, set to match your C code
+        PID_I_MIN = -58.33
+        PID_I_MAX = 58.33
+        PID_OUT_MIN = -116.67
+        PID_OUT_MAX = 116.67
+
+        sp = self.pid_setpoint
+        pv = self.position
+        Kp, Ki, Kd = self.pid_gains
+
+        # Calculate terms
+        P = sp - pv
+        D = -(pv - getattr(self, 'prev_pv', 0.0)) * PID_LOOP_HZ
+
+        # Derivative filter
+        self.pid_derivative = getattr(self, 'pid_derivative', 0.0)
+        self.pid_derivative += (D - self.pid_derivative) * D_ALPHA
+
+        # Integral calculation and clamping
+        I = self.pid_integral + P * self.dt
+        I = np.clip(I, PID_I_MIN, PID_I_MAX)
+
+        # Output calculation
+        out = Kp * P + Ki * I + Kd * self.pid_derivative
+        update_integral = PID_OUT_MIN < out < PID_OUT_MAX
+        self.pid_integral = I if update_integral else self.pid_integral
+
+        # Final output calculation and clamping
+        out = Kp * P + Ki * self.pid_integral + Kd * self.pid_derivative
+        out = np.clip(out, PID_OUT_MIN, PID_OUT_MAX)
+
+        # Store previous process value for next derivative calculation
+        self.prev_pv = pv
+
+        return out
     
     def pid_tune_step(self):
         """EXACT Python implementation matching C code - Pure Relative Detection"""
