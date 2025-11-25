@@ -165,9 +165,7 @@ static inline void task_fcu_update(void)
   if (tune_state.at_progress && !tune_state.is_at_hover)
   {
     if (pid_thrust_ramp(TUNE_RAMP_MAX, TUNE_RAMP_S))
-    {
       tune_state.is_at_hover = true;
-    }
   }
   else if (tune_state.at_progress && tune_state.is_at_hover)
   {
@@ -383,7 +381,7 @@ static inline void handle_thrust_update(void)
   memcpy(&thrust, (const void *)&received_packet.data[0], sizeof(thrust));
 
   if (tune_state.at_progress)
-    tune_state.at_progress = false;
+    memset(&tune_state, 0, sizeof(tune_state));
 
   fcu.thrust = (uint16_t)constrain(thrust, THRUST_MIN, THRUST_MAX);
 }
@@ -475,8 +473,10 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
         state.settle_time = now;
         state.measuring = false;
       }
+
       state.prev_err = err;
     }
+
     return false;
   }
 
