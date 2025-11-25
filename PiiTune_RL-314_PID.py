@@ -388,7 +388,7 @@ class PIDBalanceVisualizer:
             
             self.update()
             self.draw()
-            clock.tick(60)
+            clock.tick(120)
         
         pygame.quit()
         sys.exit()
