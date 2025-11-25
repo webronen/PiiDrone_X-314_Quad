@@ -222,8 +222,8 @@ static void (*const handle_type[PACKET_TYPE_COUNT])(void) = {
 
 static inline void flash_storage_init(void);
 
-static inline bool pid_save_gains(void);
-static inline bool pid_load_gains(void);
+static inline void pid_save_gains(void);
+static inline void pid_load_gains(void);
 
 static inline void pid_calculate(const float sp, const float pv, const float Kp, const float Ki,
                                  const float Kd, float *_I, float *_D, float *_pv, float *out);

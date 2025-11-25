@@ -267,40 +267,34 @@ static inline void flash_storage_init(void)
   spif->init();
 }
 
-static inline bool pid_load_gains(void)
+static inline void pid_load_gains(void)
 {
-  if (fs.mount(spif) != 0)
-    return false;
+  if (fs.mount(spif))
+    return;
 
   mbed::File file;
-  const bool success = (file.open(&fs, "pid_gains.bin", O_RDONLY) == 0);
-
-  if (success)
+  if (!file.open(&fs, "pid_gains.bin", O_RDONLY))
   {
     file.read(fcu.pid_gain, sizeof(fcu.pid_gain));
     file.close();
   }
 
   fs.unmount();
-  return success;
 }
 
-static inline bool pid_save_gains(void)
+static inline void pid_save_gains(void)
 {
-  if (fs.mount(spif) != 0)
+  if (fs.mount(spif))
     fs.reformat(spif);
 
   mbed::File file;
-  const bool success = (file.open(&fs, "pid_gains.bin", O_WRONLY | O_CREAT | O_TRUNC) == 0);
-
-  if (success)
+  if (!file.open(&fs, "pid_gains.bin", O_WRONLY | O_CREAT | O_TRUNC))
   {
     file.write(fcu.pid_gain, sizeof(fcu.pid_gain));
     file.close();
   }
 
   fs.unmount();
-  return success;
 }
 
 static inline void pid_calculate(const float sp, const float pv, const float Kp, const float Ki,
