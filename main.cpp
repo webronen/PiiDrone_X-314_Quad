@@ -476,13 +476,12 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
   }
 
   // Relay cycle complete - calculate performance
-  const float overshoot = state.max_os;
   const float settle_time = state.measuring ? TUNE_RELAY_FULL_PERIOD_US
                                             : (float)(state.settle_time - state.step_time);
 
   // Hypervolume metric: (1 - norm_settle) × (1 - norm_overshoot)
   const float hv = (1.0f - __builtin_fminf(settle_time / TUNE_RELAY_FULL_PERIOD_US, 1.0f)) *
-                   (1.0f - __builtin_fminf(overshoot / TUNE_RELAY_FULL_PERIOD_RADIANS, 1.0f));
+                   (1.0f - __builtin_fminf(state.max_os / TUNE_RELAY_FULL_PERIOD_RADIANS, 1.0f));
 
   // Detect non-responsive systems
   if (hv < TUNE_HYPERVOLUME_CONVERGENCE)
@@ -496,7 +495,7 @@ static inline bool pid_tune_step(const uint8_t axis, const float err)
   state.step_time = now;
   state.max_os = 0.0f;
   state.measuring = true;
-  fcu.pid_setpoint[axis] = -fcu.pid_setpoint[axis];
+  fcu.pid_setpoint[axis] *= -1.0f;
   state.relay_time = now;
   state.prev_err = err;
   state.zero_crossings = 0;
